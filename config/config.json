@@ -1,0 +1,13 @@
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "pocbase",
+    "username": "postgres",
+    "password": "postgres"
+  },
+  "application": {
+    "name": "POC Terminal Tracker",
+    "version": "1.0.0"
+  }
+}
