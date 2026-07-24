@@ -11,6 +11,7 @@
 #include "terminalsform.h"
 #include <QTimer>
 #include "receiptform.h"
+#include "rentalform.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -23,6 +24,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionClients, &QAction::triggered, this, &MainWindow::onActionClients_triggered);
     connect(ui->actionSIMCards, &QAction::triggered, this, &MainWindow::onActionSIMCards_triggered);
     connect(ui->actionReceipt, &QAction::triggered, this, &MainWindow::onActionReceipt_triggered);
+    connect(ui->actionRental, &QAction::triggered, this, &MainWindow::onActionRental_triggered);
 }
 
 MainWindow::~MainWindow()
@@ -120,5 +122,11 @@ void MainWindow::centerWindow(QWidget *widget)
 void MainWindow::onActionReceipt_triggered()
 {
     ReceiptForm *form = new ReceiptForm(this);
+    form->show();
+}
+
+void MainWindow::onActionRental_triggered()
+{
+    RentalForm *form = new RentalForm(this);
     form->show();
 }

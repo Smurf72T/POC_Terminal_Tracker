@@ -68,6 +68,7 @@
             <addaction name="menuDocuments"/>
             <addaction name="menuFile"/>
             <addaction name="menuHelp"/>
+            <addaction name="actionRental"/>
         </widget>
         <widget class="QStatusBar" name="statusbar"/>
         <action name="actionAbout">
@@ -108,6 +109,11 @@
         <action name="actionReceipt">
             <property name="text">
                 <string>Поступление терминалов</string>
+            </property>
+        </action>
+        <action name="actionRental">
+            <property name="text">
+                <string>Передача в аренду</string>
             </property>
         </action>
     </widget>

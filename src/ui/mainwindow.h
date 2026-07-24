@@ -26,6 +26,7 @@ private slots:
     void onActionSIMCards_triggered();
     void onActionTerminals_triggered();
     void onActionReceipt_triggered();
+    void onActionRental_triggered();
 
 private:
     Ui::MainWindow *ui;
