@@ -63,12 +63,12 @@
                     <string>Документы</string>
                 </property>
                 <addaction name="actionReceipt"/>
+                <addaction name="actionRental"/>
             </widget>
             <addaction name="menuDictionaries"/>
             <addaction name="menuDocuments"/>
             <addaction name="menuFile"/>
             <addaction name="menuHelp"/>
-            <addaction name="actionRental"/>
         </widget>
         <widget class="QStatusBar" name="statusbar"/>
         <action name="actionAbout">
