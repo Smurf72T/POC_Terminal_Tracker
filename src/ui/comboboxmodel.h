@@ -4,7 +4,6 @@
 #include <QAbstractItemModel>
 #include <QList>
 #include <QPair>
-#include <QHash>
 
 class ComboBoxModel : public QAbstractItemModel
 {
@@ -18,25 +17,10 @@ public:
     int columnCount(const QModelIndex &parent = QModelIndex()) const override { return 1; }
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
-        if (role == Qt::DisplayRole && index.row() < m_items.size()) {
-            return m_items[index.row()].second;
-        }
+        if (index.row() >= m_items.size()) return QVariant();
+        if (role == Qt::DisplayRole) return m_items[index.row()].second;
+        if (role == Qt::UserRole) return m_items[index.row()].first;
         return QVariant();
-    }
-
-    QHash<int, QVariant> itemData(const QModelIndex &index, const QList<int> &roles = QList<int>()) const override {
-        QHash<int, QVariant> hash;
-        if (index.row() < m_items.size()) {
-            for (int role : roles) {
-                if (role == Qt::DisplayRole) hash[role] = m_items[index.row()].second;
-                if (role == Qt::UserRole) hash[role] = m_items[index.row()].first;
-            }
-            if (roles.isEmpty()) {
-                hash[Qt::DisplayRole] = m_items[index.row()].second;
-                hash[Qt::UserRole] = m_items[index.row()].first;
-            }
-        }
-        return hash;
     }
 
     QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override {
