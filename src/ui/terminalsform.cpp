@@ -11,7 +11,7 @@
 #include <QDebug>
 
 TerminalsForm::TerminalsForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::TerminalsForm)
 {
     ui->setupUi(this);

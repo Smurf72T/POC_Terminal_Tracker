@@ -30,6 +30,7 @@ set(SOURCES
         src/ui/simcardsform.cpp
         src/ui/terminalsform.cpp
         resources.qrc
+        src/ui/receiptform.cpp
 )
 
 set(HEADERS
@@ -41,6 +42,8 @@ set(HEADERS
         src/ui/simcardsform.h
         src/ui/terminalsform.h
         src/ui/readonlydelegate.h
+        src/ui/receiptform.h
+        src/ui/comboboxdelegate.h
 )
 
 set(UI_FILES
@@ -50,6 +53,7 @@ set(UI_FILES
         src/ui/clientsform.ui
         src/ui/simcardsform.ui
         src/ui/terminalsform.ui
+        src/ui/receiptform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})

@@ -9,6 +9,8 @@
 #include "clientsform.h"
 #include "simcardsform.h"
 #include "terminalsform.h"
+#include <QTimer>
+#include "receiptform.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -20,6 +22,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionManufacturers, &QAction::triggered, this, &MainWindow::onActionManufacturers_triggered);
     connect(ui->actionClients, &QAction::triggered, this, &MainWindow::onActionClients_triggered);
     connect(ui->actionSIMCards, &QAction::triggered, this, &MainWindow::onActionSIMCards_triggered);
+    connect(ui->actionReceipt, &QAction::triggered, this, &MainWindow::onActionReceipt_triggered);
 }
 
 MainWindow::~MainWindow()
@@ -64,29 +67,58 @@ void MainWindow::onActionExit_triggered()
 void MainWindow::onActionManufacturers_triggered()
 {
     ManufacturersForm *form = new ManufacturersForm(this);
+    form->setWindowModality(Qt::WindowModal);
     form->show();
+    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionModels_triggered()
 {
     ModelsForm *form = new ModelsForm(this);
+    form->setWindowModality(Qt::WindowModal);
     form->show();
+    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionClients_triggered()
 {
     ClientsForm *form = new ClientsForm(this);
+    form->setWindowModality(Qt::WindowModal);
     form->show();
+    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionSIMCards_triggered()
 {
     SIMCardsForm *form = new SIMCardsForm(this);
+    form->setWindowModality(Qt::WindowModal);
     form->show();
+    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionTerminals_triggered()
 {
     TerminalsForm *form = new TerminalsForm(this);
+    form->setWindowModality(Qt::WindowModal);
+    form->show();
+    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
+}
+
+void MainWindow::centerWindow(QWidget *widget)
+{
+    if (!widget || !this) return;
+
+    QRect mainGeometry = this->geometry();
+    QRect widgetGeometry = widget->geometry();
+
+    int x = mainGeometry.x() + (mainGeometry.width() - widgetGeometry.width()) / 2;
+    int y = mainGeometry.y() + (mainGeometry.height() - widgetGeometry.height()) / 2;
+
+    widget->move(x, y);
+}
+
+void MainWindow::onActionReceipt_triggered()
+{
+    ReceiptForm *form = new ReceiptForm(this);
     form->show();
 }

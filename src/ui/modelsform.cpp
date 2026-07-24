@@ -12,7 +12,7 @@
 #include "terminalsform.h"
 
 ModelsForm::ModelsForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::ModelsForm)
 {
     ui->setupUi(this);

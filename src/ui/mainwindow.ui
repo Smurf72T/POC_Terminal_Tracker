@@ -58,7 +58,14 @@
                 </property>
                 <addaction name="actionAbout"/>
             </widget>
+            <widget class="QMenu" name="menuDocuments">
+                <property name="title">
+                    <string>Документы</string>
+                </property>
+                <addaction name="actionReceipt"/>
+            </widget>
             <addaction name="menuDictionaries"/>
+            <addaction name="menuDocuments"/>
             <addaction name="menuFile"/>
             <addaction name="menuHelp"/>
         </widget>
@@ -96,6 +103,11 @@
         <action name="actionTerminals">
             <property name="text">
                 <string>Терминалы</string>
+            </property>
+        </action>
+        <action name="actionReceipt">
+            <property name="text">
+                <string>Поступление терминалов</string>
             </property>
         </action>
     </widget>

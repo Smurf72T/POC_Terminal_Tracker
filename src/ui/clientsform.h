@@ -1,14 +1,14 @@
 #ifndef CLIENTSFORM_H
 #define CLIENTSFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QSqlTableModel>
 
 namespace Ui {
     class ClientsForm;
 }
 
-class ClientsForm : public QWidget
+class ClientsForm : public QDialog
 {
     Q_OBJECT
 

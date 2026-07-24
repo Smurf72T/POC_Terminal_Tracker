@@ -25,11 +25,13 @@ private slots:
     void onActionClients_triggered();
     void onActionSIMCards_triggered();
     void onActionTerminals_triggered();
+    void onActionReceipt_triggered();
 
 private:
     Ui::MainWindow *ui;
     void setupUI();
     void updateStatusBar();
+    void centerWindow(QWidget *widget);
 };
 
 #endif // MAINWINDOW_H

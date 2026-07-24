@@ -10,7 +10,7 @@
 #include <QDebug>
 
 ClientsForm::ClientsForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::ClientsForm)
 {
     ui->setupUi(this);

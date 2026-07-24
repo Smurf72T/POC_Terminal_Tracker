@@ -1,7 +1,7 @@
 #ifndef MODELSFORM_H
 #define MODELSFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QSqlRelationalTableModel>
 #include <QCloseEvent>
 
@@ -9,7 +9,7 @@ namespace Ui {
     class ModelsForm;
 }
 
-class ModelsForm : public QWidget
+class ModelsForm : public QDialog
 {
     Q_OBJECT
 

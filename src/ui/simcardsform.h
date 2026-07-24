@@ -1,7 +1,7 @@
 #ifndef SIMCARDSFORM_H
 #define SIMCARDSFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QCloseEvent>
 #include <QSqlTableModel>
 #include "readonlydelegate.h"
@@ -10,7 +10,7 @@ namespace Ui {
     class SIMCardsForm;
 }
 
-class SIMCardsForm : public QWidget
+class SIMCardsForm : public QDialog
 {
     Q_OBJECT
 

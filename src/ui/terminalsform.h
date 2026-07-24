@@ -1,14 +1,14 @@
 #ifndef TERMINALSFORM_H
 #define TERMINALSFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QSqlRelationalTableModel>
 
 namespace Ui {
     class TerminalsForm;
 }
 
-class TerminalsForm : public QWidget
+class TerminalsForm : public QDialog
 {
     Q_OBJECT
 

@@ -1,7 +1,7 @@
 #ifndef MANUFACTURERSFORM_H
 #define MANUFACTURERSFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QSqlTableModel>
 #include <QCloseEvent>
 
@@ -9,7 +9,7 @@ namespace Ui {
     class ManufacturersForm;
 }
 
-class ManufacturersForm : public QWidget
+class ManufacturersForm : public QDialog
 {
     Q_OBJECT
 

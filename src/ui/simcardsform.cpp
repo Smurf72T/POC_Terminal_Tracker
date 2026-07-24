@@ -12,7 +12,7 @@
 #include <QCloseEvent>
 
 SIMCardsForm::SIMCardsForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::SIMCardsForm)
 {
     ui->setupUi(this);

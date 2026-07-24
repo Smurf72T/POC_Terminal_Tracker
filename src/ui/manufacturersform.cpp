@@ -11,7 +11,7 @@
 #include <QDateTime>      // <-- Добавлено для QDateTime::currentMSecsSinceEpoch()
 
 ManufacturersForm::ManufacturersForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::ManufacturersForm)
 {
     ui->setupUi(this);
