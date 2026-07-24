@@ -1,122 +1,122 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
-    <class>MainWindow</class>
-    <widget class="QMainWindow" name="MainWindow">
-        <property name="geometry">
-            <rect>
-                <x>0</x>
-                <y>0</y>
-                <width>1024</width>
-                <height>768</height>
-            </rect>
-        </property>
-        <property name="windowTitle">
-            <string>MainWindow</string>
-        </property>
-        <widget class="QWidget" name="centralwidget">
-            <layout class="QVBoxLayout" name="verticalLayout">
-                <item>
-                    <widget class="QLabel" name="labelWelcome">
-                        <property name="text">
-                            <string>Добро пожаловать в систему учёта POC-терминалов</string>
-                        </property>
-                        <property name="alignment">
-                            <set>Qt::AlignCenter</set>
-                        </property>
-                    </widget>
-                </item>
-            </layout>
-        </widget>
-        <widget class="QMenuBar" name="menubar">
-            <property name="geometry">
-                <rect>
-                    <x>0</x>
-                    <y>0</y>
-                    <width>1024</width>
-                    <height>22</height>
-                </rect>
-            </property>
-            <widget class="QMenu" name="menuDictionaries">
-                <property name="title">
-                    <string>Справочники</string>
-                </property>
-                <addaction name="actionManufacturers"/>
-                <addaction name="actionModels"/>
-                <addaction name="actionClients"/>
-                <addaction name="actionSIMCards"/>
-                <addaction name="actionTerminals"/>
-            </widget>
-            <widget class="QMenu" name="menuFile">
-                <property name="title">
-                    <string>Файл</string>
-                </property>
-                <addaction name="actionExit"/>
-            </widget>
-            <widget class="QMenu" name="menuHelp">
-                <property name="title">
-                    <string>Справка</string>
-                </property>
-                <addaction name="actionAbout"/>
-            </widget>
-            <widget class="QMenu" name="menuDocuments">
-                <property name="title">
-                    <string>Документы</string>
-                </property>
-                <addaction name="actionReceipt"/>
-                <addaction name="actionRental"/>
-            </widget>
-            <addaction name="menuDictionaries"/>
-            <addaction name="menuDocuments"/>
-            <addaction name="menuFile"/>
-            <addaction name="menuHelp"/>
-        </widget>
-        <widget class="QStatusBar" name="statusbar"/>
-        <action name="actionAbout">
-            <property name="text">
-                <string>О программе</string>
-            </property>
-        </action>
-        <action name="actionExit">
-            <property name="text">
-                <string>Выход</string>
-            </property>
-        </action>
-        <action name="actionManufacturers">
-            <property name="text">
-                <string>Производители</string>
-            </property>
-        </action>
-        <action name="actionModels">
-            <property name="text">
-                <string>Модели</string>
-            </property>
-        </action>
-        <action name="actionClients">
-            <property name="text">
-                <string>Клиенты</string>
-            </property>
-        </action>
-        <action name="actionSIMCards">
-            <property name="text">
-                <string>SIM-карты</string>
-            </property>
-        </action>
-        <action name="actionTerminals">
-            <property name="text">
-                <string>Терминалы</string>
-            </property>
-        </action>
-        <action name="actionReceipt">
-            <property name="text">
-                <string>Поступление терминалов</string>
-            </property>
-        </action>
-        <action name="actionRental">
-            <property name="text">
-                <string>Передача в аренду</string>
-            </property>
-        </action>
-    </widget>
-    <resources/>
-    <connections/>
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1024</width>
+    <height>768</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="labelWelcome">
+      <property name="text">
+       <string>Добро пожаловать в систему учёта POC-терминалов</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1024</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuDictionaries">
+    <property name="title">
+     <string>Справочники</string>
+    </property>
+    <addaction name="actionManufacturers"/>
+    <addaction name="actionModels"/>
+    <addaction name="actionClients"/>
+    <addaction name="actionSIMCards"/>
+    <addaction name="actionTerminals"/>
+   </widget>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>Файл</string>
+    </property>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Справка</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
+   <widget class="QMenu" name="menuDocuments">
+    <property name="title">
+     <string>Документы</string>
+    </property>
+    <addaction name="actionReceipt"/>
+    <addaction name="actionRental"/>
+   </widget>
+   <addaction name="menuFile"/>
+   <addaction name="menuDictionaries"/>
+   <addaction name="menuDocuments"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionAbout">
+   <property name="text">
+    <string>О программе</string>
+   </property>
+  </action>
+  <action name="actionExit">
+   <property name="text">
+    <string>Выход</string>
+   </property>
+  </action>
+  <action name="actionManufacturers">
+   <property name="text">
+    <string>Производители</string>
+   </property>
+  </action>
+  <action name="actionModels">
+   <property name="text">
+    <string>Модели</string>
+   </property>
+  </action>
+  <action name="actionClients">
+   <property name="text">
+    <string>Клиенты</string>
+   </property>
+  </action>
+  <action name="actionSIMCards">
+   <property name="text">
+    <string>SIM-карты</string>
+   </property>
+  </action>
+  <action name="actionTerminals">
+   <property name="text">
+    <string>Терминалы</string>
+   </property>
+  </action>
+  <action name="actionReceipt">
+   <property name="text">
+    <string>Поступление терминалов</string>
+   </property>
+  </action>
+  <action name="actionRental">
+   <property name="text">
+    <string>Передача в аренду</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
 </ui>
