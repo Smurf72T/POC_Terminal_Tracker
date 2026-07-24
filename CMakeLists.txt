@@ -29,6 +29,7 @@ set(SOURCES
         src/ui/clientsform.cpp
         src/ui/simcardsform.cpp
         src/ui/terminalsform.cpp
+        resources.qrc
 )
 
 set(HEADERS
