@@ -69,7 +69,7 @@ void MainWindow::onActionManufacturers_triggered()
     ManufacturersForm *form = new ManufacturersForm(this);
     form->setWindowModality(Qt::WindowModal);
     form->show();
-    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
+    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionModels_triggered()
@@ -77,7 +77,7 @@ void MainWindow::onActionModels_triggered()
     ModelsForm *form = new ModelsForm(this);
     form->setWindowModality(Qt::WindowModal);
     form->show();
-    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
+    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionClients_triggered()
@@ -85,7 +85,7 @@ void MainWindow::onActionClients_triggered()
     ClientsForm *form = new ClientsForm(this);
     form->setWindowModality(Qt::WindowModal);
     form->show();
-    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
+    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionSIMCards_triggered()
@@ -93,7 +93,7 @@ void MainWindow::onActionSIMCards_triggered()
     SIMCardsForm *form = new SIMCardsForm(this);
     form->setWindowModality(Qt::WindowModal);
     form->show();
-    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
+    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionTerminals_triggered()
@@ -101,7 +101,7 @@ void MainWindow::onActionTerminals_triggered()
     TerminalsForm *form = new TerminalsForm(this);
     form->setWindowModality(Qt::WindowModal);
     form->show();
-    QTimer::singleShot(50, this, [form]() { centerWindow(form); });
+    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::centerWindow(QWidget *widget)
