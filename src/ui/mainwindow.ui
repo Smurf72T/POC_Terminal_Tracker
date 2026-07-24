@@ -36,6 +36,16 @@
                     <height>22</height>
                 </rect>
             </property>
+            <widget class="QMenu" name="menuDictionaries">
+                <property name="title">
+                    <string>Справочники</string>
+                </property>
+                <addaction name="actionManufacturers"/>
+                <addaction name="actionModels"/>
+                <addaction name="actionClients"/>
+                <addaction name="actionSIMCards"/>
+                <addaction name="actionTerminals"/>
+            </widget>
             <widget class="QMenu" name="menuFile">
                 <property name="title">
                     <string>Файл</string>
@@ -48,6 +58,7 @@
                 </property>
                 <addaction name="actionAbout"/>
             </widget>
+            <addaction name="menuDictionaries"/>
             <addaction name="menuFile"/>
             <addaction name="menuHelp"/>
         </widget>
@@ -60,6 +71,31 @@
         <action name="actionExit">
             <property name="text">
                 <string>Выход</string>
+            </property>
+        </action>
+        <action name="actionManufacturers">
+            <property name="text">
+                <string>Производители</string>
+            </property>
+        </action>
+        <action name="actionModels">
+            <property name="text">
+                <string>Модели</string>
+            </property>
+        </action>
+        <action name="actionClients">
+            <property name="text">
+                <string>Клиенты</string>
+            </property>
+        </action>
+        <action name="actionSIMCards">
+            <property name="text">
+                <string>SIM-карты</string>
+            </property>
+        </action>
+        <action name="actionTerminals">
+            <property name="text">
+                <string>Терминалы</string>
             </property>
         </action>
     </widget>

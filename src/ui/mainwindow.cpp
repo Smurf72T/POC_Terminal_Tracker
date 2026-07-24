@@ -1,8 +1,14 @@
 #include "mainwindow.h"
+#include "manufacturersform.h"
+#include "modelsform.h"
 #include "ui_mainwindow.h"
 #include "../database/databasemanager.h"
 #include <QMessageBox>
 #include <QDateTime>
+#include "modelsform.h"
+#include "clientsform.h"
+#include "simcardsform.h"
+#include "terminalsform.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -11,6 +17,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     setupUI();
     updateStatusBar();
+    connect(ui->actionManufacturers, &QAction::triggered, this, &MainWindow::onActionManufacturers_triggered);
+    connect(ui->actionClients, &QAction::triggered, this, &MainWindow::onActionClients_triggered);
+    connect(ui->actionSIMCards, &QAction::triggered, this, &MainWindow::onActionSIMCards_triggered);
 }
 
 MainWindow::~MainWindow()
@@ -26,6 +35,8 @@ void MainWindow::setupUI()
     // Подключаем сигналы меню
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onActionAbout_triggered);
     connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onActionExit_triggered);
+    connect(ui->actionModels, &QAction::triggered, this, &MainWindow::onActionModels_triggered);
+    connect(ui->actionTerminals, &QAction::triggered, this, &MainWindow::onActionTerminals_triggered);
 }
 
 void MainWindow::updateStatusBar()
@@ -48,4 +59,34 @@ void MainWindow::onActionExit_triggered()
 {
     DatabaseManager::instance().close();
     QCoreApplication::quit();
+}
+
+void MainWindow::onActionManufacturers_triggered()
+{
+    ManufacturersForm *form = new ManufacturersForm(this);
+    form->show();
+}
+
+void MainWindow::onActionModels_triggered()
+{
+    ModelsForm *form = new ModelsForm(this);
+    form->show();
+}
+
+void MainWindow::onActionClients_triggered()
+{
+    ClientsForm *form = new ClientsForm(this);
+    form->show();
+}
+
+void MainWindow::onActionSIMCards_triggered()
+{
+    SIMCardsForm *form = new SIMCardsForm(this);
+    form->show();
+}
+
+void MainWindow::onActionTerminals_triggered()
+{
+    TerminalsForm *form = new TerminalsForm(this);
+    form->show();
 }

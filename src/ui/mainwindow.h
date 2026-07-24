@@ -20,6 +20,11 @@ public:
 private slots:
     void onActionAbout_triggered();
     void onActionExit_triggered();
+    void onActionManufacturers_triggered();
+    void onActionModels_triggered();
+    void onActionClients_triggered();
+    void onActionSIMCards_triggered();
+    void onActionTerminals_triggered();
 
 private:
     Ui::MainWindow *ui;

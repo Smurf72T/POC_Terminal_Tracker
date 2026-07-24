@@ -22,7 +22,7 @@ public:
     bool isConnected() const;
     void close();
 
-    QSqlDatabase getDatabase() const;
+    QSqlDatabase& getDatabase();
     QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true);
     bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc);
 

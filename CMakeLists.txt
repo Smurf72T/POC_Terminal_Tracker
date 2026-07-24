@@ -24,15 +24,31 @@ set(SOURCES
         src/main.cpp
         src/database/databasemanager.cpp
         src/ui/mainwindow.cpp
+        src/ui/manufacturersform.cpp
+        src/ui/modelsform.cpp
+        src/ui/clientsform.cpp
+        src/ui/simcardsform.cpp
+        src/ui/terminalsform.cpp
 )
 
 set(HEADERS
         src/database/databasemanager.h
         src/ui/mainwindow.h
+        src/ui/manufacturersform.h
+        src/ui/modelsform.h
+        src/ui/clientsform.h
+        src/ui/simcardsform.h
+        src/ui/terminalsform.h
+        src/ui/readonlydelegate.h
 )
 
 set(UI_FILES
         src/ui/mainwindow.ui
+        src/ui/manufacturersform.ui
+        src/ui/modelsform.ui
+        src/ui/clientsform.ui
+        src/ui/simcardsform.ui
+        src/ui/terminalsform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})
