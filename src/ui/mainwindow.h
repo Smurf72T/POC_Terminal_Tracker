@@ -46,6 +46,7 @@ private:
     void loadTopClients();
     void loadRecentDocuments();
     void updateCounterWidget(QWidget* widget, const QString& value, const QString& label, const QString& color);
+    void openForm(QWidget *form);
 };
 
 #endif // MAINWINDOW_H

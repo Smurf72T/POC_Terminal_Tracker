@@ -1,14 +1,14 @@
 #ifndef RECEIPTFORM_H
 #define RECEIPTFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QStandardItemModel>
 
 namespace Ui {
     class ReceiptForm;
 }
 
-class ReceiptForm : public QWidget
+class ReceiptForm : public QDialog
 {
     Q_OBJECT
 

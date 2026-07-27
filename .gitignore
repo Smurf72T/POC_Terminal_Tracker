@@ -107,3 +107,5 @@ dkms.conf
 *.iml
 out
 gen
+/План_улучшений_POC_Terminal_Tracker.txt
+!/nul

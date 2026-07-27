@@ -37,7 +37,7 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-     <item><widget class="QPushButton" name="btnSave"><property name="text"><string>Сохранить</string></property><property name="styleSheet"><string>QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 5px; }</string></property></widget></item>
+     <item><widget class="QPushButton" name="btnSave"><property name="text"><string>Сохранить</string></property></widget></item>
      <item><widget class="QPushButton" name="btnClose"><property name="text"><string>Закрыть</string></property></widget></item>
     </layout>
    </item>

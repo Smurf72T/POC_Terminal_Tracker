@@ -1,13 +1,13 @@
 #ifndef PAYMENTFORM_H
 #define PAYMENTFORM_H
 
-#include <QWidget>
+#include <QDialog>
 
 namespace Ui {
     class PaymentForm;
 }
 
-class PaymentForm : public QWidget
+class PaymentForm : public QDialog
 {
     Q_OBJECT
 

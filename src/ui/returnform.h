@@ -1,14 +1,14 @@
 #ifndef RETURNFORM_H
 #define RETURNFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QStandardItemModel>
 
 namespace Ui {
     class ReturnForm;
 }
 
-class ReturnForm : public QWidget
+class ReturnForm : public QDialog
 {
     Q_OBJECT
 

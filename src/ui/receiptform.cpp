@@ -9,7 +9,7 @@
 #include <QDebug>
 
 ReceiptForm::ReceiptForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::ReceiptForm)
 {
     ui->setupUi(this);

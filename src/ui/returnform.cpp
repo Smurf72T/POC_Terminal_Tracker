@@ -8,7 +8,7 @@
 #include <QDebug>
 
 ReturnForm::ReturnForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::ReturnForm)
 {
     ui->setupUi(this);
@@ -79,13 +79,20 @@ void ReturnForm::loadRentalDetails(int rentalDocId)
     rowsModel->removeRows(0, rowsModel->rowCount());
     if (rentalDocId == 0) return;
 
-    // Загружаем строки из документа аренды, но только те терминалы, которые ещё в аренде (status = 1)
+    // Загружаем строки из документа аренды
+    // Показываем все терминалы из документа, даже если они уже возвращены (для истории)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT rd.terminalid, t.serialnumber, s.simnumber "
-                  "FROM tblrentaldetails rd "
-                  "JOIN tblterminals t ON rd.terminalid = t.terminalid "
-                  "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
-                  "WHERE rd.rentaldocid = :docid AND t.status = 1");
+    query.prepare(
+        "SELECT rd.terminalid, t.serialnumber, "
+        "COALESCE(s.simnumber, 'Нет SIM') AS simnumber, "
+        "t.status AS terminal_status, "
+        "s.status AS sim_status "
+        "FROM tblrentaldetails rd "
+        "JOIN tblterminals t ON rd.terminalid = t.terminalid "
+        "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
+        "WHERE rd.rentaldocid = :docid "
+        "ORDER BY t.serialnumber"
+    );
     query.bindValue(":docid", rentalDocId);
 
     if (!query.exec()) {
@@ -207,9 +214,20 @@ void ReturnForm::on_btnPost_clicked()
             return;
         }
 
+        // Получаем simcardid из деталей аренды для этого терминала
+        QSqlQuery simQuery(db);
+        simQuery.prepare("SELECT simcardid FROM tblrentaldetails WHERE rentaldocid = :docid AND terminalid = :tid");
+        simQuery.bindValue(":docid", rentalDocId);
+        simQuery.bindValue(":tid", termId);
+
+        int simcardId = -1;
+        if (simQuery.exec() && simQuery.next()) {
+            simcardId = simQuery.value(0).toInt();
+        }
+
         // Меняем статус терминала на "Свободен" (0)
         QSqlQuery updateQuery(db);
-        updateQuery.prepare("UPDATE tblterminals SET status = 0 WHERE terminalid = :id");
+        updateQuery.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = NULL WHERE terminalid = :id");
         updateQuery.bindValue(":id", termId);
 
         if (!updateQuery.exec()) {
@@ -217,6 +235,32 @@ void ReturnForm::on_btnPost_clicked()
             QMessageBox::critical(this, "Ошибка БД",
                 QString("Не удалось обновить статус терминала %1: %2").arg(QString::number(termId)).arg(updateQuery.lastError().text()));
             return;
+        }
+
+        // ВАЖНО: Сбрасываем статус сим-карты на "Свободна" (0) ГАРАНТИРОВАННО:
+        // Получаем simcardid не из деталей аренды (может быть устаревшим),
+        // а из tblterminals.currentsimcardid (там актуальное значение)
+        QSqlQuery currentSimQuery(db);
+        currentSimQuery.prepare("SELECT currentsimcardid FROM tblterminals WHERE terminalid = :tid");
+        currentSimQuery.bindValue(":tid", termId);
+
+        int actualSimId = -1;
+        if (currentSimQuery.exec() && currentSimQuery.next()) {
+            actualSimId = currentSimQuery.value(0).toInt();
+        }
+
+        // Если есть привязанная SIM-карта, сбрасываем её статус
+        if (actualSimId > 0) {
+            QSqlQuery simUpdateQuery(db);
+            simUpdateQuery.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
+            simUpdateQuery.bindValue(":id", actualSimId);
+
+            if (!simUpdateQuery.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД",
+                    QString("Не удалось обновить статус SIM-карты %1: %2").arg(QString::number(actualSimId)).arg(simUpdateQuery.lastError().text()));
+                return;
+            }
         }
 
         // Записываем в детали возврата

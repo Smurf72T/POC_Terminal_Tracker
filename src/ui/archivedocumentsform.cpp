@@ -9,7 +9,7 @@
 #include <QDebug>
 
 ArchiveDocumentsForm::ArchiveDocumentsForm(int docType, QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::ArchiveDocumentsForm),
     model(new QSqlQueryModel(this)),
     m_docType(docType)
@@ -83,9 +83,8 @@ void ArchiveDocumentsForm::applyFilter()
                            "docdate AS \"Дата\", "
                            "comments AS \"Комментарий\" "
                            "FROM tblreceiptdocs "
-                           "WHERE docdate BETWEEN '%1' AND '%2' "
-                           "ORDER BY docdate DESC")
-                       .arg(dateFrom, dateTo);
+                           "WHERE docdate BETWEEN :dateFrom AND :dateTo "
+                           "ORDER BY docdate DESC");
     } else if (m_docType == 2) { // Аренда — с возвратом и оплатой
         queryStr = QString(
             "SELECT r.docnumber AS \"Номер\", "
@@ -99,11 +98,10 @@ void ArchiveDocumentsForm::applyFilter()
             "LEFT JOIN tblrentaldetails rd_rental ON r.rentaldocid = rd_rental.rentaldocid "
             "LEFT JOIN tblreturndetails rd_returned ON rd_rental.terminalid = rd_returned.terminalid "
             "LEFT JOIN tblpayment_rental_links pl ON r.rentaldocid = pl.rentaldocid "
-            "WHERE r.docdate BETWEEN '%1' AND '%2' "
-            "AND (%3 = 0 OR r.clientid = %3) "
+            "WHERE r.docdate BETWEEN :dateFrom AND :dateTo "
+            "AND (:clientId = 0 OR r.clientid = :clientId) "
             "GROUP BY r.rentaldocid, r.docnumber, r.docdate, c.clientname, r.comments "
-            "ORDER BY r.docdate DESC"
-        ).arg(dateFrom, dateTo).arg(clientId);
+            "ORDER BY r.docdate DESC");
     } else if (m_docType == 3) { // Возврат
         queryStr = QString("SELECT r.docnumber AS \"Номер\", "
                            "r.docdate AS \"Дата\", "
@@ -111,10 +109,9 @@ void ArchiveDocumentsForm::applyFilter()
                            "r.comments AS \"Комментарий\" "
                            "FROM tblreturndocs r "
                            "LEFT JOIN tblclients c ON r.clientid = c.clientid "
-                           "WHERE r.docdate BETWEEN '%1' AND '%2' "
-                           "AND (%3 = 0 OR r.clientid = %3) "
-                           "ORDER BY r.docdate DESC")
-                       .arg(dateFrom, dateTo).arg(clientId);
+                           "WHERE r.docdate BETWEEN :dateFrom AND :dateTo "
+                           "AND (:clientId = 0 OR r.clientid = :clientId) "
+                           "ORDER BY r.docdate DESC");
     } else if (m_docType == 4) { // Оплата
         queryStr = QString(
             "SELECT p.paymentid AS \"ID\", "
@@ -131,17 +128,23 @@ void ArchiveDocumentsForm::applyFilter()
             "(5, 'Май'), (6, 'Июнь'), (7, 'Июль'), (8, 'Август'), "
             "(9, 'Сентябрь'), (10, 'Октябрь'), (11, 'Ноябрь'), (12, 'Декабрь') "
             ") AS pm(monthnum, monthname) ON p.periodmonth = pm.monthnum "
-            "WHERE p.paymentdate BETWEEN '%1' AND '%2' "
-            "AND (%3 = 0 OR p.clientid = %3) "
-            "ORDER BY p.paymentdate DESC"
-        ).arg(dateFrom, dateTo).arg(clientId);
+            "WHERE p.paymentdate BETWEEN :dateFrom AND :dateTo "
+            "AND (:clientId = 0 OR p.clientid = :clientId) "
+            "ORDER BY p.paymentdate DESC");
     }
 
-    model->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare(queryStr);
+    query.bindValue(":dateFrom", dateFrom);
+    query.bindValue(":dateTo", dateTo);
+    query.bindValue(":clientId", clientId);
 
-    if (model->lastError().isValid()) {
-        QMessageBox::critical(this, "Ошибка БД", model->lastError().text());
+    if (!query.exec()) {
+        QMessageBox::critical(this, "Ошибка БД", query.lastError().text());
+        return;
     }
+
+    model->setQuery(std::move(query));
 }
 
 void ArchiveDocumentsForm::on_btnFilter_clicked()

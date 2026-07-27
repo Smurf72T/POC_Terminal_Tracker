@@ -74,3 +74,57 @@ QStatusBar {
     background-color: #1E1E1E;
     color: #BBBBBB;
 }
+
+/* Карточки дашборда */
+QFrame[frameShape="4"] { /* StyledPanel */
+    background-color: #2D2D2D;
+    border-radius: 10px;
+    border: 1px solid #3C3C3C;
+}
+
+/* GroupBox */
+QGroupBox {
+    color: #E0E0E0;
+    border: 1px solid #3C3C3C;
+    border-radius: 6px;
+    margin-top: 12px;
+    font-weight: bold;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 5px;
+}
+
+/* ComboBox, DateEdit, SpinBox */
+QComboBox, QDateEdit, QSpinBox, QDoubleSpinBox {
+    background-color: #2D2D2D;
+    color: #E0E0E0;
+    border: 1px solid #3C3C3C;
+    border-radius: 4px;
+    padding: 4px 8px;
+    min-height: 24px;
+}
+QComboBox:hover, QDateEdit:hover, QSpinBox:hover {
+    border: 1px solid #0D47A1;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+/* TextEdit */
+QTextEdit {
+    background-color: #2D2D2D;
+    color: #E0E0E0;
+    border: 1px solid #3C3C3C;
+    border-radius: 4px;
+}
+
+/* ListView */
+QListView {
+    background-color: #252526;
+    color: #E0E0E0;
+    border: 1px solid #3C3C3C;
+    alternate-background-color: #2A2A2A;
+}

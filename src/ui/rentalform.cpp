@@ -11,7 +11,7 @@
 #include <QSqlRecord>
 
 RentalForm::RentalForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::RentalForm)
 {
     ui->setupUi(this);
@@ -39,6 +39,9 @@ RentalForm::RentalForm(QWidget *parent) :
     // Подключаем сигнал изменения данных
     connect(rowsModel, &QStandardItemModel::dataChanged,
             this, &RentalForm::onTableViewDataChanged);
+
+    // Проверяем/добавляем колонку comment в БД (один раз при открытии)
+    ensureCommentColumn();
 }
 
 RentalForm::~RentalForm()
@@ -80,7 +83,20 @@ void RentalForm::loadFreeSIMsToDelegate()
 {
     QList<QPair<int, QString>> sims;
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT simcardid, simnumber FROM tblsimcards WHERE status = 0 ORDER BY simnumber");
+    // ИСПРАВЛЕНО: Загружаем SIM-карты, которые:
+    // 1. status = 0 (свободны), ИЛИ
+    // 2. status = 1 (в аренде), но привязаны к терминалу со статусом 0 (возвращены)
+    query.exec(
+        "SELECT s.simcardid, s.simnumber "
+        "FROM tblsimcards s "
+        "WHERE s.status = 0 "
+        "OR EXISTS (" 
+        "    SELECT 1 FROM tblterminals t "
+        "    WHERE t.currentsimcardid = s.simcardid "
+        "    AND t.status = 0"
+        ")"
+        "ORDER BY s.simnumber"
+    );
 
     while (query.next()) {
         sims.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
@@ -121,6 +137,22 @@ void RentalForm::on_btnDeleteRow_clicked()
     int row = ui->tableView->currentIndex().row();
     if (row >= 0) {
         rowsModel->removeRow(row);
+    }
+}
+
+void RentalForm::ensureCommentColumn()
+{
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare(
+        "DO $ BEGIN "
+        "  IF NOT EXISTS (SELECT 1 FROM information_schema.columns "
+        "                 WHERE table_name='tblrentaldetails' AND column_name='comment') THEN "
+        "    ALTER TABLE tblrentaldetails ADD COLUMN comment TEXT; "
+        "  END IF; "
+        "END $");
+    if (!query.exec()) {
+        QMessageBox::critical(this, "Ошибка БД",
+            "Не удалось проверить структуру БД: " + query.lastError().text());
     }
 }
 
@@ -214,11 +246,12 @@ void RentalForm::on_btnPost_clicked()
 
         // Создаем запись в детали документа
         QSqlQuery detailQuery(db);
-        detailQuery.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid, simcardid) "
-                            "VALUES (:did, :tid, :sid)");
+        detailQuery.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid, simcardid, comment) "
+                            "VALUES (:did, :tid, :sid, :comm)");
         detailQuery.bindValue(":did", docId);
         detailQuery.bindValue(":tid", terminalId);
         detailQuery.bindValue(":sid", simId);
+        detailQuery.bindValue(":comm", comment);
 
         if (!detailQuery.exec()) {
             db.rollback();

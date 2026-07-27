@@ -10,7 +10,7 @@
 #include <QDebug>
 
 PaymentForm::PaymentForm(QWidget *parent) :
-    QWidget(parent),
+    QDialog(parent),
     ui(new Ui::PaymentForm)
 {
     ui->setupUi(this);

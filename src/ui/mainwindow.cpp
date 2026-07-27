@@ -106,7 +106,7 @@ void MainWindow::loadCounters()
 
     if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 0") && query.next()) {
         updateCounterWidget(ui->frameFreeTerminals,
-            query.value(0).toString(), "Свободно", "#2ecc71");
+            query.value(0).toString(), "Свободно терминалов", "#2ecc71");
     }
 
     if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 1") && query.next()) {
@@ -119,7 +119,18 @@ void MainWindow::loadCounters()
             query.value(0).toString(), "Всего SIM-карт", "#9b59b6");
     }
 
-    if (query.exec("SELECT COUNT(*) FROM tblsimcards WHERE status = 0") && query.next()) {
+    // ИСПРАВЛЕНО: SIM-карта считается свободной, если:
+    // 1. status = 0, ИЛИ
+    // 2. status = 1 (в аренде), но терминал с этой SIM уже возвращен (status = 0)
+    if (query.exec(
+        "SELECT COUNT(*) FROM tblsimcards s "
+        "WHERE s.status = 0 "
+        "OR EXISTS (" 
+        "    SELECT 1 FROM tblterminals t "
+        "    WHERE t.currentsimcardid = s.simcardid "
+        "    AND t.status = 0"
+        ")"
+    ) && query.next()) {
         updateCounterWidget(ui->frameFreeSIM,
             query.value(0).toString(), "Свободно SIM", "#1abc9c");
     }
@@ -133,17 +144,42 @@ void MainWindow::loadCounters()
 void MainWindow::updateCounterWidget(QWidget* widget, const QString& value,
                                      const QString& label, const QString& color)
 {
-    QLabel* valueLabel = widget->findChild<QLabel*>();
-    QLabel* nameLabel = widget->findChild<QLabel*>();
-
-    if (valueLabel && nameLabel) {
-        // Первый QLabel - значение, второй - название
-        if (valueLabel->text().isEmpty() || valueLabel->text().toInt() >= 0) {
-            valueLabel->setText(value);
-            valueLabel->setStyleSheet(QString("QLabel { color: %1; font-size: 32px; font-weight: bold; }").arg(color));
-            nameLabel->setText(label);
+    QLabel* valueLabel = nullptr;
+    for (auto* child : widget->findChildren<QLabel*>()) {
+        if (child->objectName().endsWith("Value")) {
+            valueLabel = child;
+            break;
         }
     }
+    QLabel* nameLabel = nullptr;
+    for (auto* child : widget->findChildren<QLabel*>()) {
+        if (child->objectName().endsWith("Name")) {
+            nameLabel = child;
+            break;
+        }
+    }
+
+    if (valueLabel) {
+        valueLabel->setText(value);
+        valueLabel->setStyleSheet(QString("QLabel { color: %1; font-size: 32px; font-weight: bold; }").arg(color));
+    }
+    if (nameLabel) {
+        nameLabel->setText(label);
+        nameLabel->setStyleSheet("QLabel { color: #E0E0E0; font-size: 14px; font-weight: bold; }");
+    }
+}
+
+void MainWindow::openForm(QWidget *form)
+{
+    form->setAttribute(Qt::WA_DeleteOnClose);
+    form->setWindowModality(Qt::WindowModal);
+    form->setWindowFlags(form->windowFlags() | Qt::Window);
+    form->show();
+
+    // Центрирование относительно главного окна
+    QRect mainRect = this->geometry();
+    QRect formRect = form->frameGeometry();
+    form->move(mainRect.center() - formRect.center());
 }
 
 void MainWindow::loadTopClients()
@@ -206,72 +242,60 @@ void MainWindow::onActionExit_triggered()
 
 void MainWindow::onActionManufacturers_triggered()
 {
-    ManufacturersForm *form = new ManufacturersForm(nullptr);
-    form->show();
+    openForm(new ManufacturersForm(this));
 }
 
 void MainWindow::onActionModels_triggered()
 {
-    ModelsForm *form = new ModelsForm(nullptr);
-    form->show();
+    openForm(new ModelsForm(this));
 }
 
 void MainWindow::onActionClients_triggered()
 {
-    ClientsForm *form = new ClientsForm(nullptr);
-    form->show();
+    openForm(new ClientsForm(this));
 }
 
 void MainWindow::onActionSIMCards_triggered()
 {
-    SIMCardsForm *form = new SIMCardsForm(nullptr);
-    form->show();
+    openForm(new SIMCardsForm(this));
 }
 
 void MainWindow::onActionTerminals_triggered()
 {
-    TerminalsForm *form = new TerminalsForm(nullptr);
-    form->show();
+    openForm(new TerminalsForm(this));
 }
 
 void MainWindow::onActionReceipt_triggered()
 {
-    ReceiptForm *form = new ReceiptForm(nullptr);
-    form->show();
+    openForm(new ReceiptForm(this));
 }
 
 void MainWindow::onActionRental_triggered()
 {
-    RentalForm *form = new RentalForm(nullptr);
-    form->show();
+    openForm(new RentalForm(this));
 }
 
 void MainWindow::onActionReturn_triggered()
 {
-    ReturnForm *form = new ReturnForm(nullptr);
-    form->show();
+    openForm(new ReturnForm(this));
 }
 
 void MainWindow::onActionPayment_triggered()
 {
-    PaymentForm *form = new PaymentForm(nullptr);
-    form->show();
+    openForm(new PaymentForm(this));
 }
 
 void MainWindow::onActionArchiveReceipt_triggered()
 {
-    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(1, nullptr);
-    form->show();
+    openForm(new ArchiveDocumentsForm(1, this));
 }
 
 void MainWindow::onActionArchiveRental_triggered()
 {
-    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(2, nullptr);
-    form->show();
+    openForm(new ArchiveDocumentsForm(2, this));
 }
 
 void MainWindow::onActionArchiveReturn_triggered()
 {
-    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(3, nullptr);
-    form->show();
+    openForm(new ArchiveDocumentsForm(3, this));
 }

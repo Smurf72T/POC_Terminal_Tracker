@@ -1,7 +1,7 @@
 #ifndef RENTALFORM_H
 #define RENTALFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QStandardItemModel>
 #include <QModelIndex>
 
@@ -9,7 +9,7 @@ namespace Ui {
     class RentalForm;
 }
 
-class RentalForm : public QWidget
+class RentalForm : public QDialog
 {
     Q_OBJECT
 
@@ -32,6 +32,7 @@ private:
     void loadFreeTerminalsToDelegate();
     void loadFreeSIMsToDelegate();
     void generateDocNumber();
+    void ensureCommentColumn();
 };
 
 #endif // RENTALFORM_H

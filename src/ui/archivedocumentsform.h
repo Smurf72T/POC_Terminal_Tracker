@@ -1,14 +1,14 @@
 #ifndef ARCHIVEDOCUMENTSFORM_H
 #define ARCHIVEDOCUMENTSFORM_H
 
-#include <QWidget>
+#include <QDialog>
 #include <QSqlQueryModel>
 
 namespace Ui {
     class ArchiveDocumentsForm;
 }
 
-class ArchiveDocumentsForm : public QWidget
+class ArchiveDocumentsForm : public QDialog
 {
     Q_OBJECT
 
