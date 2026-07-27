@@ -1,6 +1,7 @@
 #include "archivedocumentsform.h"
 #include "ui_archivedocumentsform.h"
 #include "../database/databasemanager.h"
+#include "CheckBoxDelegate.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -73,7 +74,6 @@ void ArchiveDocumentsForm::applyFilter()
     QString dateTo = ui->dateEditTo->date().toString("yyyy-MM-dd");
     int clientId = ui->comboBoxClient->currentData().toInt();
 
-    // Формируем запрос в зависимости от типа документа
     if (m_docType == 1) { // Поступление
         queryStr = QString("SELECT docnumber AS \"Номер\", "
                            "docdate AS \"Дата\", "
@@ -82,17 +82,22 @@ void ArchiveDocumentsForm::applyFilter()
                            "WHERE docdate BETWEEN '%1' AND '%2' "
                            "ORDER BY docdate DESC")
                        .arg(dateFrom, dateTo);
-    } else if (m_docType == 2) { // Аренда
-        queryStr = QString("SELECT r.docnumber AS \"Номер\", "
-                           "r.docdate AS \"Дата\", "
-                           "c.clientname AS \"Клиент\", "
-                           "r.comments AS \"Комментарий\" "
-                           "FROM tblrentaldocs r "
-                           "LEFT JOIN tblclients c ON r.clientid = c.clientid "
-                           "WHERE r.docdate BETWEEN '%1' AND '%2' "
-                           "AND (%3 = 0 OR r.clientid = %3) "
-                           "ORDER BY r.docdate DESC")
-                       .arg(dateFrom, dateTo).arg(clientId);
+    } else if (m_docType == 2) { // Аренда — с детальным статусом возврата
+        queryStr = QString(
+            "SELECT r.docnumber AS \"Номер\", "
+            "r.docdate AS \"Дата\", "
+            "c.clientname AS \"Клиент\", "
+            "r.comments AS \"Комментарий\", "
+            "COUNT(DISTINCT rd_returned.terminalid)::text || ' из ' || COUNT(DISTINCT rd_rental.terminalid)::text AS \"Возврат\" "
+            "FROM tblrentaldocs r "
+            "LEFT JOIN tblclients c ON r.clientid = c.clientid "
+            "LEFT JOIN tblrentaldetails rd_rental ON r.rentaldocid = rd_rental.rentaldocid "
+            "LEFT JOIN tblreturndetails rd_returned ON rd_rental.terminalid = rd_returned.terminalid "
+            "WHERE r.docdate BETWEEN '%1' AND '%2' "
+            "AND (%3 = 0 OR r.clientid = %3) "
+            "GROUP BY r.rentaldocid, r.docnumber, r.docdate, c.clientname, r.comments "
+            "ORDER BY r.docdate DESC"
+        ).arg(dateFrom, dateTo).arg(clientId);
     } else if (m_docType == 3) { // Возврат
         queryStr = QString("SELECT r.docnumber AS \"Номер\", "
                            "r.docdate AS \"Дата\", "
@@ -121,4 +126,19 @@ void ArchiveDocumentsForm::on_btnFilter_clicked()
 void ArchiveDocumentsForm::on_btnClose_clicked()
 {
     close();
+}
+
+void ArchiveDocumentsForm::setupCheckBoxColumn()
+{
+    // Для архива аренды (docType == 2) настраиваем отображение чекбокса
+    if (m_docType == 2) {
+        // Колонка "Возврат" — последняя (индекс 4)
+        int returnColumn = 4;
+
+        // Устанавливаем делегат для отображения чекбокса
+        ui->tableView->setItemDelegateForColumn(returnColumn, new CheckBoxDelegate(this));
+
+        // Делаем колонку только для чтения
+        ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    }
 }

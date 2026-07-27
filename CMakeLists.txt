@@ -45,6 +45,7 @@ set(HEADERS
         src/ui/simcardsform.h
         src/ui/terminalsform.h
         src/ui/readonlydelegate.h
+        src/ui/CheckBoxDelegate.h
         src/ui/receiptform.h
         src/ui/comboboxdelegate.h
         src/ui/rentalform.h

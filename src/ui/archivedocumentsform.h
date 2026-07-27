@@ -29,6 +29,7 @@ private:
     void setupUI();
     void loadClients();
     void applyFilter();
+    void setupCheckBoxColumn();
 };
 
 #endif // ARCHIVEDOCUMENTSFORM_H
