@@ -114,20 +114,6 @@ bool DatabaseManager::executeTransaction(const std::function<bool(QSqlDatabase&)
     return success;
 }
 
-QString DatabaseManager::generateDocNumber(const QString& docType)
-{
-    QSqlQuery query(m_database);
-    query.prepare("SELECT generate_doc_number(:doc_type)");
-    query.bindValue(":doc_type", docType);
-
-    if (query.exec() && query.next()) {
-        return query.value(0).toString();
-    }
-
-    showError("Не удалось сгенерировать номер документа");
-    return "";
-}
-
 void DatabaseManager::notifyDataChanged()
 {
     emit dataChanged();

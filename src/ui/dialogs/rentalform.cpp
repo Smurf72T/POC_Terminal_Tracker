@@ -147,14 +147,16 @@ void RentalForm::on_btnDeleteRow_clicked()
 void RentalForm::ensureCommentColumn()
 {
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare(
-        "DO $ BEGIN "
-        "  IF NOT EXISTS (SELECT 1 FROM information_schema.columns "
-        "                 WHERE table_name='tblrentaldetails' AND column_name='comment') THEN "
-        "    ALTER TABLE tblrentaldetails ADD COLUMN comment TEXT; "
-        "  END IF; "
-        "END $");
-    if (!query.exec()) {
+    // Проверяем существование колонки
+    query.exec("SELECT 1 FROM information_schema.columns "
+               "WHERE table_name='tblrentaldetails' AND column_name='comment'");
+    
+    if (!query.next()) {
+        // Колонки нет, добавляем её
+        query.exec("ALTER TABLE tblrentaldetails ADD COLUMN comment TEXT");
+    }
+    
+    if (query.lastError().isValid() && !query.lastError().text().isEmpty()) {
         QMessageBox::critical(this, "Ошибка БД",
             "Не удалось проверить структуру БД: " + query.lastError().text());
     }
