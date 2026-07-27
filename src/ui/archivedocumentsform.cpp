@@ -46,12 +46,16 @@ void ArchiveDocumentsForm::setupUI()
         setWindowTitle("Архив: Передача в аренду");
     } else if (m_docType == 3) {
         setWindowTitle("Архив: Возврат из аренды");
+    } else if (m_docType == 4) {
+        setWindowTitle("Архив: Оплата");
     }
 
     ui->tableView->setModel(model);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->setAlternatingRowColors(true);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
+
+    setupCheckBoxColumn();
 }
 
 void ArchiveDocumentsForm::loadClients()
@@ -82,17 +86,19 @@ void ArchiveDocumentsForm::applyFilter()
                            "WHERE docdate BETWEEN '%1' AND '%2' "
                            "ORDER BY docdate DESC")
                        .arg(dateFrom, dateTo);
-    } else if (m_docType == 2) { // Аренда — с детальным статусом возврата
+    } else if (m_docType == 2) { // Аренда — с возвратом и оплатой
         queryStr = QString(
             "SELECT r.docnumber AS \"Номер\", "
             "r.docdate AS \"Дата\", "
             "c.clientname AS \"Клиент\", "
             "r.comments AS \"Комментарий\", "
-            "COUNT(DISTINCT rd_returned.terminalid)::text || ' из ' || COUNT(DISTINCT rd_rental.terminalid)::text AS \"Возврат\" "
+            "COUNT(DISTINCT rd_returned.terminalid)::text || ' из ' || COUNT(DISTINCT rd_rental.terminalid)::text AS \"Возврат\", "
+            "CASE WHEN COUNT(pl.linkid) > 0 THEN 'Оплачено' ELSE 'Не оплачено' END AS \"Оплата\" "
             "FROM tblrentaldocs r "
             "LEFT JOIN tblclients c ON r.clientid = c.clientid "
             "LEFT JOIN tblrentaldetails rd_rental ON r.rentaldocid = rd_rental.rentaldocid "
             "LEFT JOIN tblreturndetails rd_returned ON rd_rental.terminalid = rd_returned.terminalid "
+            "LEFT JOIN tblpayment_rental_links pl ON r.rentaldocid = pl.rentaldocid "
             "WHERE r.docdate BETWEEN '%1' AND '%2' "
             "AND (%3 = 0 OR r.clientid = %3) "
             "GROUP BY r.rentaldocid, r.docnumber, r.docdate, c.clientname, r.comments "
@@ -109,6 +115,26 @@ void ArchiveDocumentsForm::applyFilter()
                            "AND (%3 = 0 OR r.clientid = %3) "
                            "ORDER BY r.docdate DESC")
                        .arg(dateFrom, dateTo).arg(clientId);
+    } else if (m_docType == 4) { // Оплата
+        queryStr = QString(
+            "SELECT p.paymentid AS \"ID\", "
+            "p.paymentdate AS \"Дата\", "
+            "c.clientname AS \"Клиент\", "
+            "pm.monthname AS \"Месяц\", "
+            "p.periodyear AS \"Год\", "
+            "p.amount AS \"Сумма\", "
+            "p.comment AS \"Комментарий\" "
+            "FROM tblpayments p "
+            "LEFT JOIN tblclients c ON p.clientid = c.clientid "
+            "LEFT JOIN (VALUES "
+            "(1, 'Январь'), (2, 'Февраль'), (3, 'Март'), (4, 'Апрель'), "
+            "(5, 'Май'), (6, 'Июнь'), (7, 'Июль'), (8, 'Август'), "
+            "(9, 'Сентябрь'), (10, 'Октябрь'), (11, 'Ноябрь'), (12, 'Декабрь') "
+            ") AS pm(monthnum, monthname) ON p.periodmonth = pm.monthnum "
+            "WHERE p.paymentdate BETWEEN '%1' AND '%2' "
+            "AND (%3 = 0 OR p.clientid = %3) "
+            "ORDER BY p.paymentdate DESC"
+        ).arg(dateFrom, dateTo).arg(clientId);
     }
 
     model->setQuery(queryStr, DatabaseManager::instance().getDatabase());
@@ -132,7 +158,7 @@ void ArchiveDocumentsForm::setupCheckBoxColumn()
 {
     // Для архива аренды (docType == 2) настраиваем отображение чекбокса
     if (m_docType == 2) {
-        // Колонка "Возврат" — последняя (индекс 4)
+        // Колонка "Возврат" — теперь индекс 4 (Номер, Дата, Клиент, Комментарий, Возврат, Оплата)
         int returnColumn = 4;
 
         // Устанавливаем делегат для отображения чекбокса

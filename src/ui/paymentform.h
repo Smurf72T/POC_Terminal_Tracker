@@ -18,6 +18,7 @@ public:
 private slots:
     void on_btnSave_clicked();
     void on_btnClose_clicked();
+    void on_comboBoxClient_currentIndexChanged(int index); // <-- Добавлено
 
 private:
     Ui::PaymentForm *ui;
@@ -25,6 +26,7 @@ private:
     void loadClients();
     void loadMonths();
     void loadYears();
+    void loadRentalDocsForClient(int clientId); // <-- Добавлено
     bool checkExistingPayment(int clientId, int month, int year);
 };
 

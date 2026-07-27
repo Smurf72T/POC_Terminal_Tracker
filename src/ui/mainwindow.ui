@@ -70,6 +70,7 @@
     <addaction name="actionArchiveReceipt"/>
     <addaction name="actionArchiveRental"/>
     <addaction name="actionArchiveReturn"/>
+    <addaction name="actionArchivePayment"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
@@ -140,6 +141,11 @@
   <action name="actionArchiveReturn">
    <property name="text">
     <string>Архив: Возврат</string>
+   </property>
+  </action>
+  <action name="actionArchivePayment">
+   <property name="text">
+    <string>Архив: Оплата</string>
    </property>
   </action>
   <action name="actionPayment">

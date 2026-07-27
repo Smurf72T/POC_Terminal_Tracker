@@ -13,7 +13,7 @@ class ArchiveDocumentsForm : public QWidget
     Q_OBJECT
 
 public:
-    // docType: 1 - Поступление, 2 - Аренда, 3 - Возврат
+    // docType: 1 - Поступление, 2 - Аренда, 3 - Возврат, 4 - Оплата
     explicit ArchiveDocumentsForm(int docType, QWidget *parent = nullptr);
     ~ArchiveDocumentsForm();
 

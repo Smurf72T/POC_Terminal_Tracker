@@ -32,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionArchiveReceipt, &QAction::triggered, this, &MainWindow::onActionArchiveReceipt_triggered);
     connect(ui->actionArchiveRental, &QAction::triggered, this, &MainWindow::onActionArchiveRental_triggered);
     connect(ui->actionArchiveReturn, &QAction::triggered, this, &MainWindow::onActionArchiveReturn_triggered);
+    connect(ui->actionArchivePayment, &QAction::triggered, this, &MainWindow::onActionArchivePayment_triggered);
     connect(ui->actionPayment, &QAction::triggered, this, &MainWindow::onActionPayment_triggered);
 }
 
@@ -160,6 +161,12 @@ void MainWindow::onActionArchiveRental_triggered()
 void MainWindow::onActionArchiveReturn_triggered()
 {
     ArchiveDocumentsForm *form = new ArchiveDocumentsForm(3, this); // 3 = Возврат
+    form->show();
+}
+
+void MainWindow::onActionArchivePayment_triggered()
+{
+    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(4, this); // 4 = Оплата
     form->show();
 }
 
