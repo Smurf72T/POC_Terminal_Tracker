@@ -3,6 +3,7 @@ project(POC_Terminal_Tracker LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
@@ -18,6 +19,12 @@ find_package(Qt6 6.11.1 REQUIRED COMPONENTS
 
 # Ищем PostgreSQL
 find_package(PostgreSQL REQUIRED)
+
+# Подавляем предупреждение Qt о подключении GuiPrivate (нужен QXlsx для Qt >= 6.10)
+set(QT_NO_PRIVATE_MODULE_WARNING ON CACHE BOOL "" FORCE)
+
+# Подключаем QXlsx
+add_subdirectory(libs/QXlsx/QXlsx)
 
 # Исходные файлы
 set(SOURCES
@@ -35,6 +42,7 @@ set(SOURCES
         src/ui/dialogs/returnform.cpp
         src/ui/dialogs/archivedocumentsform.cpp
         src/ui/dialogs/paymentform.cpp
+        src/utils/reportexporter.cpp
 )
 
 set(HEADERS
@@ -54,6 +62,7 @@ set(HEADERS
         src/ui/dialogs/returnform.h
         src/ui/dialogs/archivedocumentsform.h
         src/ui/dialogs/paymentform.h
+        src/utils/reportexporter.h
 )
 
 set(UI_FILES
@@ -80,6 +89,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Sql
         Qt6::PrintSupport
         PostgreSQL::PostgreSQL
+        QXlsx::QXlsx
 )
 
 # Копируем config.json в папку сборки, чтобы приложение его видело при запуске

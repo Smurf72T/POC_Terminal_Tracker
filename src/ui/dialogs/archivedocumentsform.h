@@ -19,6 +19,8 @@ public:
 
 private slots:
     void on_btnFilter_clicked();
+    void on_btnExportExcel_clicked();  // <-- Добавлено
+    void on_btnExportPdf_clicked();    // <-- Добавлено
     void on_btnClose_clicked();
 
 private:

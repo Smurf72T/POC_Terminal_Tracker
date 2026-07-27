@@ -9,6 +9,10 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QSqlRecord>
+#include "utils/reportexporter.h"
+#include <QTextDocument>
+#include <QPrinter>
+#include <QPrintDialog>
 
 RentalForm::RentalForm(QWidget *parent) :
     QDialog(parent),
@@ -290,4 +294,99 @@ void RentalForm::onTableViewDataChanged(const QModelIndex &topLeft, const QModel
 void RentalForm::on_btnClose_clicked()
 {
     close();
+}
+
+void RentalForm::on_btnPrintAct_clicked()
+{
+    int clientId = ui->comboBoxClient->currentData().toInt();
+    if (clientId == 0) {
+        QMessageBox::warning(this, "Внимание", "Сначала выберите клиента!");
+        return;
+    }
+
+    // Получаем данные клиента
+    QSqlQuery clientQuery(DatabaseManager::instance().getDatabase());
+    clientQuery.prepare("SELECT clientname, inn, address FROM tblclients WHERE clientid = :id");
+    clientQuery.bindValue(":id", clientId);
+
+    QString clientName, clientInn, clientAddress;
+    if (clientQuery.exec() && clientQuery.next()) {
+        clientName = clientQuery.value(0).toString();
+        clientInn = clientQuery.value(1).toString();
+        clientAddress = clientQuery.value(2).toString();
+    }
+
+    // Формируем HTML акта
+    QString html = "<html><head><meta charset='utf-8'>"
+                   "<style>"
+                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
+                   "h2 { text-align: center; }"
+                   "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
+                   "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
+                   "th { background-color: #f0f0f0; }"
+                   ".signature { margin-top: 50px; display: flex; justify-content: space-between; }"
+                   ".signature div { width: 45%; }"
+                   "</style></head><body>";
+
+    html += "<h2>АКТ ПРИЁМА-ПЕРЕДАЧИ ТЕРМИНАЛОВ № " + ui->lineEditNumber->text() + "</h2>";
+    html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
+    html += "<p><b>Арендодатель:</b> ООО «POC Terminal»</p>";
+    html += "<p><b>Арендатор:</b> " + clientName;
+    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn + ")";
+    if (!clientAddress.isEmpty()) html += ", адрес: " + clientAddress;
+    html += "</p>";
+    html += "<p>Настоящий акт составлен о том, что Арендодатель передал, а Арендатор принял следующие POC-терминалы:</p>";
+
+    html += "<table><tr><th>№</th><th>Серийный номер</th><th>IMEI 1</th><th>SIM-карта</th></tr>";
+
+    // Собираем данные из таблицы
+    int num = 1;
+    for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        int termId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
+        int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
+
+        if (termId == 0) continue;
+
+        // Получаем серийный номер и IMEI
+        QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
+        termQuery.prepare("SELECT serialnumber, imei1 FROM tblterminals WHERE terminalid = :id");
+        termQuery.bindValue(":id", termId);
+        QString serial, imei;
+        if (termQuery.exec() && termQuery.next()) {
+            serial = termQuery.value(0).toString();
+            imei = termQuery.value(1).toString();
+        }
+
+        // Получаем номер SIM
+        QString simNumber;
+        if (simId > 0) {
+            QSqlQuery simQuery(DatabaseManager::instance().getDatabase());
+            simQuery.prepare("SELECT simnumber FROM tblsimcards WHERE simcardid = :id");
+            simQuery.bindValue(":id", simId);
+            if (simQuery.exec() && simQuery.next()) {
+                simNumber = simQuery.value(0).toString();
+            }
+        }
+
+        html += "<tr><td>" + QString::number(num++) + "</td>"
+                "<td>" + serial + "</td>"
+                "<td>" + imei + "</td>"
+                "<td>" + simNumber + "</td></tr>";
+    }
+    html += "</table>";
+
+    html += "<div class='signature'>"
+            "<div><p>Передал (Арендодатель):</p><p>________________ / ____________</p></div>"
+            "<div><p>Принял (Арендатор):</p><p>________________ / ____________</p></div>"
+            "</div>";
+    html += "</body></html>";
+
+    // Печать или сохранение в PDF
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog printDialog(&printer, this);
+    if (printDialog.exec() == QDialog::Accepted) {
+        QTextDocument doc;
+        doc.setHtml(html);
+        doc.print(&printer);
+    }
 }

@@ -21,6 +21,7 @@ private slots:
     void on_btnAddRow_clicked();
     void on_btnDeleteRow_clicked();
     void on_btnPost_clicked();
+    void on_btnPrintAct_clicked();  // <-- Добавлено
     void on_btnClose_clicked();
     void onTableViewDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
 

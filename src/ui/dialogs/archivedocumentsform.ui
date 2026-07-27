@@ -32,6 +32,20 @@
                     <item>
                         <widget class="QPushButton" name="btnFilter"><property name="text"><string>Применить фильтр</string></property></widget>
                     </item>
+                    <item>
+                        <widget class="QPushButton" name="btnExportExcel">
+                            <property name="text">
+                                <string>📊 Excel</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnExportPdf">
+                            <property name="text">
+                                <string>📄 PDF</string>
+                            </property>
+                        </widget>
+                    </item>
                 </layout>
             </item>
             <item>

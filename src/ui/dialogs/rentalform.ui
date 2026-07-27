@@ -28,6 +28,16 @@
                     <item><widget class="QPushButton" name="btnAddRow"><property name="text"><string>Добавить строку</string></property></widget></item>
                     <item><widget class="QPushButton" name="btnDeleteRow"><property name="text"><string>Удалить строку</string></property></widget></item>
                     <item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                    <item>
+                        <widget class="QPushButton" name="btnPrintAct">
+                            <property name="text">
+                                <string>🖨️ Печать акта</string>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 5px; }</string>
+                            </property>
+                        </widget>
+                    </item>
                     <item><widget class="QPushButton" name="btnPost"><property name="text"><string>Провести</string></property></widget></item>
                     <item><widget class="QPushButton" name="btnClose"><property name="text"><string>Закрыть</string></property></widget></item>
                 </layout>

@@ -7,6 +7,9 @@
 #include <QSqlError>
 #include <QDate>
 #include <QDebug>
+#include "utils/reportexporter.h"
+#include <QFileDialog>
+#include <QTextDocument>
 
 ArchiveDocumentsForm::ArchiveDocumentsForm(int docType, QWidget *parent) :
     QDialog(parent),
@@ -170,4 +173,66 @@ void ArchiveDocumentsForm::setupCheckBoxColumn()
         // Делаем колонку только для чтения
         ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     }
+}
+
+void ArchiveDocumentsForm::on_btnExportExcel_clicked()
+{
+    QString filePath = ReportExporter::getSaveFilePath(
+        this, "Сохранить отчёт в Excel",
+        "Excel файлы (*.xlsx)");
+
+    if (filePath.isEmpty()) return;
+
+    QString title;
+    if (m_docType == 1) title = "Архив: Поступление терминалов";
+    else if (m_docType == 2) title = "Архив: Передача в аренду";
+    else title = "Архив: Возврат из аренды";
+
+    ReportExporter::exportModelToExcel(model, title, filePath, this);
+}
+
+void ArchiveDocumentsForm::on_btnExportPdf_clicked()
+{
+    QString filePath = ReportExporter::getSaveFilePath(
+        this, "Сохранить отчёт в PDF",
+        "PDF файлы (*.pdf)");
+
+    if (filePath.isEmpty()) return;
+
+    // Формируем HTML-таблицу из модели
+    QString html = "<html><head><meta charset='utf-8'>"
+                   "<style>"
+                   "body { font-family: Arial, sans-serif; font-size: 12px; }"
+                   "h1 { color: #333; }"
+                   "table { border-collapse: collapse; width: 100%; }"
+                   "th { background-color: #4472C4; color: white; padding: 8px; border: 1px solid #ddd; }"
+                   "td { padding: 6px; border: 1px solid #ddd; }"
+                   "tr:nth-child(even) { background-color: #f2f2f2; }"
+                   "</style></head><body>";
+
+    if (m_docType == 1) html += "<h1>Архив: Поступление терминалов</h1>";
+    else if (m_docType == 2) html += "<h1>Архив: Передача в аренду</h1>";
+    else html += "<h1>Архив: Возврат из аренды</h1>";
+
+    html += "<p>Период: с " + ui->dateEditFrom->date().toString("dd.MM.yyyy") +
+            " по " + ui->dateEditTo->date().toString("dd.MM.yyyy") + "</p>";
+    html += "<p>Дата формирования: " + QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss") + "</p>";
+
+    html += "<table><tr>";
+    for (int col = 0; col < model->columnCount(); ++col) {
+        html += "<th>" + model->headerData(col, Qt::Horizontal).toString() + "</th>";
+    }
+    html += "</tr>";
+
+    for (int row = 0; row < model->rowCount(); ++row) {
+        html += "<tr>";
+        for (int col = 0; col < model->columnCount(); ++col) {
+            QString value = model->data(model->index(row, col)).toString();
+            html += "<td>" + value + "</td>";
+        }
+        html += "</tr>";
+    }
+    html += "</table></body></html>";
+
+    ReportExporter::exportHtmlToPdf(html, filePath, this);
 }
