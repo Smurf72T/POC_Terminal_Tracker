@@ -1,6 +1,6 @@
 #include "manufacturersform.h"
 #include "ui_manufacturersform.h"
-#include "../database/databasemanager.h"
+#include "../../database/databasemanager.h"
 #include <QDebug>
 #include <QMessageBox>
 #include <QSqlError>

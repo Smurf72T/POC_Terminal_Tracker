@@ -1,7 +1,7 @@
 #include "archivedocumentsform.h"
 #include "ui_archivedocumentsform.h"
-#include "../database/databasemanager.h"
-#include "CheckBoxDelegate.h"
+#include "../../database/databasemanager.h"
+#include "../delegates/CheckBoxDelegate.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>

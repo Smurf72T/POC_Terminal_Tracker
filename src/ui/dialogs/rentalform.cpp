@@ -1,8 +1,8 @@
 #include "rentalform.h"
 #include "ui_rentalform.h"
-#include "comboboxdelegate.h"
-#include "comboboxmodel.h"
-#include "../database/databasemanager.h"
+#include "../delegates/comboboxdelegate.h"
+#include "../delegates/comboboxmodel.h"
+#include "../../database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>

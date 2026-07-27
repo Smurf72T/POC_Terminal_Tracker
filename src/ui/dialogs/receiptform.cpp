@@ -1,7 +1,7 @@
 #include "receiptform.h"
 #include "ui_receiptform.h"
-#include "comboboxdelegate.h"
-#include "../database/databasemanager.h"
+#include "../delegates/comboboxdelegate.h"
+#include "../../database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>

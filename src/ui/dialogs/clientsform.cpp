@@ -1,6 +1,6 @@
 #include "clientsform.h"
 #include "ui_clientsform.h"
-#include "../database/databasemanager.h"
+#include "../../database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>

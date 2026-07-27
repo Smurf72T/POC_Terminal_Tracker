@@ -24,50 +24,50 @@ set(SOURCES
         src/main.cpp
         src/database/databasemanager.cpp
         src/ui/mainwindow.cpp
-        src/ui/manufacturersform.cpp
-        src/ui/modelsform.cpp
-        src/ui/clientsform.cpp
-        src/ui/simcardsform.cpp
-        src/ui/terminalsform.cpp
+        src/ui/dialogs/manufacturersform.cpp
+        src/ui/dialogs/modelsform.cpp
+        src/ui/dialogs/clientsform.cpp
+        src/ui/dialogs/simcardsform.cpp
+        src/ui/dialogs/terminalsform.cpp
         resources.qrc
-        src/ui/receiptform.cpp
-        src/ui/rentalform.cpp
-        src/ui/returnform.cpp
-        src/ui/archivedocumentsform.cpp
-        src/ui/paymentform.cpp
+        src/ui/dialogs/receiptform.cpp
+        src/ui/dialogs/rentalform.cpp
+        src/ui/dialogs/returnform.cpp
+        src/ui/dialogs/archivedocumentsform.cpp
+        src/ui/dialogs/paymentform.cpp
 )
 
 set(HEADERS
         src/database/databasemanager.h
         src/ui/mainwindow.h
-        src/ui/manufacturersform.h
-        src/ui/modelsform.h
-        src/ui/clientsform.h
-        src/ui/simcardsform.h
-        src/ui/terminalsform.h
-        src/ui/readonlydelegate.h
-        src/ui/CheckBoxDelegate.h
-        src/ui/receiptform.h
-        src/ui/comboboxdelegate.h
-        src/ui/rentalform.h
-        src/ui/comboboxmodel.h
-        src/ui/returnform.h
-        src/ui/archivedocumentsform.h
-        src/ui/paymentform.h
+        src/ui/dialogs/manufacturersform.h
+        src/ui/dialogs/modelsform.h
+        src/ui/dialogs/clientsform.h
+        src/ui/dialogs/simcardsform.h
+        src/ui/dialogs/terminalsform.h
+        src/ui/delegates/readonlydelegate.h
+        src/ui/delegates/CheckBoxDelegate.h
+        src/ui/dialogs/receiptform.h
+        src/ui/delegates/comboboxdelegate.h
+        src/ui/dialogs/rentalform.h
+        src/ui/delegates/comboboxmodel.h
+        src/ui/dialogs/returnform.h
+        src/ui/dialogs/archivedocumentsform.h
+        src/ui/dialogs/paymentform.h
 )
 
 set(UI_FILES
         src/ui/mainwindow.ui
-        src/ui/manufacturersform.ui
-        src/ui/modelsform.ui
-        src/ui/clientsform.ui
-        src/ui/simcardsform.ui
-        src/ui/terminalsform.ui
-        src/ui/receiptform.ui
-        src/ui/rentalform.ui
-        src/ui/returnform.ui
-        src/ui/archivedocumentsform.ui
-        src/ui/paymentform.ui
+        src/ui/dialogs/manufacturersform.ui
+        src/ui/dialogs/modelsform.ui
+        src/ui/dialogs/clientsform.ui
+        src/ui/dialogs/simcardsform.ui
+        src/ui/dialogs/terminalsform.ui
+        src/ui/dialogs/receiptform.ui
+        src/ui/dialogs/rentalform.ui
+        src/ui/dialogs/returnform.ui
+        src/ui/dialogs/archivedocumentsform.ui
+        src/ui/dialogs/paymentform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})

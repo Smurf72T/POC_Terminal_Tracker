@@ -1,7 +1,7 @@
 #include "simcardsform.h"
 #include "ui_simcardsform.h"
-#include "readonlydelegate.h"
-#include "../database/databasemanager.h"
+#include "../delegates/readonlydelegate.h"
+#include "../../database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>

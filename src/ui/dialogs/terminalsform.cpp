@@ -1,6 +1,6 @@
 #include "terminalsform.h"
 #include "ui_terminalsform.h"
-#include "../database/databasemanager.h"
+#include "../../database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
