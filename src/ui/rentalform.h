@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QStandardItemModel>
+#include <QModelIndex>
 
 namespace Ui {
     class RentalForm;
@@ -21,6 +22,7 @@ private slots:
     void on_btnDeleteRow_clicked();
     void on_btnPost_clicked();
     void on_btnClose_clicked();
+    void onTableViewDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
 
 private:
     Ui::RentalForm *ui;

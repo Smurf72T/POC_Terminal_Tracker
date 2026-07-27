@@ -64,6 +64,11 @@
     </property>
     <addaction name="actionReceipt"/>
     <addaction name="actionRental"/>
+    <addaction name="actionReturn"/>
+    <addaction name="separator"/>
+    <addaction name="actionArchiveReceipt"/>
+    <addaction name="actionArchiveRental"/>
+    <addaction name="actionArchiveReturn"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
@@ -114,6 +119,26 @@
   <action name="actionRental">
    <property name="text">
     <string>Передача в аренду</string>
+   </property>
+  </action>
+  <action name="actionReturn">
+   <property name="text">
+    <string>Возврат из аренды</string>
+   </property>
+  </action>
+  <action name="actionArchiveReceipt">
+   <property name="text">
+    <string>Архив: Поступление</string>
+   </property>
+  </action>
+  <action name="actionArchiveRental">
+   <property name="text">
+    <string>Архив: Передача в аренду</string>
+   </property>
+  </action>
+  <action name="actionArchiveReturn">
+   <property name="text">
+    <string>Архив: Возврат</string>
    </property>
   </action>
  </widget>

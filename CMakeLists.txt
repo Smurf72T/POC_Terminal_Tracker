@@ -32,6 +32,8 @@ set(SOURCES
         resources.qrc
         src/ui/receiptform.cpp
         src/ui/rentalform.cpp
+        src/ui/returnform.cpp
+        src/ui/archivedocumentsform.cpp
 )
 
 set(HEADERS
@@ -47,6 +49,8 @@ set(HEADERS
         src/ui/comboboxdelegate.h
         src/ui/rentalform.h
         src/ui/comboboxmodel.h
+        src/ui/returnform.h
+        src/ui/archivedocumentsform.h
 )
 
 set(UI_FILES
@@ -58,6 +62,8 @@ set(UI_FILES
         src/ui/terminalsform.ui
         src/ui/receiptform.ui
         src/ui/rentalform.ui
+        src/ui/returnform.ui
+        src/ui/archivedocumentsform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})

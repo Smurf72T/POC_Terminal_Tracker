@@ -35,6 +35,10 @@ RentalForm::RentalForm(QWidget *parent) :
     loadClientsToDelegate();
     loadFreeTerminalsToDelegate();
     loadFreeSIMsToDelegate();
+
+    // Подключаем сигнал изменения данных
+    connect(rowsModel, &QStandardItemModel::dataChanged,
+            this, &RentalForm::onTableViewDataChanged);
 }
 
 RentalForm::~RentalForm()
@@ -96,10 +100,20 @@ void RentalForm::on_btnAddRow_clicked()
     int row = rowsModel->rowCount();
     rowsModel->insertRow(row);
 
-    // Значения по умолчанию
-    rowsModel->setItem(row, 0, new QStandardItem("0")); // ID терминала
-    rowsModel->setItem(row, 1, new QStandardItem("0")); // ID SIM
-    rowsModel->setItem(row, 2, new QStandardItem(""));
+    // Создаем элементы с пустым текстом и ID = 0
+    QStandardItem *terminalItem = new QStandardItem();
+    terminalItem->setData(0, Qt::UserRole); // ID терминала
+    terminalItem->setData("", Qt::DisplayRole); // Текст для отображения
+
+    QStandardItem *simItem = new QStandardItem();
+    simItem->setData(0, Qt::UserRole); // ID SIM
+    simItem->setData("", Qt::DisplayRole); // Текст для отображения
+
+    QStandardItem *commentItem = new QStandardItem("");
+
+    rowsModel->setItem(row, 0, terminalItem);
+    rowsModel->setItem(row, 1, simItem);
+    rowsModel->setItem(row, 2, commentItem);
 }
 
 void RentalForm::on_btnDeleteRow_clicked()
@@ -149,9 +163,9 @@ void RentalForm::on_btnPost_clicked()
     // 2. Обрабатываем строки (главная часть с защитой от гонки)
     bool error = false;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
-        int terminalId = rowsModel->data(rowsModel->index(i, 0)).toInt();
-        int simId = rowsModel->data(rowsModel->index(i, 1)).toInt();
-        QString comment = rowsModel->data(rowsModel->index(i, 2)).toString();
+        int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
+        int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
+        QString comment = rowsModel->data(rowsModel->index(i, 2), Qt::DisplayRole).toString();
 
         // Проверяем, что терминал всё ещё свободен
         QSqlQuery checkQuery(db);
@@ -220,6 +234,22 @@ void RentalForm::on_btnPost_clicked()
     } else {
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
         this->close();
+    }
+}
+
+void RentalForm::onTableViewDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+    // Когда данные изменились, обновляем отображение
+    Q_UNUSED(bottomRight);
+
+    int row = topLeft.row();
+    int column = topLeft.column();
+
+    // Если изменилась колонка терминала или SIM
+    if (column == 0 || column == 1) {
+        // Принудительно обновляем отображение
+        QModelIndex index = rowsModel->index(row, column);
+        Q_UNUSED(index);
     }
 }
 

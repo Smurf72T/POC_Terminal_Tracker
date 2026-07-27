@@ -12,6 +12,8 @@
 #include <QTimer>
 #include "receiptform.h"
 #include "rentalform.h"
+#include "returnform.h"
+#include "archivedocumentsform.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -25,6 +27,10 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionSIMCards, &QAction::triggered, this, &MainWindow::onActionSIMCards_triggered);
     connect(ui->actionReceipt, &QAction::triggered, this, &MainWindow::onActionReceipt_triggered);
     connect(ui->actionRental, &QAction::triggered, this, &MainWindow::onActionRental_triggered);
+    connect(ui->actionReturn, &QAction::triggered, this, &MainWindow::onActionReturn_triggered);
+    connect(ui->actionArchiveReceipt, &QAction::triggered, this, &MainWindow::onActionArchiveReceipt_triggered);
+    connect(ui->actionArchiveRental, &QAction::triggered, this, &MainWindow::onActionArchiveRental_triggered);
+    connect(ui->actionArchiveReturn, &QAction::triggered, this, &MainWindow::onActionArchiveReturn_triggered);
 }
 
 MainWindow::~MainWindow()
@@ -128,5 +134,29 @@ void MainWindow::onActionReceipt_triggered()
 void MainWindow::onActionRental_triggered()
 {
     RentalForm *form = new RentalForm(this);
+    form->show();
+}
+
+void MainWindow::onActionReturn_triggered()
+{
+    ReturnForm *form = new ReturnForm(this);
+    form->show();
+}
+
+void MainWindow::onActionArchiveReceipt_triggered()
+{
+    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(1, this); // 1 = Поступление
+    form->show();
+}
+
+void MainWindow::onActionArchiveRental_triggered()
+{
+    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(2, this); // 2 = Аренда
+    form->show();
+}
+
+void MainWindow::onActionArchiveReturn_triggered()
+{
+    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(3, this); // 3 = Возврат
     form->show();
 }

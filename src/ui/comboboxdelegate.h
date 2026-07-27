@@ -5,32 +5,39 @@
 #include <QComboBox>
 #include <QList>
 #include <QPair>
+#include <QMap>
 
 class ComboBoxDelegate : public QStyledItemDelegate
 {
     Q_OBJECT
 
 public:
-    // Принимает список пар (ID модели, Название модели)
     explicit ComboBoxDelegate(const QList<QPair<int, QString>>& items, QObject *parent = nullptr)
-        : QStyledItemDelegate(parent), m_items(items) {}
+        : QStyledItemDelegate(parent)
+    {
+        for (const auto &item : items) {
+            m_idToText[item.first] = item.second;
+        }
+    }
 
     QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
                           const QModelIndex &index) const override
     {
         QComboBox *editor = new QComboBox(parent);
-        for (const auto &item : m_items) {
-            editor->addItem(item.second, item.first); // Текст, ID (в UserRole)
+        for (auto it = m_idToText.begin(); it != m_idToText.end(); ++it) {
+            editor->addItem(it.value(), it.key());
         }
         return editor;
     }
 
     void setEditorData(QWidget *editor, const QModelIndex &index) const override
     {
-        int value = index.model()->data(index, Qt::EditRole).toInt();
+        int id = index.model()->data(index, Qt::UserRole).toInt();
         QComboBox *comboBox = static_cast<QComboBox*>(editor);
-        int comboIndex = comboBox->findData(value);
-        if (comboIndex >= 0) comboBox->setCurrentIndex(comboIndex);
+        int comboIndex = comboBox->findData(id);
+        if (comboIndex >= 0) {
+            comboBox->setCurrentIndex(comboIndex);
+        }
     }
 
     void setModelData(QWidget *editor, QAbstractItemModel *model,
@@ -38,11 +45,15 @@ public:
     {
         QComboBox *comboBox = static_cast<QComboBox*>(editor);
         int id = comboBox->currentData().toInt();
-        model->setData(index, id, Qt::EditRole);
+        QString text = comboBox->currentText();
+
+        // Сохраняем ID в UserRole и текст в DisplayRole
+        model->setData(index, id, Qt::UserRole);
+        model->setData(index, text, Qt::DisplayRole);
     }
 
 private:
-    QList<QPair<int, QString>> m_items;
+    QMap<int, QString> m_idToText;
 };
 
 #endif // COMBOBOXDELEGATE_H
