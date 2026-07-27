@@ -65,6 +65,7 @@
     <addaction name="actionReceipt"/>
     <addaction name="actionRental"/>
     <addaction name="actionReturn"/>
+    <addaction name="actionPayment"/>
     <addaction name="separator"/>
     <addaction name="actionArchiveReceipt"/>
     <addaction name="actionArchiveRental"/>
@@ -139,6 +140,11 @@
   <action name="actionArchiveReturn">
    <property name="text">
     <string>Архив: Возврат</string>
+   </property>
+  </action>
+  <action name="actionPayment">
+   <property name="text">
+    <string>Отметка оплаты</string>
    </property>
   </action>
  </widget>

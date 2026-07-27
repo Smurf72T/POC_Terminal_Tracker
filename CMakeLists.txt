@@ -34,6 +34,7 @@ set(SOURCES
         src/ui/rentalform.cpp
         src/ui/returnform.cpp
         src/ui/archivedocumentsform.cpp
+        src/ui/paymentform.cpp
 )
 
 set(HEADERS
@@ -52,6 +53,7 @@ set(HEADERS
         src/ui/comboboxmodel.h
         src/ui/returnform.h
         src/ui/archivedocumentsform.h
+        src/ui/paymentform.h
 )
 
 set(UI_FILES
@@ -65,6 +67,7 @@ set(UI_FILES
         src/ui/rentalform.ui
         src/ui/returnform.ui
         src/ui/archivedocumentsform.ui
+        src/ui/paymentform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})

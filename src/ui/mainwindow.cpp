@@ -14,6 +14,7 @@
 #include "rentalform.h"
 #include "returnform.h"
 #include "archivedocumentsform.h"
+#include "paymentform.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -31,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->actionArchiveReceipt, &QAction::triggered, this, &MainWindow::onActionArchiveReceipt_triggered);
     connect(ui->actionArchiveRental, &QAction::triggered, this, &MainWindow::onActionArchiveRental_triggered);
     connect(ui->actionArchiveReturn, &QAction::triggered, this, &MainWindow::onActionArchiveReturn_triggered);
+    connect(ui->actionPayment, &QAction::triggered, this, &MainWindow::onActionPayment_triggered);
 }
 
 MainWindow::~MainWindow()
@@ -158,5 +160,11 @@ void MainWindow::onActionArchiveRental_triggered()
 void MainWindow::onActionArchiveReturn_triggered()
 {
     ArchiveDocumentsForm *form = new ArchiveDocumentsForm(3, this); // 3 = Возврат
+    form->show();
+}
+
+void MainWindow::onActionPayment_triggered()
+{
+    PaymentForm *form = new PaymentForm(this);
     form->show();
 }

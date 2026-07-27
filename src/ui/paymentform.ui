@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>PaymentForm</class>
+    <widget class="QWidget" name="PaymentForm">
+        <property name="geometry">
+            <rect><x>0</x><y>0</y><width>500</width><height>350</height></rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <layout class="QFormLayout" name="formLayout">
+                    <item row="0" column="0"><widget class="QLabel" name="label"><property name="text"><string>Клиент:</string></property></widget></item>
+                    <item row="0" column="1"><widget class="QComboBox" name="comboBoxClient"/></item>
+                    <item row="1" column="0"><widget class="QLabel" name="label_2"><property name="text"><string>Период (месяц):</string></property></widget></item>
+                    <item row="1" column="1"><widget class="QComboBox" name="comboBoxMonth"/></item>
+                    <item row="2" column="0"><widget class="QLabel" name="label_3"><property name="text"><string>Год:</string></property></widget></item>
+                    <item row="2" column="1"><widget class="QSpinBox" name="spinBoxYear"><property name="minimum"><number>2000</number></property><property name="maximum"><number>2100</number></property></widget></item>
+                    <item row="3" column="0"><widget class="QLabel" name="label_4"><property name="text"><string>Дата платежа:</string></property></widget></item>
+                    <item row="3" column="1"><widget class="QDateEdit" name="dateEdit"><property name="calendarPopup"><bool>true</bool></property></widget></item>
+                    <item row="4" column="0"><widget class="QLabel" name="label_5"><property name="text"><string>Сумма:</string></property></widget></item>
+                    <item row="4" column="1"><widget class="QDoubleSpinBox" name="doubleSpinBoxAmount"><property name="prefix"><string>₽ </string></property><property name="decimals"><number>2</number></property><property name="maximum"><double>999999.990000000000000</double></property></widget></item>
+                    <item row="5" column="0"><widget class="QLabel" name="label_6"><property name="text"><string>Комментарий:</string></property></widget></item>
+                    <item row="5" column="1"><widget class="QTextEdit" name="textEditComment"><property name="maximumSize"><size><width>16777215</width><height>60</height></size></property></widget></item>
+                </layout>
+            </item>
+            <item>
+                <spacer name="verticalSpacer">
+                    <property name="orientation"><enum>Qt::Vertical</enum></property>
+                </spacer>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="horizontalLayout">
+                    <item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                    <item><widget class="QPushButton" name="btnSave"><property name="text"><string>Сохранить</string></property><property name="styleSheet"><string>QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 5px; }</string></property></widget></item>
+                    <item><widget class="QPushButton" name="btnClose"><property name="text"><string>Закрыть</string></property></widget></item>
+                </layout>
+            </item>
+        </layout>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

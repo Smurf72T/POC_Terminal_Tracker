@@ -31,6 +31,7 @@ private slots:
     void onActionArchiveReceipt_triggered();
     void onActionArchiveRental_triggered();
     void onActionArchiveReturn_triggered();
+    void onActionPayment_triggered();
 
 private:
     Ui::MainWindow *ui;
