@@ -2,8 +2,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QLabel>
-#include <QStatusBar>
+#include <QSqlQueryModel>
+#include <QTimer>
 
 namespace Ui {
     class MainWindow;
@@ -28,17 +28,24 @@ private slots:
     void onActionReceipt_triggered();
     void onActionRental_triggered();
     void onActionReturn_triggered();
+    void onActionPayment_triggered();
     void onActionArchiveReceipt_triggered();
     void onActionArchiveRental_triggered();
     void onActionArchiveReturn_triggered();
-    void onActionArchivePayment_triggered();
-    void onActionPayment_triggered();
+    void onDatabaseDataChanged(); // <-- Добавлено
 
 private:
     Ui::MainWindow *ui;
+    QSqlQueryModel *topClientsModel;
+    QSqlQueryModel *recentDocsModel;
+    QTimer *refreshTimer;
+
     void setupUI();
     void updateStatusBar();
-    void centerWindow(QWidget *widget);
+    void loadCounters();
+    void loadTopClients();
+    void loadRecentDocuments();
+    void updateCounterWidget(QWidget* widget, const QString& value, const QString& label, const QString& color);
 };
 
 #endif // MAINWINDOW_H

@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>DashboardForm</class>
+    <widget class="QWidget" name="DashboardForm">
+        <property name="geometry">
+            <rect><x>0</x><y>0</y><width>1200</width><height>800</height></rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <layout class="QHBoxLayout" name="headerLayout">
+                    <item>
+                        <widget class="QLabel" name="labelTitle">
+                            <property name="text">
+                                <string>Дашборд — Остатки и статистика</string>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QLabel { font-size: 20px; font-weight: bold; }</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <spacer name="horizontalSpacer">
+                            <property name="orientation">
+                                <enum>Qt::Horizontal</enum>
+                            </property>
+                        </spacer>
+                    </item>
+                    <item>
+                        <widget class="QLabel" name="labelLastUpdate">
+                            <property name="text">
+                                <string>Последнее обновление: —</string>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QLabel { color: gray; }</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnRefresh">
+                            <property name="text">
+                                <string>🔄 Обновить</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnClose">
+                            <property name="text">
+                                <string>Закрыть</string>
+                            </property>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+            <item>
+                <layout class="QGridLayout" name="countersLayout">
+                    <item row="0" column="0">
+                        <widget class="QFrame" name="frameTotalTerminals">
+                            <property name="frameShape">
+                                <enum>QFrame::StyledPanel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>QFrame::Raised</enum>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+                            </property>
+                            <layout class="QVBoxLayout" name="verticalLayout_2">
+                                <item>
+                                    <widget class="QLabel" name="labelTotalValue">
+                                        <property name="text">
+                                            <string>0</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QLabel" name="labelTotalName">
+                                        <property name="text">
+                                            <string>Всего терминалов</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                    <item row="0" column="1">
+                        <widget class="QFrame" name="frameFreeTerminals">
+                            <property name="frameShape">
+                                <enum>QFrame::StyledPanel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>QFrame::Raised</enum>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+                            </property>
+                            <layout class="QVBoxLayout">
+                                <item>
+                                    <widget class="QLabel" name="labelFreeValue">
+                                        <property name="text">
+                                            <string>0</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QLabel" name="labelFreeName">
+                                        <property name="text">
+                                            <string>Свободно</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                    <item row="0" column="2">
+                        <widget class="QFrame" name="frameRentedTerminals">
+                            <property name="frameShape">
+                                <enum>QFrame::StyledPanel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>QFrame::Raised</enum>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+                            </property>
+                            <layout class="QVBoxLayout">
+                                <item>
+                                    <widget class="QLabel" name="labelRentedValue">
+                                        <property name="text">
+                                            <string>0</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QLabel" name="labelRentedName">
+                                        <property name="text">
+                                            <string>В аренде</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                    <item row="1" column="0">
+                        <widget class="QFrame" name="frameTotalSIM">
+                            <property name="frameShape">
+                                <enum>QFrame::StyledPanel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>QFrame::Raised</enum>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+                            </property>
+                            <layout class="QVBoxLayout">
+                                <item>
+                                    <widget class="QLabel" name="labelSIMTotalValue">
+                                        <property name="text">
+                                            <string>0</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QLabel" name="labelSIMTotalName">
+                                        <property name="text">
+                                            <string>Всего SIM-карт</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                    <item row="1" column="1">
+                        <widget class="QFrame" name="frameFreeSIM">
+                            <property name="frameShape">
+                                <enum>QFrame::StyledPanel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>QFrame::Raised</enum>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+                            </property>
+                            <layout class="QVBoxLayout">
+                                <item>
+                                    <widget class="QLabel" name="labelSIMFreeValue">
+                                        <property name="text">
+                                            <string>0</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QLabel" name="labelSIMFreeName">
+                                        <property name="text">
+                                            <string>Свободно SIM</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                    <item row="1" column="2">
+                        <widget class="QFrame" name="frameClients">
+                            <property name="frameShape">
+                                <enum>QFrame::StyledPanel</enum>
+                            </property>
+                            <property name="frameShadow">
+                                <enum>QFrame::Raised</enum>
+                            </property>
+                            <property name="styleSheet">
+                                <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+                            </property>
+                            <layout class="QVBoxLayout">
+                                <item>
+                                    <widget class="QLabel" name="labelClientsValue">
+                                        <property name="text">
+                                            <string>0</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QLabel" name="labelClientsName">
+                                        <property name="text">
+                                            <string>Клиентов</string>
+                                        </property>
+                                        <property name="alignment">
+                                            <set>Qt::AlignCenter</set>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+            <item>
+                <widget class="QGroupBox" name="groupBoxTopClients">
+                    <property name="title">
+                        <string>Топ клиентов по аренде (топ-10)</string>
+                    </property>
+                    <layout class="QVBoxLayout" name="verticalLayout_3">
+                        <item>
+                            <widget class="QTableView" name="tableViewTopClients"/>
+                        </item>
+                    </layout>
+                </widget>
+            </item>
+            <item>
+                <widget class="QGroupBox" name="groupBoxRecentDocs">
+                    <property name="title">
+                        <string>Последние документы</string>
+                    </property>
+                    <layout class="QVBoxLayout" name="verticalLayout_4">
+                        <item>
+                            <widget class="QTableView" name="tableViewRecentDocs"/>
+                        </item>
+                    </layout>
+                </widget>
+            </item>
+        </layout>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

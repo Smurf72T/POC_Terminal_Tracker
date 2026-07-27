@@ -35,6 +35,7 @@ set(SOURCES
         src/ui/returnform.cpp
         src/ui/archivedocumentsform.cpp
         src/ui/paymentform.cpp
+        src/ui/dashboardform.cpp
 )
 
 set(HEADERS
@@ -54,6 +55,7 @@ set(HEADERS
         src/ui/returnform.h
         src/ui/archivedocumentsform.h
         src/ui/paymentform.h
+        src/ui/dashboardform.h
 )
 
 set(UI_FILES
@@ -68,6 +70,7 @@ set(UI_FILES
         src/ui/returnform.ui
         src/ui/archivedocumentsform.ui
         src/ui/paymentform.ui
+        src/ui/dashboardform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})

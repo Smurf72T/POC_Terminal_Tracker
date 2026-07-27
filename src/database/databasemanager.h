@@ -27,6 +27,10 @@ public:
     bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc);
 
     QString generateDocNumber(const QString& docType);
+    void notifyDataChanged(); // <-- Добавлено
+
+signals:
+    void dataChanged(); // <-- Добавлено
 
 private:
     DatabaseManager() = default;

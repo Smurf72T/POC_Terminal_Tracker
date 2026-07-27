@@ -6,23 +6,288 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1024</width>
-    <height>768</height>
+    <width>1200</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>POC Terminal Tracker</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="QLabel" name="labelWelcome">
-      <property name="text">
-       <string>Добро пожаловать в систему учёта POC-терминалов</string>
+     <layout class="QHBoxLayout" name="headerLayout">
+      <item>
+       <widget class="QLabel" name="labelTitle">
+        <property name="styleSheet">
+         <string>QLabel { font-size: 20px; font-weight: bold; }</string>
+        </property>
+        <property name="text">
+         <string>Дашборд — Остатки и статистика</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Orientation::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>0</width>
+          <height>0</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="labelLastUpdate">
+        <property name="styleSheet">
+         <string>QLabel { color: gray; }</string>
+        </property>
+        <property name="text">
+         <string>Последнее обновление: —</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QGridLayout" name="countersLayout">
+      <item row="0" column="0">
+       <widget class="QFrame" name="frameTotalTerminals">
+        <property name="styleSheet">
+         <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Shadow::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <widget class="QLabel" name="labelValueTotal">
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelNameTotal">
+           <property name="text">
+            <string>Всего терминалов</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QFrame" name="frameFreeTerminals">
+        <property name="styleSheet">
+         <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Shadow::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout">
+         <item>
+          <widget class="QLabel" name="labelValueFree">
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelNameFree">
+           <property name="text">
+            <string>Свободно</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QFrame" name="frameRentedTerminals">
+        <property name="styleSheet">
+         <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Shadow::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout">
+         <item>
+          <widget class="QLabel" name="labelValueRented">
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelNameRented">
+           <property name="text">
+            <string>В аренде</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QFrame" name="frameTotalSIM">
+        <property name="styleSheet">
+         <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Shadow::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout">
+         <item>
+          <widget class="QLabel" name="labelValueTotalSIM">
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelNameTotalSIM">
+           <property name="text">
+            <string>Всего SIM-карт</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QFrame" name="frameFreeSIM">
+        <property name="styleSheet">
+         <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Shadow::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout">
+         <item>
+          <widget class="QLabel" name="labelValueFreeSIM">
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelNameFreeSIM">
+           <property name="text">
+            <string>Свободно SIM</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QFrame" name="frameClients">
+        <property name="styleSheet">
+         <string>QFrame { background-color: #ecf0f1; border-radius: 10px; padding: 15px; }</string>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::Shape::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Shadow::Raised</enum>
+        </property>
+        <layout class="QVBoxLayout">
+         <item>
+          <widget class="QLabel" name="labelValueClients">
+           <property name="text">
+            <string>0</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="labelNameClients">
+           <property name="text">
+            <string>Клиентов</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupBoxTopClients">
+      <property name="title">
+       <string>Топ клиентов по аренде (топ-10)</string>
       </property>
-      <property name="alignment">
-       <set>Qt::AlignmentFlag::AlignCenter</set>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <widget class="QTableView" name="tableViewTopClients"/>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupBoxRecentDocs">
+      <property name="title">
+       <string>Последние документы</string>
       </property>
+      <layout class="QVBoxLayout" name="verticalLayout_4">
+       <item>
+        <widget class="QTableView" name="tableViewRecentDocs"/>
+       </item>
+      </layout>
      </widget>
     </item>
    </layout>
@@ -32,7 +297,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1024</width>
+     <width>1200</width>
      <height>22</height>
     </rect>
    </property>
@@ -46,18 +311,6 @@
     <addaction name="actionSIMCards"/>
     <addaction name="actionTerminals"/>
    </widget>
-   <widget class="QMenu" name="menuFile">
-    <property name="title">
-     <string>Файл</string>
-    </property>
-    <addaction name="actionExit"/>
-   </widget>
-   <widget class="QMenu" name="menuHelp">
-    <property name="title">
-     <string>Справка</string>
-    </property>
-    <addaction name="actionAbout"/>
-   </widget>
    <widget class="QMenu" name="menuDocuments">
     <property name="title">
      <string>Документы</string>
@@ -70,7 +323,18 @@
     <addaction name="actionArchiveReceipt"/>
     <addaction name="actionArchiveRental"/>
     <addaction name="actionArchiveReturn"/>
-    <addaction name="actionArchivePayment"/>
+   </widget>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>Файл</string>
+    </property>
+    <addaction name="actionExit"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Справка</string>
+    </property>
+    <addaction name="actionAbout"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
@@ -128,6 +392,11 @@
     <string>Возврат из аренды</string>
    </property>
   </action>
+  <action name="actionPayment">
+   <property name="text">
+    <string>Отметка оплаты</string>
+   </property>
+  </action>
   <action name="actionArchiveReceipt">
    <property name="text">
     <string>Архив: Поступление</string>
@@ -141,16 +410,6 @@
   <action name="actionArchiveReturn">
    <property name="text">
     <string>Архив: Возврат</string>
-   </property>
-  </action>
-  <action name="actionArchivePayment">
-   <property name="text">
-    <string>Архив: Оплата</string>
-   </property>
-  </action>
-  <action name="actionPayment">
-   <property name="text">
-    <string>Отметка оплаты</string>
    </property>
   </action>
  </widget>

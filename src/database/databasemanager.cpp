@@ -128,6 +128,11 @@ QString DatabaseManager::generateDocNumber(const QString& docType)
     return "";
 }
 
+void DatabaseManager::notifyDataChanged()
+{
+    emit dataChanged();
+}
+
 void DatabaseManager::showError(const QString& message)
 {
     QMessageBox::critical(nullptr, "Ошибка базы данных", message);

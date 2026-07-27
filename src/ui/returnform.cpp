@@ -238,6 +238,7 @@ void ReturnForm::on_btnPost_clicked()
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
         QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
+        DatabaseManager::instance().notifyDataChanged();
         this->close();
     }
 }

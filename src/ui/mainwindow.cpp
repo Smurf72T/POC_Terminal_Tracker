@@ -1,39 +1,64 @@
 #include "mainwindow.h"
-#include "manufacturersform.h"
-#include "modelsform.h"
 #include "ui_mainwindow.h"
-#include "../database/databasemanager.h"
-#include <QMessageBox>
-#include <QDateTime>
+#include "database/databasemanager.h"
+#include "manufacturersform.h"
 #include "modelsform.h"
 #include "clientsform.h"
 #include "simcardsform.h"
 #include "terminalsform.h"
-#include <QTimer>
 #include "receiptform.h"
 #include "rentalform.h"
 #include "returnform.h"
-#include "archivedocumentsform.h"
 #include "paymentform.h"
+#include "archivedocumentsform.h"
+#include <QMessageBox>
+#include <QDateTime>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QLabel>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow)
+    ui(new Ui::MainWindow),
+    topClientsModel(new QSqlQueryModel(this)),
+    recentDocsModel(new QSqlQueryModel(this)),
+    refreshTimer(new QTimer(this))
 {
     ui->setupUi(this);
     setupUI();
     updateStatusBar();
-    connect(ui->actionManufacturers, &QAction::triggered, this, &MainWindow::onActionManufacturers_triggered);
-    connect(ui->actionClients, &QAction::triggered, this, &MainWindow::onActionClients_triggered);
-    connect(ui->actionSIMCards, &QAction::triggered, this, &MainWindow::onActionSIMCards_triggered);
-    connect(ui->actionReceipt, &QAction::triggered, this, &MainWindow::onActionReceipt_triggered);
-    connect(ui->actionRental, &QAction::triggered, this, &MainWindow::onActionRental_triggered);
-    connect(ui->actionReturn, &QAction::triggered, this, &MainWindow::onActionReturn_triggered);
-    connect(ui->actionArchiveReceipt, &QAction::triggered, this, &MainWindow::onActionArchiveReceipt_triggered);
-    connect(ui->actionArchiveRental, &QAction::triggered, this, &MainWindow::onActionArchiveRental_triggered);
-    connect(ui->actionArchiveReturn, &QAction::triggered, this, &MainWindow::onActionArchiveReturn_triggered);
-    connect(ui->actionArchivePayment, &QAction::triggered, this, &MainWindow::onActionArchivePayment_triggered);
-    connect(ui->actionPayment, &QAction::triggered, this, &MainWindow::onActionPayment_triggered);
+
+    // Подключаем сигнал от DatabaseManager
+    connect(&DatabaseManager::instance(), &DatabaseManager::dataChanged,
+            this, &MainWindow::onDatabaseDataChanged);
+
+    // Настраиваем таблицы
+    ui->tableViewTopClients->setModel(topClientsModel);
+    ui->tableViewTopClients->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableViewTopClients->setAlternatingRowColors(true);
+    ui->tableViewTopClients->horizontalHeader()->setStretchLastSection(true);
+
+    ui->tableViewRecentDocs->setModel(recentDocsModel);
+    ui->tableViewRecentDocs->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableViewRecentDocs->setAlternatingRowColors(true);
+    ui->tableViewRecentDocs->horizontalHeader()->setStretchLastSection(true);
+
+    // Автообновление каждые 30 секунд
+    connect(refreshTimer, &QTimer::timeout, this, [this]() {
+        loadCounters();
+        loadTopClients();
+        loadRecentDocuments();
+        ui->labelLastUpdate->setText("Последнее обновление: " +
+            QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"));
+    });
+    refreshTimer->start(30000);
+
+    // Первичная загрузка
+    loadCounters();
+    loadTopClients();
+    loadRecentDocuments();
+    ui->labelLastUpdate->setText("Последнее обновление: " +
+        QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"));
 }
 
 MainWindow::~MainWindow()
@@ -44,13 +69,22 @@ MainWindow::~MainWindow()
 void MainWindow::setupUI()
 {
     setWindowTitle("POC Terminal Tracker");
-    resize(1024, 768);
+    resize(1200, 800);
 
-    // Подключаем сигналы меню
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onActionAbout_triggered);
     connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onActionExit_triggered);
+    connect(ui->actionManufacturers, &QAction::triggered, this, &MainWindow::onActionManufacturers_triggered);
     connect(ui->actionModels, &QAction::triggered, this, &MainWindow::onActionModels_triggered);
+    connect(ui->actionClients, &QAction::triggered, this, &MainWindow::onActionClients_triggered);
+    connect(ui->actionSIMCards, &QAction::triggered, this, &MainWindow::onActionSIMCards_triggered);
     connect(ui->actionTerminals, &QAction::triggered, this, &MainWindow::onActionTerminals_triggered);
+    connect(ui->actionReceipt, &QAction::triggered, this, &MainWindow::onActionReceipt_triggered);
+    connect(ui->actionRental, &QAction::triggered, this, &MainWindow::onActionRental_triggered);
+    connect(ui->actionReturn, &QAction::triggered, this, &MainWindow::onActionReturn_triggered);
+    connect(ui->actionPayment, &QAction::triggered, this, &MainWindow::onActionPayment_triggered);
+    connect(ui->actionArchiveReceipt, &QAction::triggered, this, &MainWindow::onActionArchiveReceipt_triggered);
+    connect(ui->actionArchiveRental, &QAction::triggered, this, &MainWindow::onActionArchiveRental_triggered);
+    connect(ui->actionArchiveReturn, &QAction::triggered, this, &MainWindow::onActionArchiveReturn_triggered);
 }
 
 void MainWindow::updateStatusBar()
@@ -60,6 +94,101 @@ void MainWindow::updateStatusBar()
                          " | " + QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
     statusBar()->showMessage(statusText);
 }
+
+void MainWindow::loadCounters()
+{
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+
+    if (query.exec("SELECT COUNT(*) FROM tblterminals") && query.next()) {
+        updateCounterWidget(ui->frameTotalTerminals,
+            query.value(0).toString(), "Всего терминалов", "#3498db");
+    }
+
+    if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 0") && query.next()) {
+        updateCounterWidget(ui->frameFreeTerminals,
+            query.value(0).toString(), "Свободно", "#2ecc71");
+    }
+
+    if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 1") && query.next()) {
+        updateCounterWidget(ui->frameRentedTerminals,
+            query.value(0).toString(), "В аренде", "#e74c3c");
+    }
+
+    if (query.exec("SELECT COUNT(*) FROM tblsimcards") && query.next()) {
+        updateCounterWidget(ui->frameTotalSIM,
+            query.value(0).toString(), "Всего SIM-карт", "#9b59b6");
+    }
+
+    if (query.exec("SELECT COUNT(*) FROM tblsimcards WHERE status = 0") && query.next()) {
+        updateCounterWidget(ui->frameFreeSIM,
+            query.value(0).toString(), "Свободно SIM", "#1abc9c");
+    }
+
+    if (query.exec("SELECT COUNT(*) FROM tblclients") && query.next()) {
+        updateCounterWidget(ui->frameClients,
+            query.value(0).toString(), "Клиентов", "#f39c12");
+    }
+}
+
+void MainWindow::updateCounterWidget(QWidget* widget, const QString& value,
+                                     const QString& label, const QString& color)
+{
+    QLabel* valueLabel = widget->findChild<QLabel*>();
+    QLabel* nameLabel = widget->findChild<QLabel*>();
+
+    if (valueLabel && nameLabel) {
+        // Первый QLabel - значение, второй - название
+        if (valueLabel->text().isEmpty() || valueLabel->text().toInt() >= 0) {
+            valueLabel->setText(value);
+            valueLabel->setStyleSheet(QString("QLabel { color: %1; font-size: 32px; font-weight: bold; }").arg(color));
+            nameLabel->setText(label);
+        }
+    }
+}
+
+void MainWindow::loadTopClients()
+{
+    QString queryStr =
+        "SELECT c.clientname AS \"Клиент\", "
+        "COUNT(t.terminalid) AS \"Терминалов в аренде\" "
+        "FROM tblclients c "
+        "JOIN tblrentaldocs r ON c.clientid = r.clientid "
+        "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
+        "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
+        "GROUP BY c.clientid, c.clientname "
+        "ORDER BY COUNT(t.terminalid) DESC "
+        "LIMIT 10";
+
+    topClientsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    ui->tableViewTopClients->resizeColumnsToContents();
+}
+
+void MainWindow::loadRecentDocuments()
+{
+    QString queryStr =
+        "SELECT docnumber AS \"Номер\", docdate AS \"Дата\", 'Поступление' AS \"Тип\" FROM tblreceiptdocs "
+        "UNION ALL "
+        "SELECT docnumber, docdate, 'Аренда' FROM tblrentaldocs "
+        "UNION ALL "
+        "SELECT docnumber, docdate, 'Возврат' FROM tblreturndocs "
+        "ORDER BY \"Дата\" DESC "
+        "LIMIT 15";
+
+    recentDocsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    ui->tableViewRecentDocs->resizeColumnsToContents();
+}
+
+void MainWindow::onDatabaseDataChanged()
+{
+    // Автоматическое обновление при изменении данных
+    loadCounters();
+    loadTopClients();
+    loadRecentDocuments();
+    ui->labelLastUpdate->setText("Последнее обновление: " +
+        QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"));
+}
+
+// ... все остальные слоты (onActionManufacturers_triggered и т.д.) остаются без изменений ...
 
 void MainWindow::onActionAbout_triggered()
 {
@@ -77,101 +206,72 @@ void MainWindow::onActionExit_triggered()
 
 void MainWindow::onActionManufacturers_triggered()
 {
-    ManufacturersForm *form = new ManufacturersForm(this);
-    form->setWindowModality(Qt::WindowModal);
+    ManufacturersForm *form = new ManufacturersForm(nullptr);
     form->show();
-    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionModels_triggered()
 {
-    ModelsForm *form = new ModelsForm(this);
-    form->setWindowModality(Qt::WindowModal);
+    ModelsForm *form = new ModelsForm(nullptr);
     form->show();
-    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionClients_triggered()
 {
-    ClientsForm *form = new ClientsForm(this);
-    form->setWindowModality(Qt::WindowModal);
+    ClientsForm *form = new ClientsForm(nullptr);
     form->show();
-    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionSIMCards_triggered()
 {
-    SIMCardsForm *form = new SIMCardsForm(this);
-    form->setWindowModality(Qt::WindowModal);
+    SIMCardsForm *form = new SIMCardsForm(nullptr);
     form->show();
-    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
 }
 
 void MainWindow::onActionTerminals_triggered()
 {
-    TerminalsForm *form = new TerminalsForm(this);
-    form->setWindowModality(Qt::WindowModal);
+    TerminalsForm *form = new TerminalsForm(nullptr);
     form->show();
-    QTimer::singleShot(50, this, [this, form]() { centerWindow(form); });
-}
-
-void MainWindow::centerWindow(QWidget *widget)
-{
-    if (!widget || !this) return;
-
-    QRect mainGeometry = this->geometry();
-    QRect widgetGeometry = widget->geometry();
-
-    int x = mainGeometry.x() + (mainGeometry.width() - widgetGeometry.width()) / 2;
-    int y = mainGeometry.y() + (mainGeometry.height() - widgetGeometry.height()) / 2;
-
-    widget->move(x, y);
 }
 
 void MainWindow::onActionReceipt_triggered()
 {
-    ReceiptForm *form = new ReceiptForm(this);
+    ReceiptForm *form = new ReceiptForm(nullptr);
     form->show();
 }
 
 void MainWindow::onActionRental_triggered()
 {
-    RentalForm *form = new RentalForm(this);
+    RentalForm *form = new RentalForm(nullptr);
     form->show();
 }
 
 void MainWindow::onActionReturn_triggered()
 {
-    ReturnForm *form = new ReturnForm(this);
-    form->show();
-}
-
-void MainWindow::onActionArchiveReceipt_triggered()
-{
-    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(1, this); // 1 = Поступление
-    form->show();
-}
-
-void MainWindow::onActionArchiveRental_triggered()
-{
-    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(2, this); // 2 = Аренда
-    form->show();
-}
-
-void MainWindow::onActionArchiveReturn_triggered()
-{
-    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(3, this); // 3 = Возврат
-    form->show();
-}
-
-void MainWindow::onActionArchivePayment_triggered()
-{
-    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(4, this); // 4 = Оплата
+    ReturnForm *form = new ReturnForm(nullptr);
     form->show();
 }
 
 void MainWindow::onActionPayment_triggered()
 {
-    PaymentForm *form = new PaymentForm(this);
+    PaymentForm *form = new PaymentForm(nullptr);
+    form->show();
+}
+
+void MainWindow::onActionArchiveReceipt_triggered()
+{
+    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(1, nullptr);
+    form->show();
+}
+
+void MainWindow::onActionArchiveRental_triggered()
+{
+    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(2, nullptr);
+    form->show();
+}
+
+void MainWindow::onActionArchiveReturn_triggered()
+{
+    ArchiveDocumentsForm *form = new ArchiveDocumentsForm(3, nullptr);
     form->show();
 }

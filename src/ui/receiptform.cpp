@@ -152,6 +152,7 @@ void ReceiptForm::on_btnPost_clicked()
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
+        DatabaseManager::instance().notifyDataChanged();
         this->close();
     }
 }

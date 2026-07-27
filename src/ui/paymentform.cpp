@@ -235,6 +235,7 @@ void PaymentForm::on_btnSave_clicked()
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
         QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
+        DatabaseManager::instance().notifyDataChanged();
         this->close();
     }
 }
