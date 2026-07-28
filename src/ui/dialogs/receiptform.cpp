@@ -124,9 +124,17 @@ void ReceiptForm::on_btnPost_clicked()
     // 2. Обрабатываем строки
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
-        int modelId = rowsModel->data(rowsModel->index(i, 1)).toInt();
+        int modelId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
         QString imei1 = rowsModel->data(rowsModel->index(i, 2)).toString();
         QString imei2 = rowsModel->data(rowsModel->index(i, 3)).toString();
+
+        // Валидация модели
+        if (modelId <= 0) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Строка %1: выберите модель из списка.").arg(i + 1));
+            return;
+        }
 
         // Валидация серийного номера
         if (!Validator::validateSerialNotEmpty(serial)) {
@@ -141,17 +149,19 @@ void ReceiptForm::on_btnPost_clicked()
         imei1.remove(digitRe);
         imei2.remove(digitRe);
 
-        if (!imei1.isEmpty() && !Validator::validateIMEI(imei1)) {
+        if (!imei1.isEmpty() && imei1.length() != 15) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр.").arg(i + 1));
+                QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
+                .arg(i + 1).arg(imei1).arg(imei1.length()));
             return;
         }
 
-        if (!imei2.isEmpty() && !Validator::validateIMEI(imei2)) {
+        if (!imei2.isEmpty() && imei2.length() != 15) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр.").arg(i + 1));
+                QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
+                .arg(i + 1).arg(imei2).arg(imei2.length()));
             return;
         }
 
