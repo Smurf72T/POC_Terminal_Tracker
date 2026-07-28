@@ -108,7 +108,7 @@ void ReceiptForm::on_btnPost_clicked()
     query.prepare("INSERT INTO tblreceiptdocs (docnumber, docdate, comments) "
                   "VALUES (:num, :date, :comm) RETURNING receiptdocid");
     query.bindValue(":num", ui->lineEditNumber->text());
-    query.bindValue(":date", ui->dateEdit->date());
+    query.bindValue(":date", QDateTime::currentDateTime());
     query.bindValue(":comm", ui->textEditComment->toPlainText());
 
     if (!query.exec() || !query.next()) {

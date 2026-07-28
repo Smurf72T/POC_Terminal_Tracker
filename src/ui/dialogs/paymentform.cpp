@@ -202,7 +202,7 @@ void PaymentForm::on_btnSave_clicked()
     query.prepare("INSERT INTO tblpayments (clientid, paymentdate, periodmonth, periodyear, amount, comment) "
                   "VALUES (:cid, :date, :month, :year, :amount, :comment) RETURNING paymentid");
     query.bindValue(":cid", clientId);
-    query.bindValue(":date", ui->dateEdit->date());
+    query.bindValue(":date", QDateTime::currentDateTime());
     query.bindValue(":month", month);
     query.bindValue(":year", year);
     query.bindValue(":amount", amount);

@@ -186,7 +186,7 @@ void ReturnForm::on_btnPost_clicked()
     query.prepare("INSERT INTO tblreturndocs (docnumber, docdate, clientid, comments) "
                   "VALUES (:num, :date, :client, :comm) RETURNING returndocid");
     query.bindValue(":num", ui->lineEditNumber->text());
-    query.bindValue(":date", ui->dateEdit->date());
+    query.bindValue(":date", QDateTime::currentDateTime());
     query.bindValue(":client", clientId);
     query.bindValue(":comm", ui->textEditComment->toPlainText());
 

@@ -192,7 +192,7 @@ void RentalForm::on_btnPost_clicked()
     query.prepare("INSERT INTO tblrentaldocs (docnumber, docdate, clientid, comments) "
                   "VALUES (:num, :date, :client, :comm) RETURNING rentaldocid");
     query.bindValue(":num", ui->lineEditNumber->text());
-    query.bindValue(":date", ui->dateEdit->date());
+    query.bindValue(":date", QDateTime::currentDateTime());
     query.bindValue(":client", clientId);
     query.bindValue(":comm", ui->textEditComment->toPlainText());
 
