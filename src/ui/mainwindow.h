@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QLabel>
 #include <QSqlQueryModel>
 #include <QTimer>
 
@@ -32,6 +33,7 @@ private slots:
     void onActionArchiveReceipt_triggered();
     void onActionArchiveRental_triggered();
     void onActionArchiveReturn_triggered();
+    void onActionArchivePayment_triggered();
     void onDatabaseDataChanged(); // <-- Добавлено
 
 private:
@@ -45,7 +47,7 @@ private:
     void loadCounters();
     void loadTopClients();
     void loadRecentDocuments();
-    void updateCounterWidget(QWidget* widget, const QString& value, const QString& label, const QString& color);
+    void updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel, const QString& value, const QString& label, const QString& color);
     void openForm(QWidget *form);
 };
 

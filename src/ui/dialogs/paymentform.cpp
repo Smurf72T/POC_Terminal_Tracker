@@ -1,6 +1,6 @@
 #include "paymentform.h"
 #include "ui_paymentform.h"
-#include "../../database/databasemanager.h"
+#include "database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -234,6 +234,9 @@ void PaymentForm::on_btnSave_clicked()
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
+        // Логирование действия
+        DatabaseManager::instance().logAction("POST", "tblpayments", paymentId);
+        
         QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();

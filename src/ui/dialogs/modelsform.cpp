@@ -1,6 +1,6 @@
 #include "modelsform.h"
 #include "ui_modelsform.h"
-#include "../../database/databasemanager.h"
+#include "database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -30,7 +30,13 @@ ModelsForm::ModelsForm(QWidget *parent) :
     model->setRelation(1, QSqlRelation("tblmanufacturers", "manufacturerid", "manufacturername"));
 
     if (!model->select()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить модели: " + model->lastError().text());
+        QMessageBox::critical(this, "Ошибка БД",
+            "Не удалось загрузить модели: " + model->lastError().text() +
+            "\n\nПроверьте соединение с базой данных.");
+        ui->tableView->setEnabled(false);
+        ui->btnAdd->setEnabled(false);
+        ui->btnDelete->setEnabled(false);
+        ui->lineEditSearch->setEnabled(false);
         return;
     }
 
@@ -50,6 +56,28 @@ ModelsForm::ModelsForm(QWidget *parent) :
     ui->tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
     ui->tableView->setAlternatingRowColors(true);
+
+    // Debounce timer для поиска
+    static QTimer* searchTimer = nullptr;
+    if (!searchTimer) {
+        searchTimer = new QTimer(this);
+        searchTimer->setSingleShot(true);
+        searchTimer->setInterval(300);
+        connect(searchTimer, &QTimer::timeout, this, [this]() {
+            QString searchText = ui->lineEditSearch->text();
+            if (searchText.isEmpty()) {
+                model->setFilter("");
+            } else {
+                QString filter = QString("modelname LIKE '%%1%%' OR manufacturername LIKE '%%1%%'")
+                                    .arg(searchText.replace("'", "''"));
+                model->setFilter(filter);
+            }
+            model->select();
+        });
+    }
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
+        searchTimer->start();
+    });
 }
 
 ModelsForm::~ModelsForm()
@@ -125,7 +153,12 @@ void ModelsForm::on_btnDelete_clicked()
             query.bindValue(":id", id);
 
             if (query.exec()) {
-                model->select();
+                if (!model->select()) {
+                    QMessageBox::critical(this, "Ошибка БД",
+                        "Запись удалена, но не удалось обновить таблицу: " + model->lastError().text() +
+                        "\n\nПопробуйте перезапустить форму.");
+                    ui->tableView->setEnabled(false);
+                }
             } else {
                 QMessageBox::warning(this, "Ошибка", "Не удалось удалить. Возможно, есть привязанные терминалы.\n" + query.lastError().text());
             }

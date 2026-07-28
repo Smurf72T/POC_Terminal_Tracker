@@ -1,8 +1,8 @@
 #include "rentalform.h"
 #include "ui_rentalform.h"
-#include "../delegates/comboboxdelegate.h"
-#include "../delegates/comboboxmodel.h"
-#include "../../database/databasemanager.h"
+#include "delegates/comboboxdelegate.h"
+#include "delegates/comboboxmodel.h"
+#include "database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -112,7 +112,12 @@ void RentalForm::loadFreeSIMsToDelegate()
 
 void RentalForm::generateDocNumber()
 {
-    ui->lineEditNumber->setText("АР-" + QString::number(QDateTime::currentMSecsSinceEpoch() % 100000));
+    QString number = DatabaseManager::instance().generateDocNumber("rental");
+    if (!number.isEmpty()) {
+        ui->lineEditNumber->setText(number);
+    } else {
+        ui->lineEditNumber->setText("АР-00001");
+    }
 }
 
 void RentalForm::on_btnAddRow_clicked()
@@ -271,6 +276,10 @@ void RentalForm::on_btnPost_clicked()
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
+        // Логирование действия
+        DatabaseManager::instance().logAction("POST", "tblrentaldocs", docId);
+        
+        isPosted = true;
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();
@@ -304,6 +313,15 @@ void RentalForm::on_btnPrintAct_clicked()
     if (clientId == 0) {
         QMessageBox::warning(this, "Внимание", "Сначала выберите клиента!");
         return;
+    }
+
+    // ПРЕДУПРЕЖДЕНИЕ: документ не проведён
+    if (!isPosted) {
+        int btn = QMessageBox::warning(this, "Внимание",
+            "Акт будет распечатан до проведения документа. "
+            "После проведения данные могут измениться.\n\n"
+            "Распечатать как черновик?");
+        if (btn != QMessageBox::Yes) return;
     }
 
     // Получаем данные клиента

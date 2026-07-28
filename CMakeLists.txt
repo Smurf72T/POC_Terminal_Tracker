@@ -43,6 +43,7 @@ set(SOURCES
         src/ui/dialogs/archivedocumentsform.cpp
         src/ui/dialogs/paymentform.cpp
         src/utils/reportexporter.cpp
+        src/utils/validator.cpp
 )
 
 set(HEADERS
@@ -63,6 +64,7 @@ set(HEADERS
         src/ui/dialogs/archivedocumentsform.h
         src/ui/dialogs/paymentform.h
         src/utils/reportexporter.h
+        src/utils/validator.h
 )
 
 set(UI_FILES
@@ -102,5 +104,6 @@ configure_file(
 # Добавляем include директории
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/src/ui
         ${PostgreSQL_INCLUDE_DIRS}
 )

@@ -20,6 +20,7 @@ private slots:
     void on_btnAdd_clicked();
     void on_btnDelete_clicked();
     void on_btnClose_clicked();
+    void on_model_dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight);
 
 private:
     Ui::TerminalsForm *ui;

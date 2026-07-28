@@ -123,3 +123,35 @@ void DatabaseManager::showError(const QString& message)
 {
     QMessageBox::critical(nullptr, "Ошибка базы данных", message);
 }
+
+QString DatabaseManager::generateDocNumber(const QString& docType)
+{
+    QSqlQuery query(m_database);
+    query.prepare("SELECT generate_doc_number(:type)");
+    query.bindValue(":type", docType);
+
+    if (!query.exec() || !query.next()) {
+        showError("Не удалось сгенерировать номер документа: " + query.lastError().text());
+        return QString();
+    }
+
+    return query.value(0).toString();
+}
+
+void DatabaseManager::logAction(const QString& action, const QString& tableName, int recordId,
+                                const QString& username, const QString& oldValues,
+                                const QString& newValues)
+{
+    QSqlQuery query(m_database);
+    query.prepare("SELECT log_audit_action(:action, :table, :recid, :uname, :oldv, :newv)");
+    query.bindValue(":action", action);
+    query.bindValue(":table", tableName);
+    query.bindValue(":recid", recordId);
+    query.bindValue(":uname", username);
+    query.bindValue(":oldv", oldValues);
+    query.bindValue(":newv", newValues);
+
+    if (!query.exec()) {
+        qDebug() << "[AuditLog] Ошибка логирования:" << query.lastError().text();
+    }
+}

@@ -1,6 +1,6 @@
 #include "returnform.h"
 #include "ui_returnform.h"
-#include "../../database/databasemanager.h"
+#include "database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -138,7 +138,12 @@ void ReturnForm::on_comboBoxRentalDoc_currentIndexChanged(int index)
 
 void ReturnForm::generateDocNumber()
 {
-    ui->lineEditNumber->setText("ВР-" + QString::number(QDateTime::currentMSecsSinceEpoch() % 100000));
+    QString number = DatabaseManager::instance().generateDocNumber("return");
+    if (!number.isEmpty()) {
+        ui->lineEditNumber->setText(number);
+    } else {
+        ui->lineEditNumber->setText("ВР-00001");
+    }
 }
 
 void ReturnForm::on_btnPost_clicked()
@@ -177,7 +182,7 @@ void ReturnForm::on_btnPost_clicked()
 
     QSqlQuery query(db);
 
-    // 1. Создаем шапку
+    // 1. Создаем шапку документа возврата
     query.prepare("INSERT INTO tblreturndocs (docnumber, docdate, clientid, comments) "
                   "VALUES (:num, :date, :client, :comm) RETURNING returndocid");
     query.bindValue(":num", ui->lineEditNumber->text());
@@ -194,19 +199,24 @@ void ReturnForm::on_btnPost_clicked()
 
     // 2. Обрабатываем выбранные терминалы
     for (int termId : terminalsToReturn) {
-        // Проверяем, что терминал всё ещё в аренде (защита от гонки)
+        // Блокируем терминал и проверяем, что он всё ещё в аренде
         QSqlQuery checkQuery(db);
-        checkQuery.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+        checkQuery.prepare(
+            "SELECT status, currentsimcardid FROM tblterminals "
+            "WHERE terminalid = :id FOR UPDATE NOWAIT");
         checkQuery.bindValue(":id", termId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Не удалось заблокировать терминал %1").arg(termId));
+                QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.")
+                    .arg(termId));
             return;
         }
 
         int status = checkQuery.value(0).toInt();
+        int actualSimId = checkQuery.value(1).toInt(); // читаем SIM ДО очистки
+
         if (status != 1) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
@@ -214,42 +224,22 @@ void ReturnForm::on_btnPost_clicked()
             return;
         }
 
-        // Получаем simcardid из деталей аренды для этого терминала
-        QSqlQuery simQuery(db);
-        simQuery.prepare("SELECT simcardid FROM tblrentaldetails WHERE rentaldocid = :docid AND terminalid = :tid");
-        simQuery.bindValue(":docid", rentalDocId);
-        simQuery.bindValue(":tid", termId);
-
-        int simcardId = -1;
-        if (simQuery.exec() && simQuery.next()) {
-            simcardId = simQuery.value(0).toInt();
-        }
-
-        // Меняем статус терминала на "Свободен" (0)
+        // Меняем статус терминала на «Свободен» и очищаем привязку SIM
         QSqlQuery updateQuery(db);
-        updateQuery.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = NULL WHERE terminalid = :id");
+        updateQuery.prepare(
+            "UPDATE tblterminals SET status = 0, currentsimcardid = NULL "
+            "WHERE terminalid = :id");
         updateQuery.bindValue(":id", termId);
 
         if (!updateQuery.exec()) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
-                QString("Не удалось обновить статус терминала %1: %2").arg(QString::number(termId)).arg(updateQuery.lastError().text()));
+                QString("Не удалось обновить статус терминала %1:\n%2")
+                    .arg(termId).arg(updateQuery.lastError().text()));
             return;
         }
 
-        // ВАЖНО: Сбрасываем статус сим-карты на "Свободна" (0) ГАРАНТИРОВАННО:
-        // Получаем simcardid не из деталей аренды (может быть устаревшим),
-        // а из tblterminals.currentsimcardid (там актуальное значение)
-        QSqlQuery currentSimQuery(db);
-        currentSimQuery.prepare("SELECT currentsimcardid FROM tblterminals WHERE terminalid = :tid");
-        currentSimQuery.bindValue(":tid", termId);
-
-        int actualSimId = -1;
-        if (currentSimQuery.exec() && currentSimQuery.next()) {
-            actualSimId = currentSimQuery.value(0).toInt();
-        }
-
-        // Если есть привязанная SIM-карта, сбрасываем её статус
+        // Сбрасываем статус SIM-карты (если была привязана)
         if (actualSimId > 0) {
             QSqlQuery simUpdateQuery(db);
             simUpdateQuery.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
@@ -258,29 +248,36 @@ void ReturnForm::on_btnPost_clicked()
             if (!simUpdateQuery.exec()) {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка БД",
-                    QString("Не удалось обновить статус SIM-карты %1: %2").arg(QString::number(actualSimId)).arg(simUpdateQuery.lastError().text()));
+                    QString("Не удалось обновить статус SIM-карты %1:\n%2")
+                        .arg(actualSimId).arg(simUpdateQuery.lastError().text()));
                 return;
             }
         }
 
         // Записываем в детали возврата
         QSqlQuery detailQuery(db);
-        detailQuery.prepare("INSERT INTO tblreturndetails (returndocid, terminalid) VALUES (:did, :tid)");
+        detailQuery.prepare(
+            "INSERT INTO tblreturndetails (returndocid, terminalid) "
+            "VALUES (:did, :tid)");
         detailQuery.bindValue(":did", docId);
         detailQuery.bindValue(":tid", termId);
 
         if (!detailQuery.exec()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД",
+                "Ошибка связи: " + detailQuery.lastError().text());
             return;
         }
     }
 
-    // 3. Фиксируем
+    // 3. Фиксируем транзакцию
     if (!db.commit()) {
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
+        // Логирование действия
+        DatabaseManager::instance().logAction("POST", "tblreturndocs", docId);
+        
         QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();

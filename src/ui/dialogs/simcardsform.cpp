@@ -1,7 +1,7 @@
 #include "simcardsform.h"
 #include "ui_simcardsform.h"
-#include "../delegates/readonlydelegate.h"
-#include "../../database/databasemanager.h"
+#include "delegates/readonlydelegate.h"
+#include "database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -25,7 +25,13 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     model->setEditStrategy(QSqlTableModel::OnManualSubmit);
 
     if (!model->select()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить SIM-карты: " + model->lastError().text());
+        QMessageBox::critical(this, "Ошибка БД",
+            "Не удалось загрузить SIM-карты: " + model->lastError().text() +
+            "\n\nПроверьте соединение с базой данных.");
+        ui->tableView->setEnabled(false);
+        ui->btnAdd->setEnabled(false);
+        ui->btnDelete->setEnabled(false);
+        ui->lineEditSearch->setEnabled(false);
         return;
     }
 
@@ -57,6 +63,28 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
 
     // ВАЖНО: Делаем колонку статуса (индекс 2) только для чтения
     ui->tableView->setItemDelegateForColumn(2, new ReadOnlyDelegate(ui->tableView));
+
+    // Debounce timer для поиска
+    static QTimer* searchTimer = nullptr;
+    if (!searchTimer) {
+        searchTimer = new QTimer(this);
+        searchTimer->setSingleShot(true);
+        searchTimer->setInterval(300);
+        connect(searchTimer, &QTimer::timeout, this, [this]() {
+            QString searchText = ui->lineEditSearch->text();
+            if (searchText.isEmpty()) {
+                model->setFilter("");
+            } else {
+                QString filter = QString("simnumber LIKE '%%1%%'")
+                                    .arg(searchText.replace("'", "''"));
+                model->setFilter(filter);
+            }
+            model->select();
+        });
+    }
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
+        searchTimer->start();
+    });
 }
 
 SIMCardsForm::~SIMCardsForm()
@@ -79,7 +107,13 @@ void SIMCardsForm::on_btnAdd_clicked()
         int newId = query.value(0).toInt();
 
         // Обновляем модель из VIEW
-        model->select();
+        if (!model->select()) {
+            QMessageBox::critical(this, "Ошибка БД",
+                "Запись создана, но не удалось обновить таблицу: " + model->lastError().text() +
+                "\n\nПопробуйте перезапустить форму.");
+            ui->tableView->setEnabled(false);
+            return;
+        }
 
         // Находим новую строку
         for (int row = 0; row < model->rowCount(); row++) {

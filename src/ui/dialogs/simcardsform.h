@@ -4,7 +4,7 @@
 #include <QDialog>
 #include <QCloseEvent>
 #include <QSqlTableModel>
-#include "../delegates/readonlydelegate.h"
+#include "delegates/readonlydelegate.h"
 
 namespace Ui {
     class SIMCardsForm;

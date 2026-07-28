@@ -1,6 +1,6 @@
 #include "clientsform.h"
 #include "ui_clientsform.h"
-#include "../../database/databasemanager.h"
+#include "database/databasemanager.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -8,6 +8,9 @@
 #include <QLineEdit>
 #include <QDateTime>
 #include <QDebug>
+
+// Debounce timer for search
+static QTimer* s_searchTimer = nullptr;
 
 ClientsForm::ClientsForm(QWidget *parent) :
     QDialog(parent),
@@ -22,7 +25,13 @@ ClientsForm::ClientsForm(QWidget *parent) :
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
 
     if (!model->select()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить клиентов: " + model->lastError().text());
+        QMessageBox::critical(this, "Ошибка БД",
+            "Не удалось загрузить клиентов: " + model->lastError().text() +
+            "\n\nПроверьте соединение с базой данных.");
+        ui->tableView->setEnabled(false);
+        ui->btnAdd->setEnabled(false);
+        ui->btnDelete->setEnabled(false);
+        ui->lineEditSearch->setEnabled(false);
         return;
     }
 
@@ -45,10 +54,35 @@ ClientsForm::ClientsForm(QWidget *parent) :
     ui->tableView->setColumnWidth(1, 250);
     ui->tableView->setColumnWidth(2, 100);
     ui->tableView->setColumnWidth(3, 200);
+
+    // Debounce timer для поиска
+    if (!s_searchTimer) {
+        s_searchTimer = new QTimer(this);
+        s_searchTimer->setSingleShot(true);
+        s_searchTimer->setInterval(300);
+        connect(s_searchTimer, &QTimer::timeout, this, [this]() {
+            QString searchText = ui->lineEditSearch->text();
+            if (searchText.isEmpty()) {
+                model->setFilter("");
+            } else {
+                QString filter = QString("clientname LIKE '%%1%%' OR inn LIKE '%%1%%'")
+                                    .arg(searchText.replace("'", "''"));
+                model->setFilter(filter);
+            }
+            model->select();
+        });
+    }
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
+        s_searchTimer->start();
+    });
 }
 
 ClientsForm::~ClientsForm()
 {
+    if (s_searchTimer) {
+        s_searchTimer->deleteLater();
+        s_searchTimer = nullptr;
+    }
     delete ui;
 }
 
@@ -106,7 +140,12 @@ void ClientsForm::on_btnDelete_clicked()
             query.bindValue(":id", id);
 
             if (query.exec()) {
-                model->select();
+                if (!model->select()) {
+                    QMessageBox::critical(this, "Ошибка БД",
+                        "Данные удалены, но не удалось обновить таблицу: " + model->lastError().text() +
+                        "\n\nПопробуйте перезапустить форму.");
+                    ui->tableView->setEnabled(false);
+                }
             } else {
                 QMessageBox::warning(this, "Ошибка", "Не удалось удалить. Возможно, есть арендованные терминалы.\n" + query.lastError().text());
             }
@@ -114,6 +153,12 @@ void ClientsForm::on_btnDelete_clicked()
     } else {
         QMessageBox::information(this, "Внимание", "Выберите строку.");
     }
+}
+
+void ClientsForm::on_lineEditSearch_textChanged(const QString &arg1)
+{
+    Q_UNUSED(arg1);
+    // Логика поиска обрабатывается через debounce timer в конструкторе
 }
 
 void ClientsForm::on_btnClose_clicked()

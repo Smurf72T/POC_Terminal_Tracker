@@ -20,6 +20,7 @@ private slots:
     void on_btnAdd_clicked();
     void on_btnDelete_clicked();
     void on_btnClose_clicked();
+    void on_lineEditSearch_textChanged(const QString &arg1);
 
 private:
     Ui::ClientsForm *ui;

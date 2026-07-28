@@ -28,6 +28,7 @@ private slots:
 private:
     Ui::RentalForm *ui;
     QStandardItemModel *rowsModel;
+    bool isPosted = false;
 
     void loadClientsToDelegate();
     void loadFreeTerminalsToDelegate();

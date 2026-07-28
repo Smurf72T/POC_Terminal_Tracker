@@ -85,6 +85,7 @@ void MainWindow::setupUI()
     connect(ui->actionArchiveReceipt, &QAction::triggered, this, &MainWindow::onActionArchiveReceipt_triggered);
     connect(ui->actionArchiveRental, &QAction::triggered, this, &MainWindow::onActionArchiveRental_triggered);
     connect(ui->actionArchiveReturn, &QAction::triggered, this, &MainWindow::onActionArchiveReturn_triggered);
+    connect(ui->actionArchivePayment, &QAction::triggered, this, &MainWindow::onActionArchivePayment_triggered);
 }
 
 void MainWindow::updateStatusBar()
@@ -100,22 +101,22 @@ void MainWindow::loadCounters()
     QSqlQuery query(DatabaseManager::instance().getDatabase());
 
     if (query.exec("SELECT COUNT(*) FROM tblterminals") && query.next()) {
-        updateCounterWidget(ui->frameTotalTerminals,
+        updateCounterWidget(ui->labelValueTotal, ui->labelNameTotal,
             query.value(0).toString(), "Всего терминалов", "#3498db");
     }
 
     if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 0") && query.next()) {
-        updateCounterWidget(ui->frameFreeTerminals,
+        updateCounterWidget(ui->labelValueFree, ui->labelNameFree,
             query.value(0).toString(), "Свободно терминалов", "#2ecc71");
     }
 
     if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 1") && query.next()) {
-        updateCounterWidget(ui->frameRentedTerminals,
+        updateCounterWidget(ui->labelValueRented, ui->labelNameRented,
             query.value(0).toString(), "В аренде", "#e74c3c");
     }
 
     if (query.exec("SELECT COUNT(*) FROM tblsimcards") && query.next()) {
-        updateCounterWidget(ui->frameTotalSIM,
+        updateCounterWidget(ui->labelValueTotalSIM, ui->labelNameTotalSIM,
             query.value(0).toString(), "Всего SIM-карт", "#9b59b6");
     }
 
@@ -131,34 +132,20 @@ void MainWindow::loadCounters()
         "    AND t.status = 0"
         ")"
     ) && query.next()) {
-        updateCounterWidget(ui->frameFreeSIM,
+        updateCounterWidget(ui->labelValueFreeSIM, ui->labelNameFreeSIM,
             query.value(0).toString(), "Свободно SIM", "#1abc9c");
     }
 
     if (query.exec("SELECT COUNT(*) FROM tblclients") && query.next()) {
-        updateCounterWidget(ui->frameClients,
+        updateCounterWidget(ui->labelValueClients, ui->labelNameClients,
             query.value(0).toString(), "Клиентов", "#f39c12");
     }
 }
 
-void MainWindow::updateCounterWidget(QWidget* widget, const QString& value,
-                                     const QString& label, const QString& color)
+void MainWindow::updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel,
+                                     const QString& value, const QString& label,
+                                     const QString& color)
 {
-    QLabel* valueLabel = nullptr;
-    for (auto* child : widget->findChildren<QLabel*>()) {
-        if (child->objectName().endsWith("Value")) {
-            valueLabel = child;
-            break;
-        }
-    }
-    QLabel* nameLabel = nullptr;
-    for (auto* child : widget->findChildren<QLabel*>()) {
-        if (child->objectName().endsWith("Name")) {
-            nameLabel = child;
-            break;
-        }
-    }
-
     if (valueLabel) {
         valueLabel->setText(value);
         valueLabel->setStyleSheet(QString("QLabel { color: %1; font-size: 32px; font-weight: bold; }").arg(color));
@@ -298,4 +285,9 @@ void MainWindow::onActionArchiveRental_triggered()
 void MainWindow::onActionArchiveReturn_triggered()
 {
     openForm(new ArchiveDocumentsForm(3, this));
+}
+
+void MainWindow::onActionArchivePayment_triggered()
+{
+    openForm(new ArchiveDocumentsForm(4, this));
 }

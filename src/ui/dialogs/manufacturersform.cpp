@@ -1,6 +1,6 @@
 #include "manufacturersform.h"
 #include "ui_manufacturersform.h"
-#include "../../database/databasemanager.h"
+#include "database/databasemanager.h"
 #include <QDebug>
 #include <QMessageBox>
 #include <QSqlError>
@@ -33,7 +33,12 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
     // Выполняем select и проверяем результат
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка загрузки данных",
-            "Не удалось загрузить данные:\n" + model->lastError().text());
+            "Не удалось загрузить данные:\n" + model->lastError().text() +
+            "\n\nПроверьте соединение с базой данных.");
+        ui->tableView->setEnabled(false);
+        ui->btnAdd->setEnabled(false);
+        ui->btnDelete->setEnabled(false);
+        ui->lineEditSearch->setEnabled(false);
         return;
     }
     
@@ -61,6 +66,28 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
     ui->tableView->setAlternatingRowColors(true);
     
     qDebug() << "Таблица настроена, модель привязана";
+
+    // Debounce timer для поиска
+    static QTimer* searchTimer = nullptr;
+    if (!searchTimer) {
+        searchTimer = new QTimer(this);
+        searchTimer->setSingleShot(true);
+        searchTimer->setInterval(300);
+        connect(searchTimer, &QTimer::timeout, this, [this]() {
+            QString searchText = ui->lineEditSearch->text();
+            if (searchText.isEmpty()) {
+                model->setFilter("");
+            } else {
+                QString filter = QString("manufacturername LIKE '%%1%%'")
+                                    .arg(searchText.replace("'", "''"));
+                model->setFilter(filter);
+            }
+            model->select();
+        });
+    }
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
+        searchTimer->start();
+    });
 }
 
 ManufacturersForm::~ManufacturersForm()
@@ -135,8 +162,14 @@ void ManufacturersForm::on_btnDelete_clicked()
             query.bindValue(":id", id);
 
             if (query.exec()) {
-                model->select(); // Обновляем модель
-                QMessageBox::information(this, "Успех", "Запись удалена.");
+                if (!model->select()) {
+                    QMessageBox::critical(this, "Ошибка БД",
+                        "Запись удалена, но не удалось обновить таблицу: " + model->lastError().text() +
+                        "\n\nПопробуйте перезапустить форму.");
+                    ui->tableView->setEnabled(false);
+                } else {
+                    QMessageBox::information(this, "Успех", "Запись удалена.");
+                }
             } else {
                 QMessageBox::warning(this, "Ошибка удаления",
                     "Не удалось удалить запись:\n" + query.lastError().text());

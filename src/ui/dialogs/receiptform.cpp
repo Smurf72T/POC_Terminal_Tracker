@@ -1,7 +1,8 @@
 #include "receiptform.h"
 #include "ui_receiptform.h"
-#include "../delegates/comboboxdelegate.h"
-#include "../../database/databasemanager.h"
+#include "delegates/comboboxdelegate.h"
+#include "database/databasemanager.h"
+#include "utils/validator.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -54,9 +55,12 @@ void ReceiptForm::loadModelsToDelegate()
 
 void ReceiptForm::generateDocNumber()
 {
-    // Используем функцию из БД или просто генерируем временный
-    // Для простоты пока используем временный, позже привяжем к seq_receipt_doc_number
-    ui->lineEditNumber->setText("ПП-" + QString::number(QDateTime::currentMSecsSinceEpoch() % 100000));
+    QString number = DatabaseManager::instance().generateDocNumber("receipt");
+    if (!number.isEmpty()) {
+        ui->lineEditNumber->setText(number);
+    } else {
+        ui->lineEditNumber->setText("ПП-00001");
+    }
 }
 
 void ReceiptForm::on_btnAddRow_clicked()
@@ -66,7 +70,13 @@ void ReceiptForm::on_btnAddRow_clicked()
 
     // Значения по умолчанию
     rowsModel->setItem(row, 0, new QStandardItem("SN-..."));
-    rowsModel->setItem(row, 1, new QStandardItem("0")); // ID модели
+
+    // Модель (ID): текст "0", UserRole = 0 для консистентности с ComboBoxDelegate
+    QStandardItem* modelItem = new QStandardItem();
+    modelItem->setText("0");
+    modelItem->setData(0, Qt::UserRole);
+    rowsModel->setItem(row, 1, modelItem);
+
     rowsModel->setItem(row, 2, new QStandardItem("000000000000000"));
     rowsModel->setItem(row, 3, new QStandardItem("000000000000000"));
 }
@@ -116,6 +126,29 @@ void ReceiptForm::on_btnPost_clicked()
         QString imei1 = rowsModel->data(rowsModel->index(i, 2)).toString();
         QString imei2 = rowsModel->data(rowsModel->index(i, 3)).toString();
 
+        // Валидация серийного номера
+        if (!Validator::validateSerialNotEmpty(serial)) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка", 
+                QString("Строка %1: серийный номер должен содержать минимум 3 символа.").arg(i + 1));
+            return;
+        }
+
+        // Валидация IMEI
+        if (!imei1.isEmpty() && !Validator::validateIMEI(imei1)) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр.").arg(i + 1));
+            return;
+        }
+
+        if (!imei2.isEmpty() && !Validator::validateIMEI(imei2)) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр.").arg(i + 1));
+            return;
+        }
+
         // Вставляем терминал
         QSqlQuery termQuery(db);
         termQuery.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status) "
@@ -151,6 +184,9 @@ void ReceiptForm::on_btnPost_clicked()
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
+        // Логирование действия
+        DatabaseManager::instance().logAction("POST", "tblreceiptdocs", docId);
+        
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();

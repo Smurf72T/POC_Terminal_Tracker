@@ -1,6 +1,7 @@
 #include "terminalsform.h"
 #include "ui_terminalsform.h"
 #include "../../database/databasemanager.h"
+#include "utils/validator.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -64,6 +65,32 @@ TerminalsForm::TerminalsForm(QWidget *parent) :
     ui->tableView->setColumnWidth(1, 150);
     ui->tableView->setColumnWidth(3, 150);
     ui->tableView->setColumnWidth(4, 150);
+
+    // Подключаем валидацию при изменении данных модели
+    connect(model, &QSqlRelationalTableModel::dataChanged,
+            this, &TerminalsForm::on_model_dataChanged);
+
+    // Debounce timer для поиска
+    static QTimer* searchTimer = nullptr;
+    if (!searchTimer) {
+        searchTimer = new QTimer(this);
+        searchTimer->setSingleShot(true);
+        searchTimer->setInterval(300);
+        connect(searchTimer, &QTimer::timeout, this, [this]() {
+            QString searchText = ui->lineEditSearch->text();
+            if (searchText.isEmpty()) {
+                model->setFilter("");
+            } else {
+                QString filter = QString("serialnumber LIKE '%%1%%' OR imei1 LIKE '%%1%%' OR imei2 LIKE '%%1%%'")
+                                    .arg(searchText.replace("'", "''"));
+                model->setFilter(filter);
+            }
+            model->select();
+        });
+    }
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
+        searchTimer->start();
+    });
 }
 
 TerminalsForm::~TerminalsForm()
@@ -122,6 +149,39 @@ void TerminalsForm::on_btnAdd_clicked()
             }
         });
     });
+}
+
+void TerminalsForm::on_model_dataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+{
+    Q_UNUSED(bottomRight);
+
+    int row = topLeft.row();
+    int column = topLeft.column();
+
+    // Валидация IMEI 1 (колонка 3) и IMEI 2 (колонка 4)
+    if (column == 3 || column == 4) {
+        QString imei = model->data(topLeft).toString();
+        if (!imei.isEmpty() && !Validator::validateIMEI(imei)) {
+            QMessageBox::warning(this, "Ошибка валидации",
+                QString("Строка %1, IMEI %2: должно быть ровно 15 цифр.")
+                    .arg(row + 1).arg(column == 3 ? "1" : "2"));
+        }
+    }
+
+    // Валидация серийного номера (колонка 1)
+    if (column == 1) {
+        QString serial = model->data(topLeft).toString();
+        if (!Validator::validateSerialNotEmpty(serial)) {
+            QMessageBox::warning(this, "Ошибка валидации",
+                QString("Строка %1: серийный номер должен содержать минимум 3 символа.").arg(row + 1));
+        } else if (Validator::checkUniqueSerial(serial, model->data(model->index(row, 0)).toInt())) {
+            // Уникальность уже проверена функцией
+            Q_UNUSED(0);
+        } else {
+            QMessageBox::warning(this, "Ошибка валидации",
+                QString("Строка %1: терминал с таким серийным номером уже существует.").arg(row + 1));
+        }
+    }
 }
 
 void TerminalsForm::on_btnDelete_clicked()

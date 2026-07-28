@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
     <class>TerminalsForm</class>
-    <widget class="QWidget" name="TerminalsForm">
+    <widget class="QDialog" name="TerminalsForm">
         <property name="geometry">
             <rect>
                 <x>0</x>
@@ -14,6 +14,16 @@
             <string>Form</string>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <widget class="QLineEdit" name="lineEditSearch">
+                    <property name="placeholderText">
+                        <string>Поиск по серийному номеру или IMEI...</string>
+                    </property>
+                    <property name="clearButtonEnabled">
+                        <bool>true</bool>
+                    </property>
+                </widget>
+            </item>
             <item>
                 <widget class="QTableView" name="tableView">
                     <property name="alternatingRowColors">

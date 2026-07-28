@@ -1,7 +1,7 @@
 #include "archivedocumentsform.h"
 #include "ui_archivedocumentsform.h"
-#include "../../database/databasemanager.h"
-#include "../delegates/CheckBoxDelegate.h"
+#include "database/databasemanager.h"
+#include "delegates/CheckBoxDelegate.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -186,7 +186,8 @@ void ArchiveDocumentsForm::on_btnExportExcel_clicked()
     QString title;
     if (m_docType == 1) title = "Архив: Поступление терминалов";
     else if (m_docType == 2) title = "Архив: Передача в аренду";
-    else title = "Архив: Возврат из аренды";
+    else if (m_docType == 3) title = "Архив: Возврат из аренды";
+    else title = "Архив: Оплата";
 
     ReportExporter::exportModelToExcel(model, title, filePath, this);
 }
@@ -212,7 +213,8 @@ void ArchiveDocumentsForm::on_btnExportPdf_clicked()
 
     if (m_docType == 1) html += "<h1>Архив: Поступление терминалов</h1>";
     else if (m_docType == 2) html += "<h1>Архив: Передача в аренду</h1>";
-    else html += "<h1>Архив: Возврат из аренды</h1>";
+    else if (m_docType == 3) html += "<h1>Архив: Возврат из аренды</h1>";
+    else html += "<h1>Архив: Оплата</h1>";
 
     html += "<p>Период: с " + ui->dateEditFrom->date().toString("dd.MM.yyyy") +
             " по " + ui->dateEditTo->date().toString("dd.MM.yyyy") + "</p>";
