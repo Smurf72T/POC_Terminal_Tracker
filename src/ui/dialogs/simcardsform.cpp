@@ -65,23 +65,20 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     ui->tableView->setItemDelegateForColumn(2, new ReadOnlyDelegate(ui->tableView));
 
     // Debounce timer для поиска
-    static QTimer* searchTimer = nullptr;
-    if (!searchTimer) {
-        searchTimer = new QTimer(this);
-        searchTimer->setSingleShot(true);
-        searchTimer->setInterval(300);
-        connect(searchTimer, &QTimer::timeout, this, [this]() {
-            QString searchText = ui->lineEditSearch->text();
-            if (searchText.isEmpty()) {
-                model->setFilter("");
-            } else {
-                QString filter = QString("simnumber LIKE '%%1%%'")
-                                    .arg(searchText.replace("'", "''"));
-                model->setFilter(filter);
-            }
-            model->select();
-        });
-    }
+    searchTimer = new QTimer(this);
+    searchTimer->setSingleShot(true);
+    searchTimer->setInterval(300);
+    connect(searchTimer, &QTimer::timeout, this, [this]() {
+        QString searchText = ui->lineEditSearch->text();
+        if (searchText.isEmpty()) {
+            model->setFilter("");
+        } else {
+            QString filter = QString("simnumber LIKE '%%1%%'")
+                                .arg(searchText.replace("'", "''"));
+            model->setFilter(filter);
+        }
+        model->select();
+    });
     connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
         searchTimer->start();
     });

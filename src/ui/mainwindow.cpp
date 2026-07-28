@@ -185,11 +185,13 @@ void MainWindow::openForm(QWidget *form)
     form->setWindowModality(Qt::WindowModal);
     form->setWindowFlags(form->windowFlags() | Qt::Window);
     form->show();
+    form->activateWindow();
 
-    // Центрирование относительно главного окна
+    // Центрирование относительно главного окна (после show, когда размеры известны)
     QRect mainRect = this->geometry();
-    QRect formRect = form->frameGeometry();
-    form->move(mainRect.center() - formRect.center());
+    int x = mainRect.x() + (mainRect.width() - form->width()) / 2;
+    int y = mainRect.y() + (mainRect.height() - form->height()) / 2;
+    form->move(x, y);
 }
 
 void MainWindow::loadTopClients()
@@ -423,21 +425,25 @@ void MainWindow::openFreeDevicesReport()
     auto *btnExportSim = new QPushButton("Экспорт SIM-карт в Excel", dialog);
     auto *btnClose = new QPushButton("Закрыть", dialog);
 
-    connect(btnExportTerm, &QPushButton::clicked, [termModel, dialog]() {
+    connect(btnExportTerm, &QPushButton::clicked, [termView, dialog]() {
+        auto *model = qobject_cast<QSqlQueryModel*>(termView->model());
+        if (!model) return;
         QString filePath = QFileDialog::getSaveFileName(dialog,
             "Экспорт свободных терминалов", "free_terminals.xlsx", "Excel (*.xlsx);;Все файлы (*)");
         if (!filePath.isEmpty()) {
-            if (ReportExporter::exportModelToExcel(termModel, "Свободные терминалы", filePath)) {
+            if (ReportExporter::exportModelToExcel(model, "Свободные терминалы", filePath)) {
                 QMessageBox::information(dialog, "Успех", "Терминалы экспортированы.");
             }
         }
     });
 
-    connect(btnExportSim, &QPushButton::clicked, [simModel, dialog]() {
+    connect(btnExportSim, &QPushButton::clicked, [simView, dialog]() {
+        auto *model = qobject_cast<QSqlQueryModel*>(simView->model());
+        if (!model) return;
         QString filePath = QFileDialog::getSaveFileName(dialog,
             "Экспорт свободных SIM", "free_simcards.xlsx", "Excel (*.xlsx);;Все файлы (*)");
         if (!filePath.isEmpty()) {
-            if (ReportExporter::exportModelToExcel(simModel, "Свободные SIM-карты", filePath)) {
+            if (ReportExporter::exportModelToExcel(model, "Свободные SIM-карты", filePath)) {
                 QMessageBox::information(dialog, "Успех", "SIM-карты экспортированы.");
             }
         }
@@ -508,13 +514,17 @@ void MainWindow::performBackup()
     // Устанавливаем пароль в PGPASSWORD
     QProcess process;
     auto env = process.environment();
+    bool found = false;
     for (int i = 0; i < env.size(); ++i) {
         if (env[i].startsWith("PGPASSWORD=")) {
             env[i] = "PGPASSWORD=" + password;
+            found = true;
             break;
         }
     }
-    env.append("PGPASSWORD=" + password);
+    if (!found) {
+        env.append("PGPASSWORD=" + password);
+    }
     process.setEnvironment(env);
     process.start("pg_dump", args);
 
@@ -569,10 +579,12 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
 
         // Получаем типы столбцов из information_schema
         QSqlQuery colQuery(db);
-        colQuery.exec(QString("SELECT column_name, data_type, is_nullable "
-                              "FROM information_schema.columns "
-                              "WHERE table_schema = 'public' AND table_name = '%1' "
-                              "ORDER BY ordinal_position").arg(table));
+        colQuery.prepare("SELECT column_name, data_type, is_nullable "
+                         "FROM information_schema.columns "
+                         "WHERE table_schema = 'public' AND table_name = :tbl "
+                         "ORDER BY ordinal_position");
+        colQuery.bindValue(":tbl", table);
+        colQuery.exec();
 
         QStringList columnDefs;
         while (colQuery.next()) {

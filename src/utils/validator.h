@@ -26,14 +26,14 @@ public:
     // Проверка уникальности серийного номера
     static bool checkUniqueSerial(const QString& serial, int excludeTerminalId = -1);
 
-    // Создание QRegularExpressionValidator для IMEI
-    static QRegularExpression* createIMEIValidator();
+    // Создание QRegularExpression для IMEI
+    static QRegularExpression createIMEIValidator();
 
-    // Создание QRegularExpressionValidator для ИНН
-    static QRegularExpression* createINNValidator();
+    // Создание QRegularExpression для ИНН
+    static QRegularExpression createINNValidator();
 
-    // Создание QRegularExpressionValidator для серийного номера (не пустой, только допустимые символы)
-    static QRegularExpression* createSerialValidator();
+    // Создание QRegularExpression для серийного номера (не пустой, только допустимые символы)
+    static QRegularExpression createSerialValidator();
 
 private:
     static QRegularExpression s_imeiRegex;

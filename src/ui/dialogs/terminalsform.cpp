@@ -1,6 +1,6 @@
 #include "terminalsform.h"
 #include "ui_terminalsform.h"
-#include "../../database/databasemanager.h"
+#include "database/databasemanager.h"
 #include "utils/validator.h"
 #include <QMessageBox>
 #include <QSqlError>
@@ -71,23 +71,20 @@ TerminalsForm::TerminalsForm(QWidget *parent) :
             this, &TerminalsForm::on_model_dataChanged);
 
     // Debounce timer для поиска
-    static QTimer* searchTimer = nullptr;
-    if (!searchTimer) {
-        searchTimer = new QTimer(this);
-        searchTimer->setSingleShot(true);
-        searchTimer->setInterval(300);
-        connect(searchTimer, &QTimer::timeout, this, [this]() {
-            QString searchText = ui->lineEditSearch->text();
-            if (searchText.isEmpty()) {
-                model->setFilter("");
-            } else {
-                QString filter = QString("serialnumber LIKE '%%1%%' OR imei1 LIKE '%%1%%' OR imei2 LIKE '%%1%%'")
-                                    .arg(searchText.replace("'", "''"));
-                model->setFilter(filter);
-            }
-            model->select();
-        });
-    }
+    searchTimer = new QTimer(this);
+    searchTimer->setSingleShot(true);
+    searchTimer->setInterval(300);
+    connect(searchTimer, &QTimer::timeout, this, [this]() {
+        QString searchText = ui->lineEditSearch->text();
+        if (searchText.isEmpty()) {
+            model->setFilter("");
+        } else {
+            QString filter = QString("serialnumber LIKE '%%1%%' OR imei1 LIKE '%%1%%' OR imei2 LIKE '%%1%%'")
+                                .arg(searchText.replace("'", "''"));
+            model->setFilter(filter);
+        }
+        model->select();
+    });
     connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
         searchTimer->start();
     });
@@ -174,10 +171,7 @@ void TerminalsForm::on_model_dataChanged(const QModelIndex &topLeft, const QMode
         if (!Validator::validateSerialNotEmpty(serial)) {
             QMessageBox::warning(this, "Ошибка валидации",
                 QString("Строка %1: серийный номер должен содержать минимум 3 символа.").arg(row + 1));
-        } else if (Validator::checkUniqueSerial(serial, model->data(model->index(row, 0)).toInt())) {
-            // Уникальность уже проверена функцией
-            Q_UNUSED(0);
-        } else {
+        } else if (!Validator::checkUniqueSerial(serial, model->data(model->index(row, 0)).toInt())) {
             QMessageBox::warning(this, "Ошибка валидации",
                 QString("Строка %1: терминал с таким серийным номером уже существует.").arg(row + 1));
         }

@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QSqlRelationalTableModel>
+#include <QTimer>
 
 namespace Ui {
     class TerminalsForm;
@@ -25,6 +26,7 @@ private slots:
 private:
     Ui::TerminalsForm *ui;
     QSqlRelationalTableModel *model;
+    QTimer *searchTimer;
 };
 
 #endif // TERMINALSFORM_H

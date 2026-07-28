@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QCloseEvent>
 #include <QSqlTableModel>
+#include <QTimer>
 #include "delegates/readonlydelegate.h"
 
 namespace Ui {
@@ -29,6 +30,7 @@ protected:
 private:
     Ui::SIMCardsForm *ui;
     QSqlTableModel *model;
+    QTimer *searchTimer;
 };
 
 #endif // SIMCARDSFORM_H

@@ -54,19 +54,18 @@ bool Validator::checkUniqueSerial(const QString& serial, int excludeTerminalId)
     return false;
 }
 
-QRegularExpression* Validator::createIMEIValidator()
+QRegularExpression Validator::createIMEIValidator()
 {
-    return new QRegularExpression(s_imeiRegex);
+    return QRegularExpression(s_imeiRegex);
 }
 
-QRegularExpression* Validator::createINNValidator()
+QRegularExpression Validator::createINNValidator()
 {
-    return new QRegularExpression(s_innRegex);
+    return QRegularExpression(s_innRegex);
 }
 
-QRegularExpression* Validator::createSerialValidator()
+QRegularExpression Validator::createSerialValidator()
 {
     // Серийный номер: минимум 3 символа, допустимы буквы, цифры, дефис, точка
-    QRegularExpression* regex = new QRegularExpression("^[A-Za-z0-9\\-\\.]{3,50}$");
-    return regex;
+    return QRegularExpression("^[A-Za-z0-9\\-\\.]{3,50}$");
 }

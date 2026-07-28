@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QSqlRelationalTableModel>
 #include <QCloseEvent>
+#include <QTimer>
 
 namespace Ui {
     class ModelsForm;
@@ -25,6 +26,7 @@ private slots:
 private:
     Ui::ModelsForm *ui;
     QSqlRelationalTableModel *model;
+    QTimer *searchTimer;
 };
 
 #endif // MODELSFORM_H

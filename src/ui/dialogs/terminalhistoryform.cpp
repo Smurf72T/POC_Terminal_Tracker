@@ -26,18 +26,23 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
 
     receiptModel = new QSqlQueryModel(this);
-    receiptModel->setQuery(QString(
+    QSqlQuery receiptQuery(db);
+    receiptQuery.prepare(
         "SELECT rd.receiptdocid, rd.docnumber, rd.docdate, t.serialnumber, m.modelname "
         "FROM tblreceiptdocs rd "
         "JOIN tblreceiptdetails rdet ON rd.receiptdocid = rdet.receiptdocid "
         "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-        "WHERE t.terminalid = %1 "
+        "WHERE t.terminalid = :tid "
         "ORDER BY rd.docdate DESC"
-    ).arg(terminalId), db);
+    );
+    receiptQuery.bindValue(":tid", terminalId);
+    receiptQuery.exec();
+    receiptModel->setQuery(std::move(receiptQuery));
 
     rentalModel = new QSqlQueryModel(this);
-    rentalModel->setQuery(QString(
+    QSqlQuery rentalQuery(db);
+    rentalQuery.prepare(
         "SELECT rdo.rentaldocid, rdo.docnumber, rdo.docdate, t.serialnumber, c.clientname, "
         "s.simnumber "
         "FROM tblrentaldocs rdo "
@@ -45,31 +50,42 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
         "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
         "LEFT JOIN tblclients c ON rdo.clientid = c.clientid "
         "LEFT JOIN tblsimcards s ON rdet.simcardid = s.simcardid "
-        "WHERE t.terminalid = %1 "
+        "WHERE t.terminalid = :tid "
         "ORDER BY rdo.docdate DESC"
-    ).arg(terminalId), db);
+    );
+    rentalQuery.bindValue(":tid", terminalId);
+    rentalQuery.exec();
+    rentalModel->setQuery(std::move(rentalQuery));
 
     returnModel = new QSqlQueryModel(this);
-    returnModel->setQuery(QString(
+    QSqlQuery returnQuery(db);
+    returnQuery.prepare(
         "SELECT ret.returndocid, ret.docnumber, ret.docdate, t.serialnumber, c.clientname "
         "FROM tblreturndocs ret "
         "JOIN tblreturndetails rdet ON ret.returndocid = rdet.returndocid "
         "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
         "LEFT JOIN tblclients c ON ret.clientid = c.clientid "
-        "WHERE t.terminalid = %1 "
+        "WHERE t.terminalid = :tid "
         "ORDER BY ret.docdate DESC"
-    ).arg(terminalId), db);
+    );
+    returnQuery.bindValue(":tid", terminalId);
+    returnQuery.exec();
+    returnModel->setQuery(std::move(returnQuery));
 
     paymentModel = new QSqlQueryModel(this);
-    paymentModel->setQuery(QString(
+    QSqlQuery paymentQuery(db);
+    paymentQuery.prepare(
         "SELECT p.paymentdocid, p.docnumber, p.docdate, c.clientname, rdo.docnumber as rent_doc "
         "FROM tblpaymentdocs p "
         "JOIN tblrentaldocs rdo ON p.rentaldocid = rdo.rentaldocid "
         "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
         "JOIN tblclients c ON rdo.clientid = c.clientid "
-        "WHERE rdet.terminalid = %1 "
+        "WHERE rdet.terminalid = :tid "
         "ORDER BY p.docdate DESC"
-    ).arg(terminalId), db);
+    );
+    paymentQuery.bindValue(":tid", terminalId);
+    paymentQuery.exec();
+    paymentModel->setQuery(std::move(paymentQuery));
 
     receiptModel->setHeaderData(0, Qt::Horizontal, "ID");
     receiptModel->setHeaderData(1, Qt::Horizontal, "Номер документа");

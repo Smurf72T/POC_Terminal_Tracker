@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QSqlTableModel>
+#include <QTimer>
 
 namespace Ui {
     class ClientsForm;
@@ -25,6 +26,7 @@ private slots:
 private:
     Ui::ClientsForm *ui;
     QSqlTableModel *model;
+    QTimer *searchTimer;
 };
 
 #endif // CLIENTSFORM_H

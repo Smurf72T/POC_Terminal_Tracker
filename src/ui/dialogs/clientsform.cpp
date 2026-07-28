@@ -9,9 +9,6 @@
 #include <QDateTime>
 #include <QDebug>
 
-// Debounce timer for search
-static QTimer* s_searchTimer = nullptr;
-
 ClientsForm::ClientsForm(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::ClientsForm)
@@ -56,33 +53,27 @@ ClientsForm::ClientsForm(QWidget *parent) :
     ui->tableView->setColumnWidth(3, 200);
 
     // Debounce timer для поиска
-    if (!s_searchTimer) {
-        s_searchTimer = new QTimer(this);
-        s_searchTimer->setSingleShot(true);
-        s_searchTimer->setInterval(300);
-        connect(s_searchTimer, &QTimer::timeout, this, [this]() {
-            QString searchText = ui->lineEditSearch->text();
-            if (searchText.isEmpty()) {
-                model->setFilter("");
-            } else {
-                QString filter = QString("clientname LIKE '%%1%%' OR inn LIKE '%%1%%'")
-                                    .arg(searchText.replace("'", "''"));
-                model->setFilter(filter);
-            }
-            model->select();
-        });
-    }
+    searchTimer = new QTimer(this);
+    searchTimer->setSingleShot(true);
+    searchTimer->setInterval(300);
+    connect(searchTimer, &QTimer::timeout, this, [this]() {
+        QString searchText = ui->lineEditSearch->text();
+        if (searchText.isEmpty()) {
+            model->setFilter("");
+        } else {
+            QString filter = QString("clientname LIKE '%%1%%' OR inn LIKE '%%1%%'")
+                                .arg(searchText.replace("'", "''"));
+            model->setFilter(filter);
+        }
+        model->select();
+    });
     connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
-        s_searchTimer->start();
+        searchTimer->start();
     });
 }
 
 ClientsForm::~ClientsForm()
 {
-    if (s_searchTimer) {
-        s_searchTimer->deleteLater();
-        s_searchTimer = nullptr;
-    }
     delete ui;
 }
 

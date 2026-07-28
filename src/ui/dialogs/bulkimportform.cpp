@@ -259,8 +259,8 @@ bool BulkImportForm::importData()
             existingSerials.insert(serial);
 
             dbMgr.logAction("ADD", "tblterminals", terminalId,
-                QString("Массовый импорт: serial=%1, imei1=%2").arg(serial).arg(imei1),
-                QString());
+                "admin", "{}",
+                QString("serial=%1, imei1=%2").arg(serial).arg(imei1));
         } else {
             failed++;
             errors.append(QString("Строка %1: %2").arg(row + 2).arg(query.lastError().text()));
