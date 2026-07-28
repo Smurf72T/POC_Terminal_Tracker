@@ -34,6 +34,8 @@
 #include <QFileInfo>
 #include <QSqlRecord>
 #include <QPushButton>
+#include <QComboBox>
+#include <QCompleter>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -319,18 +321,62 @@ void MainWindow::onActionArchivePayment_triggered()
 
 void MainWindow::onActionTerminalHistory_triggered()
 {
-    // Получаем выбранный терминал из справочника
-    bool ok;
-    QString serial = QInputDialog::getText(this, "История терминала",
-        "Введите серийный номер терминала:", QLineEdit::Normal, QString(), &ok);
-    if (!ok || serial.isEmpty()) return;
+    QDialog dialog(this);
+    dialog.setWindowTitle("История терминала");
+    dialog.resize(400, 100);
 
+    auto *layout = new QVBoxLayout(&dialog);
+    auto *label = new QLabel("Введите или выберите серийный номер:", &dialog);
+    auto *combo = new QComboBox(&dialog);
+    combo->setEditable(true);
+    combo->setInsertPolicy(QComboBox::NoInsert);
+
+    // Загружаем все серийные номера
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT terminalid FROM tblterminals WHERE serialnumber = :sn");
-    query.bindValue(":sn", serial);
+    query.exec("SELECT terminalid, serialnumber FROM tblterminals ORDER BY serialnumber");
 
-    if (query.exec() && query.next()) {
-        int terminalId = query.value(0).toInt();
+    struct TermInfo { int id; QString serial; };
+    QList<TermInfo> terminals;
+    while (query.next()) {
+        terminals.append({query.value(0).toInt(), query.value(1).toString()});
+    }
+
+    for (const auto &t : terminals) {
+        combo->addItem(t.serial, t.id);
+    }
+
+    // Автокомплит с поиском по вхождению подстроки
+    QCompleter *completer = new QCompleter(combo->model(), &dialog);
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    completer->setFilterMode(Qt::MatchContains);
+    combo->setCompleter(completer);
+
+    auto *btnLayout = new QHBoxLayout();
+    auto *btnOk = new QPushButton("Открыть", &dialog);
+    auto *btnCancel = new QPushButton("Отмена", &dialog);
+    btnLayout->addStretch();
+    btnLayout->addWidget(btnOk);
+    btnLayout->addWidget(btnCancel);
+
+    layout->addWidget(label);
+    layout->addWidget(combo);
+    layout->addLayout(btnLayout);
+
+    connect(btnOk, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(btnCancel, &QPushButton::clicked, &dialog, &QDialog::reject);
+
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    QString serial = combo->currentText().trimmed();
+    if (serial.isEmpty()) return;
+
+    // Ищем терминал
+    QSqlQuery findQuery(DatabaseManager::instance().getDatabase());
+    findQuery.prepare("SELECT terminalid FROM tblterminals WHERE serialnumber = :sn");
+    findQuery.bindValue(":sn", serial);
+
+    if (findQuery.exec() && findQuery.next()) {
+        int terminalId = findQuery.value(0).toInt();
         openForm(new TerminalHistoryForm(terminalId, serial, this));
     } else {
         QMessageBox::warning(this, "Ошибка",

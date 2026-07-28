@@ -4,7 +4,7 @@
     "port": 5432,
     "database": "pocbase",
     "username": "postgres",
-    "password": ""
+    "password": "postgres"
   },
   "application": {
     "name": "POC Terminal Tracker",
