@@ -42,6 +42,8 @@ set(SOURCES
         src/ui/dialogs/returnform.cpp
         src/ui/dialogs/archivedocumentsform.cpp
         src/ui/dialogs/paymentform.cpp
+        src/ui/dialogs/terminalhistoryform.cpp
+        src/ui/dialogs/bulkimportform.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
 )
@@ -63,6 +65,8 @@ set(HEADERS
         src/ui/dialogs/returnform.h
         src/ui/dialogs/archivedocumentsform.h
         src/ui/dialogs/paymentform.h
+        src/ui/dialogs/terminalhistoryform.h
+        src/ui/dialogs/bulkimportform.h
         src/utils/reportexporter.h
         src/utils/validator.h
 )
@@ -79,6 +83,8 @@ set(UI_FILES
         src/ui/dialogs/returnform.ui
         src/ui/dialogs/archivedocumentsform.ui
         src/ui/dialogs/paymentform.ui
+        src/ui/dialogs/terminalhistoryform.ui
+        src/ui/dialogs/bulkimportform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})

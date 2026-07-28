@@ -5,6 +5,10 @@
 #include <QLabel>
 #include <QSqlQueryModel>
 #include <QTimer>
+#include <QLineEdit>
+#include <QDialog>
+#include <QGroupBox>
+#include <QMessageBox>
 
 namespace Ui {
     class MainWindow;
@@ -34,6 +38,11 @@ private slots:
     void onActionArchiveRental_triggered();
     void onActionArchiveReturn_triggered();
     void onActionArchivePayment_triggered();
+    void onActionTerminalHistory_triggered();
+    void onActionFreeDevicesReport_triggered();
+    void onActionBulkImport_triggered();
+    void onActionBackup_triggered();
+    void onActionExpiryNotifications_triggered();
     void onDatabaseDataChanged(); // <-- Добавлено
 
 private:
@@ -49,6 +58,12 @@ private:
     void loadRecentDocuments();
     void updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel, const QString& value, const QString& label, const QString& color);
     void openForm(QWidget *form);
+    void openTerminalHistory(int terminalId, QString serialNumber);
+    void openFreeDevicesReport();
+    void openBulkImport();
+    void performBackup();
+    void performFallbackBackup(const QString &filePath, const QString &dbname, const QString &password);
+    void showExpiryNotifications();
 };
 
 #endif // MAINWINDOW_H

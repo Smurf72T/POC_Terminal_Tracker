@@ -355,9 +355,20 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
+   <widget class="QMenu" name="menuService">
+    <property name="title">
+     <string>Сервис</string>
+    </property>
+    <addaction name="actionTerminalHistory"/>
+    <addaction name="actionFreeDevicesReport"/>
+    <addaction name="actionBulkImport"/>
+    <addaction name="actionBackup"/>
+    <addaction name="actionExpiryNotifications"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
    <addaction name="menuDocuments"/>
+   <addaction name="menuService"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -434,6 +445,34 @@
   <action name="actionArchivePayment">
    <property name="text">
     <string>Архив: Оплата</string>
+   </property>
+  </action>
+  <action name="actionTerminalHistory">
+   <property name="text">
+    <string>История терминала</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+H</string>
+   </property>
+  </action>
+  <action name="actionFreeDevicesReport">
+   <property name="text">
+    <string>Отчёт: Свободные устройства</string>
+   </property>
+  </action>
+  <action name="actionBulkImport">
+   <property name="text">
+    <string>Массовое поступление (из Excel)</string>
+   </property>
+  </action>
+  <action name="actionBackup">
+   <property name="text">
+    <string>Резервное копирование БД</string>
+   </property>
+  </action>
+  <action name="actionExpiryNotifications">
+   <property name="text">
+    <string>Уведомления о просрочке</string>
    </property>
   </action>
  </widget>
