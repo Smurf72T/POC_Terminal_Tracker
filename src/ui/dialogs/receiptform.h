@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QStandardItemModel>
+#include <QPair>
 
 namespace Ui {
     class ReceiptForm;
@@ -28,6 +29,8 @@ private:
 
     void loadModelsToDelegate();
     void generateDocNumber();
+
+    QList<QPair<int, QString>> m_models;
 };
 
 #endif // RECEIPTFORM_H

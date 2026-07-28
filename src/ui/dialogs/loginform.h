@@ -25,6 +25,9 @@ private slots:
     void on_btnRegister_clicked();
 
 private:
+    void loadUsers();
+
+private:
     Ui::LoginForm *ui;
     QString m_username;
     int m_userId = 0;

@@ -41,16 +41,16 @@ ReceiptForm::~ReceiptForm()
 
 void ReceiptForm::loadModelsToDelegate()
 {
-    QList<QPair<int, QString>> models;
+    m_models.clear();
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.exec("SELECT modelid, modelname FROM tblmodels ORDER BY modelname");
 
     while (query.next()) {
-        models.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
+        m_models.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
     }
 
     // Устанавливаем делегат на колонку 1 (Модель)
-    ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(models, this));
+    ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(m_models, this));
 }
 
 void ReceiptForm::generateDocNumber()
@@ -71,10 +71,13 @@ void ReceiptForm::on_btnAddRow_clicked()
     // Значения по умолчанию
     rowsModel->setItem(row, 0, new QStandardItem("SN-..."));
 
-    // Модель (ID): текст "0", UserRole = 0 для консистентности с ComboBoxDelegate
+    // Модель (ID): берем первый доступный ID из БД
+    int defaultModelId = m_models.isEmpty() ? 0 : m_models.first().first;
+    QString defaultModelName = m_models.isEmpty() ? QString() : m_models.first().second;
+
     QStandardItem* modelItem = new QStandardItem();
-    modelItem->setText("0");
-    modelItem->setData(0, Qt::UserRole);
+    modelItem->setText(defaultModelName);
+    modelItem->setData(defaultModelId, Qt::UserRole);
     rowsModel->setItem(row, 1, modelItem);
 
     rowsModel->setItem(row, 2, new QStandardItem("000000000000000"));
@@ -134,6 +137,10 @@ void ReceiptForm::on_btnPost_clicked()
         }
 
         // Валидация IMEI
+        QRegularExpression digitRe("[^\\d]");
+        imei1.remove(digitRe);
+        imei2.remove(digitRe);
+
         if (!imei1.isEmpty() && !Validator::validateIMEI(imei1)) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",

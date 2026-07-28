@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>POC Terminal Tracker</string>
   </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>E:/Downloads/1925548.png</normaloff>E:/Downloads/1925548.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
@@ -64,223 +68,187 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2">
          <item>
-          <widget class="QLabel" name="labelValueTotal">
-           <property name="objectName">
-            <string>counterValue</string>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelNameTotal">
-           <property name="objectName">
-            <string>counterName</string>
-           </property>
-           <property name="text">
-            <string>Всего терминалов</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QFrame" name="frameFreeTerminals">
-        <property name="frameShape">
-         <enum>QFrame::Shape::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Shadow::Raised</enum>
-        </property>
-        <layout class="QVBoxLayout">
-         <item>
-          <widget class="QLabel" name="labelValueFree">
-           <property name="objectName">
-            <string>counterValue</string>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelNameFree">
-           <property name="objectName">
-            <string>counterName</string>
-           </property>
-           <property name="text">
-            <string>Свободно терминалов</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="0" column="2">
-       <widget class="QFrame" name="frameRentedTerminals">
-        <property name="frameShape">
-         <enum>QFrame::Shape::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Shadow::Raised</enum>
-        </property>
-        <layout class="QVBoxLayout">
-         <item>
-          <widget class="QLabel" name="labelValueRented">
-           <property name="objectName">
-            <string>counterValue</string>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelNameRented">
-           <property name="objectName">
-            <string>counterName</string>
-           </property>
-           <property name="text">
-            <string>В аренде</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QFrame" name="frameTotalSIM">
-        <property name="frameShape">
-         <enum>QFrame::Shape::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Shadow::Raised</enum>
-        </property>
-        <layout class="QVBoxLayout">
-         <item>
-          <widget class="QLabel" name="labelValueTotalSIM">
-           <property name="objectName">
-            <string>counterValue</string>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelNameTotalSIM">
-           <property name="objectName">
-            <string>counterName</string>
-           </property>
-           <property name="text">
-            <string>Всего SIM-карт</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QFrame" name="frameFreeSIM">
-        <property name="frameShape">
-         <enum>QFrame::Shape::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Shadow::Raised</enum>
-        </property>
-        <layout class="QVBoxLayout">
-         <item>
-          <widget class="QLabel" name="labelValueFreeSIM">
-           <property name="objectName">
-            <string>counterValue</string>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelNameFreeSIM">
-           <property name="objectName">
-            <string>counterName</string>
-           </property>
-           <property name="text">
-            <string>Свободно SIM</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="1" column="2">
-       <widget class="QFrame" name="frameClients">
-        <property name="frameShape">
-         <enum>QFrame::Shape::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Shadow::Raised</enum>
-        </property>
-        <layout class="QVBoxLayout">
-         <item>
-          <widget class="QLabel" name="labelValueClients">
-           <property name="objectName">
-            <string>counterValue</string>
-           </property>
-           <property name="text">
-            <string>0</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="labelNameClients">
-           <property name="objectName">
-            <string>counterName</string>
-           </property>
-           <property name="text">
-            <string>Клиентов</string>
-           </property>
-           <property name="alignment">
-            <set>Qt::AlignmentFlag::AlignCenter</set>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
+           <widget class="QLabel" name="labelValueTotal">
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelNameTotal">
+            <property name="text">
+             <string>Всего терминалов</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QFrame" name="frameFreeTerminals">
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout">
+          <item>
+           <widget class="QLabel" name="labelValueFree">
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelNameFree">
+            <property name="text">
+             <string>Свободно терминалов</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QFrame" name="frameRentedTerminals">
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout">
+          <item>
+           <widget class="QLabel" name="labelValueRented">
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelNameRented">
+            <property name="text">
+             <string>В аренде</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QFrame" name="frameTotalSIM">
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout">
+          <item>
+           <widget class="QLabel" name="labelValueTotalSIM">
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelNameTotalSIM">
+            <property name="text">
+             <string>Всего SIM-карт</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QFrame" name="frameFreeSIM">
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout">
+          <item>
+           <widget class="QLabel" name="labelValueFreeSIM">
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelNameFreeSIM">
+            <property name="text">
+             <string>Свободно SIM</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QFrame" name="frameClients">
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Raised</enum>
+         </property>
+         <layout class="QVBoxLayout">
+          <item>
+           <widget class="QLabel" name="labelValueClients">
+            <property name="text">
+             <string>0</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelNameClients">
+            <property name="text">
+             <string>Клиентов</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
       </item>
      </layout>
     </item>
@@ -355,20 +323,20 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
-    <widget class="QMenu" name="menuService">
-     <property name="title">
-      <string>Сервис</string>
-     </property>
-     <addaction name="actionTerminalHistory"/>
-     <addaction name="actionFreeDevicesReport"/>
-     <addaction name="actionBulkImport"/>
-     <addaction name="actionBatchStatus"/>
-     <addaction name="actionReports"/>
-     <addaction name="separator"/>
-     <addaction name="actionBackup"/>
-     <addaction name="actionExpiryNotifications"/>
-     <addaction name="actionAuditLog"/>
-    </widget>
+   <widget class="QMenu" name="menuService">
+    <property name="title">
+     <string>Сервис</string>
+    </property>
+    <addaction name="actionTerminalHistory"/>
+    <addaction name="actionFreeDevicesReport"/>
+    <addaction name="actionBulkImport"/>
+    <addaction name="actionBatchStatus"/>
+    <addaction name="actionReports"/>
+    <addaction name="separator"/>
+    <addaction name="actionBackup"/>
+    <addaction name="actionExpiryNotifications"/>
+    <addaction name="actionAuditLog"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
    <addaction name="menuDocuments"/>
@@ -474,27 +442,27 @@
     <string>Резервное копирование БД</string>
    </property>
   </action>
-   <action name="actionExpiryNotifications">
-    <property name="text">
-     <string>Уведомления о просрочке</string>
-    </property>
-   </action>
-   <action name="actionAuditLog">
-    <property name="text">
-     <string>Журнал аудита</string>
-    </property>
-   </action>
-   <action name="actionBatchStatus">
-    <property name="text">
-     <string>Массовое обновление статусов</string>
-    </property>
-   </action>
-   <action name="actionReports">
-    <property name="text">
-     <string>Отчёты по периодам</string>
-    </property>
-   </action>
-  </widget>
+  <action name="actionExpiryNotifications">
+   <property name="text">
+    <string>Уведомления о просрочке</string>
+   </property>
+  </action>
+  <action name="actionAuditLog">
+   <property name="text">
+    <string>Журнал аудита</string>
+   </property>
+  </action>
+  <action name="actionBatchStatus">
+   <property name="text">
+    <string>Массовое обновление статусов</string>
+   </property>
+  </action>
+  <action name="actionReports">
+   <property name="text">
+    <string>Отчёты по периодам</string>
+   </property>
+  </action>
+ </widget>
  <resources/>
  <connections/>
 </ui>

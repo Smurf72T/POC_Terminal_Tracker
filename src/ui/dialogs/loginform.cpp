@@ -14,6 +14,8 @@ LoginForm::LoginForm(QWidget *parent) :
     setWindowTitle("Вход в POC Terminal Tracker");
     setFixedSize(400, 250);
 
+    loadUsers();
+
     connect(ui->lineEditPass, &QLineEdit::returnPressed, this, &LoginForm::on_btnLogin_clicked);
 }
 
@@ -26,13 +28,32 @@ QString LoginForm::getUsername() const { return m_username; }
 int LoginForm::getUserId() const { return m_userId; }
 QString LoginForm::getRole() const { return m_role; }
 
+void LoginForm::loadUsers()
+{
+    ui->comboBoxUser->clear();
+
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.exec("SELECT username, display_name FROM tbl_users WHERE is_active = TRUE ORDER BY username");
+
+    while (query.next()) {
+        QString username = query.value(0).toString();
+        QString displayName = query.value(1).toString();
+        QString label = displayName.isEmpty() ? username : displayName + " (" + username + ")";
+        ui->comboBoxUser->addItem(label, username);
+    }
+
+    if (ui->comboBoxUser->count() > 0) {
+        ui->lineEditPass->setFocus();
+    }
+}
+
 void LoginForm::on_btnLogin_clicked()
 {
-    QString username = ui->lineEditUser->text().trimmed();
+    QString username = ui->comboBoxUser->currentData().toString();
     QString password = ui->lineEditPass->text();
 
     if (username.isEmpty() || password.isEmpty()) {
-        ui->labelError->setText("Введите логин и пароль!");
+        ui->labelError->setText("Выберите пользователя и введите пароль!");
         return;
     }
 
@@ -50,7 +71,7 @@ void LoginForm::on_btnLogin_clicked()
         m_role = query.value(3).toString();
         accept();
     } else {
-        ui->labelError->setText("Неверный логин или пароль!");
+        ui->labelError->setText("Неверный пароль!");
     }
 }
 
@@ -95,7 +116,9 @@ void LoginForm::on_btnRegister_clicked()
 
     if (query.exec()) {
         QMessageBox::information(this, "Успех", "Пользователь '" + username.trimmed() + "' зарегистрирован!\nТеперь войдите в систему.");
-        ui->lineEditUser->setText(username.trimmed());
+        loadUsers();
+        int idx = ui->comboBoxUser->findData(username.trimmed());
+        if (idx >= 0) ui->comboBoxUser->setCurrentIndex(idx);
         ui->lineEditPass->setFocus();
     } else {
         QMessageBox::warning(this, "Ошибка", "Не удалось создать пользователя.\nВозможно, такой логин уже существует.");

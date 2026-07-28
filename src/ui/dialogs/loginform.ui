@@ -24,8 +24,13 @@
                         <widget class="QLabel" name="labelUser"><property name="text"><string>Пользователь:</string></property></widget>
                     </item>
                     <item>
-                        <widget class="QLineEdit" name="lineEditUser">
-                            <property name="placeholderText"><string>Введите логин</string></property>
+                        <widget class="QComboBox" name="comboBoxUser">
+                            <property name="sizePolicy">
+                                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                </sizepolicy>
+                            </property>
                         </widget>
                     </item>
                 </layout>

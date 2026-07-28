@@ -19,7 +19,9 @@ Validator::Validator(QObject *parent) : QObject(parent)
 
 bool Validator::validateIMEI(const QString& imei)
 {
-    return imeiRegex().match(imei).hasMatch() && checkLuhn(imei);
+    QString cleaned = imei;
+    cleaned.remove(QRegularExpression("[^\\d]"));
+    return imeiRegex().match(cleaned).hasMatch();
 }
 
 bool Validator::validateINN(const QString& inn)
