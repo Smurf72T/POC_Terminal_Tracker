@@ -61,8 +61,12 @@ ClientsForm::ClientsForm(QWidget *parent) :
         if (searchText.isEmpty()) {
             model->setFilter("");
         } else {
-            QString filter = QString("clientname LIKE '%%1%%' OR inn LIKE '%%1%%'")
-                                .arg(searchText.replace("'", "''"));
+            QString escaped = searchText;
+            escaped.replace("'", "''");
+            escaped.replace("%", "\\%");
+            escaped.replace("_", "\\_");
+            QString filter = QString("clientname LIKE '%%1%%' ESCAPE '\\' OR inn LIKE '%%1%%' ESCAPE '\\'")
+                                .arg(escaped);
             model->setFilter(filter);
         }
         model->select();

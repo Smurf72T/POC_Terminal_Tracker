@@ -355,16 +355,20 @@
     </property>
     <addaction name="actionAbout"/>
    </widget>
-   <widget class="QMenu" name="menuService">
-    <property name="title">
-     <string>Сервис</string>
-    </property>
-    <addaction name="actionTerminalHistory"/>
-    <addaction name="actionFreeDevicesReport"/>
-    <addaction name="actionBulkImport"/>
-    <addaction name="actionBackup"/>
-    <addaction name="actionExpiryNotifications"/>
-   </widget>
+    <widget class="QMenu" name="menuService">
+     <property name="title">
+      <string>Сервис</string>
+     </property>
+     <addaction name="actionTerminalHistory"/>
+     <addaction name="actionFreeDevicesReport"/>
+     <addaction name="actionBulkImport"/>
+     <addaction name="actionBatchStatus"/>
+     <addaction name="actionReports"/>
+     <addaction name="separator"/>
+     <addaction name="actionBackup"/>
+     <addaction name="actionExpiryNotifications"/>
+     <addaction name="actionAuditLog"/>
+    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
    <addaction name="menuDocuments"/>
@@ -470,12 +474,27 @@
     <string>Резервное копирование БД</string>
    </property>
   </action>
-  <action name="actionExpiryNotifications">
-   <property name="text">
-    <string>Уведомления о просрочке</string>
-   </property>
-  </action>
- </widget>
+   <action name="actionExpiryNotifications">
+    <property name="text">
+     <string>Уведомления о просрочке</string>
+    </property>
+   </action>
+   <action name="actionAuditLog">
+    <property name="text">
+     <string>Журнал аудита</string>
+    </property>
+   </action>
+   <action name="actionBatchStatus">
+    <property name="text">
+     <string>Массовое обновление статусов</string>
+    </property>
+   </action>
+   <action name="actionReports">
+    <property name="text">
+     <string>Отчёты по периодам</string>
+    </property>
+   </action>
+  </widget>
  <resources/>
  <connections/>
 </ui>

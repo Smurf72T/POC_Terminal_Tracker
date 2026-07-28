@@ -7,6 +7,7 @@
 #include <QTextCursor>
 #include <QPrinter>
 #include <QDateTime>
+#include <QFileInfo>
 #include <QDebug>
 
 ReportExporter::ReportExporter(QObject *parent) : QObject(parent) {}
@@ -91,6 +92,12 @@ bool ReportExporter::exportHtmlToPdf(const QString& html,
     printer.setPageMargins(QMarginsF(15, 15, 15, 15));
 
     doc.print(&printer);
+
+    if (!QFile::exists(filePath) || QFileInfo(filePath).size() == 0) {
+        QMessageBox::critical(parent, "Ошибка",
+            QString("Не удалось сохранить PDF-файл:\n%1").arg(filePath));
+        return false;
+    }
 
     QMessageBox::information(parent, "Экспорт",
         QString("PDF успешно сохранён:\n%1").arg(filePath));

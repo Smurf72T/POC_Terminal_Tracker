@@ -7,13 +7,17 @@ CREATE TABLE IF NOT EXISTS tbl_users (
     user_id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
     display_name VARCHAR(100),
+    password_hash VARCHAR(256),
+    role VARCHAR(50) DEFAULT 'user',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Вставляем дефолтного пользователя
-INSERT INTO tbl_users (username, display_name, is_active)
-VALUES ('admin', 'Администратор', TRUE)
+-- Вставляем дефолтного пользователя (пароль: admin123)
+INSERT INTO tbl_users (username, display_name, password_hash, role, is_active)
+VALUES ('admin', 'Администратор',
+        '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+        'admin', TRUE)
 ON CONFLICT (username) DO NOTHING;
 
 -- Таблица аудита
@@ -21,7 +25,7 @@ CREATE TABLE IF NOT EXISTS tbl_audit_log (
     audit_log_id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES tbl_users(user_id),
     username VARCHAR(100),
-    action VARCHAR(50) NOT NULL, -- CREATE, UPDATE, DELETE, POST, LOGIN
+    action VARCHAR(50) NOT NULL,
     table_name VARCHAR(100),
     record_id INTEGER,
     old_values JSONB,
@@ -29,13 +33,15 @@ CREATE TABLE IF NOT EXISTS tbl_audit_log (
     performed_at TIMESTAMP DEFAULT NOW()
 );
 
--- Индекс для быстрого поиска по таблице и дате
-CREATE INDEX IF NOT EXISTS idx_audit_log_table_date 
+-- Индексы
+CREATE INDEX IF NOT EXISTS idx_audit_log_table_date
 ON tbl_audit_log(table_name, performed_at DESC);
 
--- Индекс по пользователю
-CREATE INDEX IF NOT EXISTS idx_audit_log_user 
+CREATE INDEX IF NOT EXISTS idx_audit_log_user
 ON tbl_audit_log(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_performed_at
+ON tbl_audit_log(performed_at DESC);
 
 -- Функция для упрощённой записи в аудит
 CREATE OR REPLACE FUNCTION log_audit_action(
@@ -50,14 +56,68 @@ RETURNS VOID AS $$
 DECLARE
     v_user_id INTEGER;
 BEGIN
-    -- Получаем ID пользователя по имени
-    SELECT user_id INTO v_user_id FROM tbl_users 
+    SELECT user_id INTO v_user_id FROM tbl_users
     WHERE username = COALESCE(p_username, 'system') AND is_active = TRUE;
-    
+
     INSERT INTO tbl_audit_log (user_id, username, action, table_name, record_id, old_values, new_values, performed_at)
     VALUES (v_user_id, COALESCE(p_username, 'system'), p_action, p_table_name, p_record_id, p_old_values, p_new_values, NOW());
 END;
 $$ LANGUAGE plpgsql;
 
--- Пример использования
--- SELECT log_audit_action('POST', 'tblrentaldocs', 1, 'admin', NULL, '{"docnumber": "АР-00001"}');
+-- Триггер для автоматического логирования изменений в tblterminals
+CREATE OR REPLACE FUNCTION audit_terminals_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO tbl_audit_log (username, action, table_name, record_id, new_values, performed_at)
+        VALUES (COALESCE(current_setting('app.username', TRUE), 'system'), 'CREATE', 'tblterminals',
+                NEW.terminalid, row_to_json(NEW)::jsonb, NOW());
+        RETURN NEW;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO tbl_audit_log (username, action, table_name, record_id, old_values, new_values, performed_at)
+        VALUES (COALESCE(current_setting('app.username', TRUE), 'system'), 'UPDATE', 'tblterminals',
+                NEW.terminalid, row_to_json(OLD)::jsonb, row_to_json(NEW)::jsonb, NOW());
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        INSERT INTO tbl_audit_log (username, action, table_name, record_id, old_values, performed_at)
+        VALUES (COALESCE(current_setting('app.username', TRUE), 'system'), 'DELETE', 'tblterminals',
+                OLD.terminalid, row_to_json(OLD)::jsonb, NOW());
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_audit_terminals ON tblterminals;
+CREATE TRIGGER trg_audit_terminals
+    AFTER INSERT OR UPDATE OR DELETE ON tblterminals
+    FOR EACH ROW EXECUTE FUNCTION audit_terminals_trigger();
+
+-- Триггер для логирования изменений в tblclients
+CREATE OR REPLACE FUNCTION audit_clients_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO tbl_audit_log (username, action, table_name, record_id, new_values, performed_at)
+        VALUES (COALESCE(current_setting('app.username', TRUE), 'system'), 'CREATE', 'tblclients',
+                NEW.clientid, row_to_json(NEW)::jsonb, NOW());
+        RETURN NEW;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO tbl_audit_log (username, action, table_name, record_id, old_values, new_values, performed_at)
+        VALUES (COALESCE(current_setting('app.username', TRUE), 'system'), 'UPDATE', 'tblclients',
+                NEW.clientid, row_to_json(OLD)::jsonb, row_to_json(NEW)::jsonb, NOW());
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        INSERT INTO tbl_audit_log (username, action, table_name, record_id, old_values, performed_at)
+        VALUES (COALESCE(current_setting('app.username', TRUE), 'system'), 'DELETE', 'tblclients',
+                OLD.clientid, row_to_json(OLD)::jsonb, NOW());
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_audit_clients ON tblclients;
+CREATE TRIGGER trg_audit_clients
+    AFTER INSERT OR UPDATE OR DELETE ON tblclients
+    FOR EACH ROW EXECUTE FUNCTION audit_clients_trigger();

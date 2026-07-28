@@ -13,6 +13,11 @@
 #include "dialogs/archivedocumentsform.h"
 #include "dialogs/terminalhistoryform.h"
 #include "dialogs/bulkimportform.h"
+#include "dialogs/auditlogform.h"
+#include "dialogs/expirynotificationsform.h"
+#include "dialogs/batchstatusform.h"
+#include "dialogs/reportsform.h"
+#include "dialogs/loginform.h"
 #include "utils/reportexporter.h"
 #include <QInputDialog>
 #include <QMessageBox>
@@ -111,6 +116,9 @@ void MainWindow::setupUI()
     connect(ui->actionBulkImport, &QAction::triggered, this, &MainWindow::onActionBulkImport_triggered);
     connect(ui->actionBackup, &QAction::triggered, this, &MainWindow::onActionBackup_triggered);
     connect(ui->actionExpiryNotifications, &QAction::triggered, this, &MainWindow::onActionExpiryNotifications_triggered);
+    connect(ui->actionAuditLog, &QAction::triggered, this, &MainWindow::onActionAuditLog_triggered);
+    connect(ui->actionBatchStatus, &QAction::triggered, this, &MainWindow::onActionBatchStatus_triggered);
+    connect(ui->actionReports, &QAction::triggered, this, &MainWindow::onActionReports_triggered);
 }
 
 void MainWindow::updateStatusBar()
@@ -230,15 +238,12 @@ void MainWindow::loadRecentDocuments()
 
 void MainWindow::onDatabaseDataChanged()
 {
-    // Автоматическое обновление при изменении данных
     loadCounters();
     loadTopClients();
     loadRecentDocuments();
     ui->labelLastUpdate->setText("Последнее обновление: " +
         QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"));
 }
-
-// ... все остальные слоты (onActionManufacturers_triggered и т.д.) остаются без изменений ...
 
 void MainWindow::onActionAbout_triggered()
 {
@@ -509,6 +514,36 @@ void MainWindow::openFreeDevicesReport()
     dialog->open();
 }
 
+void MainWindow::onActionAuditLog_triggered()
+{
+    openForm(new AuditLogForm(this));
+}
+
+void MainWindow::onActionBatchStatus_triggered()
+{
+    openForm(new BatchStatusForm(this));
+}
+
+void MainWindow::onActionReports_triggered()
+{
+    openForm(new ReportsForm(this));
+}
+
+void MainWindow::showLoginDialog()
+{
+    LoginForm loginDialog(this);
+    if (loginDialog.exec() == QDialog::Accepted) {
+        m_currentUser = loginDialog.getUsername();
+        m_currentUserId = loginDialog.getUserId();
+        m_currentUserRole = loginDialog.getRole();
+        DatabaseManager::instance().setCurrentUser(m_currentUser);
+        statusBar()->showMessage(statusBar()->currentMessage() +
+            " | Пользователь: " + m_currentUser);
+    } else {
+        QCoreApplication::quit();
+    }
+}
+
 void MainWindow::openBulkImport()
 {
     openForm(new BulkImportForm(this));
@@ -621,9 +656,8 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
         QString table = tableQuery.value(0).toString();
 
         out << "-- Таблица: " << table << "\n";
-        out << "CREATE TABLE IF NOT EXISTS " << table << " (\n";
+        out << "CREATE TABLE IF NOT EXISTS \"" << table << "\" (\n";
 
-        // Получаем типы столбцов из information_schema
         QSqlQuery colQuery(db);
         colQuery.prepare("SELECT column_name, data_type, is_nullable "
                          "FROM information_schema.columns "
@@ -633,29 +667,36 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
         colQuery.exec();
 
         QStringList columnDefs;
+        QStringList columnNames;
         while (colQuery.next()) {
             QString name = colQuery.value(0).toString();
             QString type = colQuery.value(1).toString();
             QString nullable = colQuery.value(2).toString();
+            columnNames.append("\"" + name + "\"");
 
             if (type.toUpper().startsWith("INT")) type = "INTEGER";
-            columnDefs.append("    " + name + " " + type +
+            columnDefs.append("    \"" + name + "\" " + type +
                               (nullable == "YES" ? " NULL" : " NOT NULL"));
         }
-        out << columnDefs.join("\n") << "\n);\n\n";
+        out << columnDefs.join(",\n") << "\n);\n\n";
 
         QSqlQuery dataQuery(db);
-        dataQuery.exec(QString("SELECT * FROM %1").arg(table));
+        dataQuery.prepare(QString("SELECT * FROM \"%1\"").arg(table));
+        dataQuery.exec();
 
         while (dataQuery.next()) {
-            out << "INSERT INTO " << table << " VALUES (";
+            out << "INSERT INTO \"" << table << "\" (" << columnNames.join(", ") << ") VALUES (";
             for (int i = 0; i < dataQuery.record().count(); i++) {
                 if (i > 0) out << ", ";
                 QVariant val = dataQuery.value(i);
                 if (val.isNull()) {
                     out << "NULL";
-                } else {
+                } else if (val.typeId() == QMetaType::QString || val.typeId() == QMetaType::QByteArray) {
                     out << "'" << val.toString().replace("'", "''") << "'";
+                } else if (val.typeId() == QMetaType::QDateTime || val.typeId() == QMetaType::QDate) {
+                    out << "'" << val.toString() << "'";
+                } else {
+                    out << val.toString();
                 }
             }
             out << ");\n";
@@ -672,42 +713,5 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
 
 void MainWindow::showExpiryNotifications()
 {
-    QDialog *dialog = new QDialog(this);
-    dialog->setWindowTitle("Уведомления о просрочке");
-    dialog->resize(800, 500);
-
-    auto *layout = new QVBoxLayout(dialog);
-
-    auto *lblInfo = new QLabel(
-        "Функция уведомлений о просроченной аренде и неоплаченных периодах.\n\n"
-        "Для использования данного функционала необходимо:\n"
-        "1. Добавить поле «срок аренды» в tblrentaldocs\n"
-        "2. Добавить поле «оплачено» в tblpaymentdocs\n\n"
-        "На данный момент активных уведомлений нет.", dialog);
-    lblInfo->setWordWrap(true);
-    layout->addWidget(lblInfo);
-
-    // Добавляем текущую статистику
-    QSqlQuery statQuery(DatabaseManager::instance().getDatabase());
-    statQuery.exec("SELECT COUNT(*) FROM tblrentaldocs");
-    int totalRentals = 0;
-    if (statQuery.next()) totalRentals = statQuery.value(0).toInt();
-
-    statQuery.exec("SELECT COUNT(*) FROM tblpaymentdocs");
-    int totalPayments = 0;
-    if (statQuery.next()) totalPayments = statQuery.value(0).toInt();
-
-    QString statText = QString("Всего арендных документов: %1\n"
-                                "Всего документов оплаты: %2")
-                           .arg(totalRentals).arg(totalPayments);
-    auto *statLbl = new QLabel(statText, dialog);
-    statLbl->setStyleSheet("QLabel { color: #666; font-size: 12px; }");
-    layout->addWidget(statLbl);
-
-    auto *btnClose = new QPushButton("Закрыть", dialog);
-    connect(btnClose, &QPushButton::clicked, dialog, &QDialog::accept);
-    layout->addWidget(btnClose);
-
-    dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->open();
+    openForm(new ExpiryNotificationsForm(this));
 }

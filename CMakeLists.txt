@@ -44,6 +44,11 @@ set(SOURCES
         src/ui/dialogs/paymentform.cpp
         src/ui/dialogs/terminalhistoryform.cpp
         src/ui/dialogs/bulkimportform.cpp
+        src/ui/dialogs/auditlogform.cpp
+        src/ui/dialogs/loginform.cpp
+        src/ui/dialogs/expirynotificationsform.cpp
+        src/ui/dialogs/batchstatusform.cpp
+        src/ui/dialogs/reportsform.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
 )
@@ -67,6 +72,11 @@ set(HEADERS
         src/ui/dialogs/paymentform.h
         src/ui/dialogs/terminalhistoryform.h
         src/ui/dialogs/bulkimportform.h
+        src/ui/dialogs/auditlogform.h
+        src/ui/dialogs/loginform.h
+        src/ui/dialogs/expirynotificationsform.h
+        src/ui/dialogs/batchstatusform.h
+        src/ui/dialogs/reportsform.h
         src/utils/reportexporter.h
         src/utils/validator.h
 )
@@ -85,6 +95,11 @@ set(UI_FILES
         src/ui/dialogs/paymentform.ui
         src/ui/dialogs/terminalhistoryform.ui
         src/ui/dialogs/bulkimportform.ui
+        src/ui/dialogs/auditlogform.ui
+        src/ui/dialogs/loginform.ui
+        src/ui/dialogs/expirynotificationsform.ui
+        src/ui/dialogs/batchstatusform.ui
+        src/ui/dialogs/reportsform.ui
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})
@@ -100,10 +115,17 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         QXlsx::QXlsx
 )
 
-# Копируем config.json в папку сборки, чтобы приложение его видело при запуске
+# Копируем config.json в папку сборки
 configure_file(
         ${CMAKE_SOURCE_DIR}/config/config.json
         ${CMAKE_BINARY_DIR}/config/config.json
+        COPYONLY
+)
+
+# Копируем .env в папку сборки
+configure_file(
+        ${CMAKE_SOURCE_DIR}/.env
+        ${CMAKE_BINARY_DIR}/.env
         COPYONLY
 )
 
@@ -113,3 +135,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/src/ui
         ${PostgreSQL_INCLUDE_DIRS}
 )
+
+# Копируем DLL PostgreSQL в папку сборки
+set(PG_DLL_DIR "${PostgreSQL_ROOT}/bin")
+foreach(_pg_dll libpq.dll libintl-9.dll libssl-3-x64.dll libcrypto-3-x64.dll)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${PG_DLL_DIR}/${_pg_dll}"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${_pg_dll}"
+            COMMENT "Copying ${_pg_dll}"
+    )
+endforeach()

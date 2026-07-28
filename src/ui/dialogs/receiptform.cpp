@@ -119,7 +119,6 @@ void ReceiptForm::on_btnPost_clicked()
     int docId = query.value(0).toInt();
 
     // 2. Обрабатываем строки
-    bool error = false;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
         int modelId = rowsModel->data(rowsModel->index(i, 1)).toInt();

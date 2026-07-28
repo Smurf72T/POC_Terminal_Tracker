@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>BatchStatusForm</class>
+    <widget class="QWidget" name="BatchStatusForm">
+        <property name="geometry">
+            <rect><x>0</x><y>0</y><width>800</width><height>500</height></rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <widget class="QLabel" name="labelTitle">
+                    <property name="text"><string>Массовое обновление статусов терминалов</string></property>
+                    <property name="styleSheet"><string>QLabel { font-size: 16px; font-weight: bold; }</string></property>
+                </widget>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="filterLayout">
+                    <item>
+                        <widget class="QLabel" name="labelStatus"><property name="text"><string>Текущий статус:</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QComboBox" name="comboBoxCurrentStatus"/>
+                    </item>
+                    <item>
+                        <widget class="QLabel" name="labelNewStatus"><property name="text"><string>Новый статус:</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QComboBox" name="comboBoxNewStatus"/>
+                    </item>
+                    <item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                    <item>
+                        <widget class="QPushButton" name="btnApply"><property name="text"><string>Применить к выбранным</string></property></widget>
+                    </item>
+                </layout>
+            </item>
+            <item>
+                <widget class="QTableView" name="tableView">
+                    <property name="alternatingRowColors"><bool>true</bool></property>
+                </widget>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="bottomLayout">
+                    <item>
+                        <widget class="QPushButton" name="btnSelectAll"><property name="text"><string>Выбрать все</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnDeselectAll"><property name="text"><string>Снять выделение</string></property></widget>
+                    </item>
+                    <item><spacer name="horizontalSpacer_2"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                    <item>
+                        <widget class="QPushButton" name="btnClose"><property name="text"><string>Закрыть</string></property></widget>
+                    </item>
+                </layout>
+            </item>
+        </layout>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

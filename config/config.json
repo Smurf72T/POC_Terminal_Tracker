@@ -4,10 +4,10 @@
     "port": 5432,
     "database": "pocbase",
     "username": "postgres",
-    "password": "postgres"
+    "password": ""
   },
   "application": {
     "name": "POC Terminal Tracker",
-    "version": "1.0.0"
+    "version": "1.1.0"
   }
 }

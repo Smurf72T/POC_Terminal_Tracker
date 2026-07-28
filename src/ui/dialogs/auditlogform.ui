@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>AuditLogForm</class>
+    <widget class="QWidget" name="AuditLogForm">
+        <property name="geometry">
+            <rect><x>0</x><y>0</y><width>1000</width><height>600</height></rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <layout class="QHBoxLayout" name="filterLayout">
+                    <item>
+                        <widget class="QLabel" name="labelFrom"><property name="text"><string>С даты:</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QDateEdit" name="dateEditFrom"><property name="calendarPopup"><bool>true</bool></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QLabel" name="labelTo"><property name="text"><string>По дату:</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QDateEdit" name="dateEditTo"><property name="calendarPopup"><bool>true</bool></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QLabel" name="labelAction"><property name="text"><string>Действие:</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QComboBox" name="comboBoxAction"/>
+                    </item>
+                    <item>
+                        <widget class="QLabel" name="labelTable"><property name="text"><string>Таблица:</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QComboBox" name="comboBoxTable"/>
+                    </item>
+                    <item>
+                        <spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnFilter"><property name="text"><string>Применить фильтр</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnExportExcel"><property name="text"><string>Excel</string></property></widget>
+                    </item>
+                </layout>
+            </item>
+            <item>
+                <widget class="QTableView" name="tableView">
+                    <property name="alternatingRowColors"><bool>true</bool></property>
+                </widget>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="bottomLayout">
+                    <item><spacer name="horizontalSpacer_2"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                    <item>
+                        <widget class="QPushButton" name="btnClose"><property name="text"><string>Закрыть</string></property></widget>
+                    </item>
+                </layout>
+            </item>
+        </layout>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

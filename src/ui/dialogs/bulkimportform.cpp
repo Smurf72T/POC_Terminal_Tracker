@@ -270,7 +270,6 @@ bool BulkImportForm::importData()
     if (failed > 0) {
         db.rollback();
         showImportResult(false, model->rowCount(), imported, failed, errors.join("\n"));
-        dbMgr.notifyDataChanged();
         return false;
     }
 

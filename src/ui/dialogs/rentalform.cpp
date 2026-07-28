@@ -202,7 +202,6 @@ void RentalForm::on_btnPost_clicked()
     int docId = query.value(0).toInt();
 
     // 2. Обрабатываем строки (главная часть с защитой от гонки)
-    bool error = false;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
         int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
@@ -232,7 +231,7 @@ void RentalForm::on_btnPost_clicked()
         QSqlQuery updateQuery(db);
         updateQuery.prepare("UPDATE tblterminals SET status = 1, currentsimcardid = :simid WHERE terminalid = :id");
         updateQuery.bindValue(":id", terminalId);
-        updateQuery.bindValue(":simid", simId);
+        updateQuery.bindValue(":simid", simId > 0 ? QVariant(simId) : QVariant());
 
         if (!updateQuery.exec()) {
             db.rollback();
@@ -242,15 +241,17 @@ void RentalForm::on_btnPost_clicked()
         }
 
         // Обновляем статус SIM-карты
-        QSqlQuery simQuery(db);
-        simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
-        simQuery.bindValue(":id", simId);
+        if (simId > 0) {
+            QSqlQuery simQuery(db);
+            simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
+            simQuery.bindValue(":id", simId);
 
-        if (!simQuery.exec()) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка БД",
-                QString("Не удалось обновить SIM-карту %1: %2").arg(simId).arg(simQuery.lastError().text()));
-            return;
+            if (!simQuery.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД",
+                    QString("Не удалось обновить SIM-карту %1: %2").arg(simId).arg(simQuery.lastError().text()));
+                return;
+            }
         }
 
         // Создаем запись в детали документа

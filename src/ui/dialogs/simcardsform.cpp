@@ -73,8 +73,12 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         if (searchText.isEmpty()) {
             model->setFilter("");
         } else {
-            QString filter = QString("simnumber LIKE '%%1%%'")
-                                .arg(searchText.replace("'", "''"));
+            QString escaped = searchText;
+            escaped.replace("'", "''");
+            escaped.replace("%", "\\%");
+            escaped.replace("_", "\\_");
+            QString filter = QString("simnumber LIKE '%%1%%' ESCAPE '\\'")
+                                .arg(escaped);
             model->setFilter(filter);
         }
         model->select();

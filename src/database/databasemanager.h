@@ -30,10 +30,12 @@ public:
                    const QString& username = "admin", const QString& oldValues = "{}",
                    const QString& newValues = "{}");
 
-    void notifyDataChanged(); // <-- Добавлено
+    void notifyDataChanged();
+    void setCurrentUser(const QString& username);
+    QString getCurrentUser() const;
 
 signals:
-    void dataChanged(); // <-- Добавлено
+    void dataChanged();
 
 private:
     DatabaseManager() = default;
@@ -47,6 +49,7 @@ private:
     QSqlDatabase m_database;
     QJsonObject m_config;
     bool m_initialized = false;
+    QString m_currentUser = "admin";
 };
 
 #endif // DATABASEMANAGER_H

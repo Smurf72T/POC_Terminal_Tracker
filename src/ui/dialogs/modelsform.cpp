@@ -66,8 +66,12 @@ ModelsForm::ModelsForm(QWidget *parent) :
         if (searchText.isEmpty()) {
             model->setFilter("");
         } else {
-            QString filter = QString("modelname LIKE '%%1%%' OR manufacturername LIKE '%%1%%'")
-                                .arg(searchText.replace("'", "''"));
+            QString escaped = searchText;
+            escaped.replace("'", "''");
+            escaped.replace("%", "\\%");
+            escaped.replace("_", "\\_");
+            QString filter = QString("modelname LIKE '%%1%%' ESCAPE '\\' OR manufacturername LIKE '%%1%%' ESCAPE '\\'")
+                                .arg(escaped);
             model->setFilter(filter);
         }
         model->select();
@@ -86,7 +90,7 @@ void ModelsForm::on_btnAdd_clicked()
 {
     // Сначала проверяем, есть ли вообще производители
     QSqlQuery checkQuery(DatabaseManager::instance().getDatabase());
-    checkQuery.exec("SELECT manufacturerid FROM tblmanufacturers LIMIT 1");
+    checkQuery.exec("SELECT manufacturerid FROM tblmanufacturers ORDER BY manufacturerid LIMIT 1");
 
     if (!checkQuery.next()) {
         QMessageBox::warning(this, "Внимание", "Сначала добавьте хотя бы одного производителя в справочнике!");

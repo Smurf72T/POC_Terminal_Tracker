@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>ExpiryNotificationsForm</class>
+    <widget class="QWidget" name="ExpiryNotificationsForm">
+        <property name="geometry">
+            <rect><x>0</x><y>0</y><width>900</width><height>600</height></rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <widget class="QLabel" name="labelTitle">
+                    <property name="text"><string>Уведомления о просроченной аренде</string></property>
+                    <property name="styleSheet"><string>QLabel { font-size: 16px; font-weight: bold; }</string></property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QGroupBox" name="groupBoxOverdue">
+                    <property name="title"><string>Просроченные аренды (без возврата более 30 дней)</string></property>
+                    <layout class="QVBoxLayout" name="overdueLayout">
+                        <item>
+                            <widget class="QTableView" name="tableViewOverdue">
+                                <property name="alternatingRowColors"><bool>true</bool></property>
+                            </widget>
+                        </item>
+                    </layout>
+                </widget>
+            </item>
+            <item>
+                <widget class="QGroupBox" name="groupBoxUnpaid">
+                    <property name="title"><string>Неоплаченные периоды</string></property>
+                    <layout class="QVBoxLayout" name="unpaidLayout">
+                        <item>
+                            <widget class="QTableView" name="tableViewUnpaid">
+                                <property name="alternatingRowColors"><bool>true</bool></property>
+                            </widget>
+                        </item>
+                    </layout>
+                </widget>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="bottomLayout">
+                    <item>
+                        <widget class="QPushButton" name="btnRefresh"><property name="text"><string>Обновить</string></property></widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnExport"><property name="text"><string>Экспорт в Excel</string></property></widget>
+                    </item>
+                    <item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+                    <item>
+                        <widget class="QPushButton" name="btnClose"><property name="text"><string>Закрыть</string></property></widget>
+                    </item>
+                </layout>
+            </item>
+        </layout>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

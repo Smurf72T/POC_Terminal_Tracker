@@ -1,0 +1,3 @@
+[submodule "libs/QXlsx"]
+	path = libs/QXlsx
+	url = https://github.com/QtExcel/QXlsx.git

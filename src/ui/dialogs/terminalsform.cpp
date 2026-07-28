@@ -75,25 +75,34 @@ void TerminalsForm::loadModel(const QString &filter)
         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
         "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid";
 
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+
     if (!filter.isEmpty()) {
-        QString escaped = filter;
-        escaped.replace("'", "''");
-        queryStr += QString(" WHERE t.serialnumber LIKE '%%1%%' "
-                            "OR t.imei1 LIKE '%%1%%' "
-                            "OR t.imei2 LIKE '%%1%%' "
-                            "OR m.modelname LIKE '%%1%%'")
-                        .arg(escaped);
+        QString likeFilter = "%" + filter + "%";
+        queryStr += " WHERE (t.serialnumber LIKE :f1 "
+                    "OR t.imei1 LIKE :f2 "
+                    "OR t.imei2 LIKE :f3 "
+                    "OR m.modelname LIKE :f4)";
+        queryStr += " ORDER BY t.serialnumber";
+        query.prepare(queryStr);
+        query.bindValue(":f1", likeFilter);
+        query.bindValue(":f2", likeFilter);
+        query.bindValue(":f3", likeFilter);
+        query.bindValue(":f4", likeFilter);
+    } else {
+        queryStr += " ORDER BY t.serialnumber";
+        query.prepare(queryStr);
     }
 
-    queryStr += " ORDER BY t.serialnumber";
-
-    model->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    if (query.exec()) {
+        model->setQuery(std::move(query));
+    }
 }
 
 void TerminalsForm::on_btnAdd_clicked()
 {
     QSqlQuery checkQuery(DatabaseManager::instance().getDatabase());
-    checkQuery.exec("SELECT modelid FROM tblmodels LIMIT 1");
+    checkQuery.exec("SELECT modelid FROM tblmodels ORDER BY modelid LIMIT 1");
     if (!checkQuery.next()) {
         QMessageBox::warning(this, "Внимание", "Сначала добавьте модели в справочнике моделей!");
         return;
@@ -148,6 +157,29 @@ void TerminalsForm::on_btnDelete_clicked()
 
     if (status == "В аренде") {
         QMessageBox::warning(this, "Ошибка удаления", "Нельзя удалить терминал, который находится в аренде!");
+        return;
+    }
+
+    QSqlQuery checkRefQuery(DatabaseManager::instance().getDatabase());
+    checkRefQuery.prepare(
+        "SELECT "
+        "(SELECT COUNT(*) FROM tblreceiptdetails WHERE terminalid = :id) + "
+        "(SELECT COUNT(*) FROM tblrentaldetails WHERE terminalid = :id) + "
+        "(SELECT COUNT(*) FROM tblreturndetails WHERE terminalid = :id)");
+    checkRefQuery.bindValue(":id", id);
+
+    if (checkRefQuery.exec() && checkRefQuery.next() && checkRefQuery.value(0).toInt() > 0) {
+        QMessageBox::warning(this, "Ошибка удаления",
+            "Невозможно удалить терминал: на него ссылаются документы.\n"
+            "Терминал будет деактивирован вместо удаления.");
+        QSqlQuery deactivateQuery(DatabaseManager::instance().getDatabase());
+        deactivateQuery.prepare("DELETE FROM tblterminals WHERE terminalid = :id");
+        deactivateQuery.bindValue(":id", id);
+        if (deactivateQuery.exec()) {
+            loadModel();
+        } else {
+            QMessageBox::warning(this, "Ошибка", "Не удалось деактивировать: " + deactivateQuery.lastError().text());
+        }
         return;
     }
 

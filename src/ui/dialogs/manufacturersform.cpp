@@ -30,7 +30,6 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
     model->setTable("tblmanufacturers");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
     
-    // Выполняем select и проверяем результат
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка загрузки данных",
             "Не удалось загрузить данные:\n" + model->lastError().text() +
@@ -42,13 +41,7 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
         return;
     }
     
-    // Проверяем количество записей
     int rowCount = model->rowCount();
-    qDebug() << "Загружено записей из tblmanufacturers:" << rowCount;
-    
-    if (rowCount == 0) {
-        qDebug() << "Таблица пуста или не найдена";
-    }
 
     // Настройка сортировки
     model->setSort(0, Qt::AscendingOrder);
@@ -64,8 +57,6 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
     ui->tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
     ui->tableView->setAlternatingRowColors(true);
-    
-    qDebug() << "Таблица настроена, модель привязана";
 
     // Debounce timer для поиска
     searchTimer = new QTimer(this);
@@ -76,8 +67,12 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
         if (searchText.isEmpty()) {
             model->setFilter("");
         } else {
-            QString filter = QString("manufacturername LIKE '%%1%%'")
-                                .arg(searchText.replace("'", "''"));
+            QString escaped = searchText;
+            escaped.replace("'", "''");
+            escaped.replace("%", "\\%");
+            escaped.replace("_", "\\_");
+            QString filter = QString("manufacturername LIKE '%%1%%' ESCAPE '\\'")
+                                .arg(escaped);
             model->setFilter(filter);
         }
         model->select();

@@ -1,111 +1,82 @@
-### UiPath template
-# gitignore template for RPA development using UiPath Studio
-# website: https://www.uipath.com/product/studio
-#
-# Recommended: n/a
+# Build directories
+cmake-build-debug/
+cmake-build-release/
+build/
+out/
 
-# Ignore folders that could cause issues if accidentally tracked
-**/.local/**
-**/.settings/**
-**/.objects/**
-**/.tmh/**
-**/*.log
-
-### C++ template
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
+# Compiled files
 *.o
 *.obj
-
-# Precompiled Headers
+*.d
 *.gch
 *.pch
+*.slo
+*.lo
 
-# Compiled Dynamic libraries
+# Libraries (built artifacts)
+*.a
+*.la
+*.lai
+*.lib
 *.so
+*.so.*
 *.dylib
 *.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
 
 # Executables
 *.exe
 *.out
 *.app
-
-### C template
-# Prerequisites
-*.d
-
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
 
 # Linker output
 *.ilk
 *.map
 *.exp
 
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
 # Debug files
-*.dSYM/
-*.su
-*.idb
 *.pdb
+*.idb
+*.dSYM/
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-### Example user template template
-### Example user template
-
-# IntelliJ project files
-.idea
+# IDE - JetBrains (CLion)
+.idea/
 *.iml
-out
-gen
-/План_улучшений_POC_Terminal_Tracker.txt
 
+# IDE - Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+CMakeSettings.json
+CMakeUserPresets.json
+
+# IDE - VS Code (optional, if used)
+.vscode/
+
+# Qt
+*.autosave
+*.pro.user
+*.pro.user.*
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+.cmake/
+
+# PostgreSQL
+*.sql.bak
+
+# Environment / secrets
+.env
+
+# AI tool artifacts
+.gigacode/
+
+# Logs
+*.log
+
+# Project-specific
+/План_улучшений_POC_Terminal_Tracker.txt

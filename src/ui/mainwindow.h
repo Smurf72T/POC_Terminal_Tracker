@@ -43,13 +43,20 @@ private slots:
     void onActionBulkImport_triggered();
     void onActionBackup_triggered();
     void onActionExpiryNotifications_triggered();
-    void onDatabaseDataChanged(); // <-- Добавлено
+    void onActionAuditLog_triggered();
+    void onActionBatchStatus_triggered();
+    void onActionReports_triggered();
+    void onDatabaseDataChanged();
 
 private:
     Ui::MainWindow *ui;
     QSqlQueryModel *topClientsModel;
     QSqlQueryModel *recentDocsModel;
     QTimer *refreshTimer;
+
+    QString m_currentUser;
+    int m_currentUserId = 0;
+    QString m_currentUserRole;
 
     void setupUI();
     void updateStatusBar();
@@ -64,6 +71,7 @@ private:
     void performBackup();
     void performFallbackBackup(const QString &filePath, const QString &dbname, const QString &password);
     void showExpiryNotifications();
+    void showLoginDialog();
 };
 
 #endif // MAINWINDOW_H

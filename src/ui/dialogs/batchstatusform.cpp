@@ -1,0 +1,143 @@
+#include "batchstatusform.h"
+#include "ui_batchstatusform.h"
+#include "database/databasemanager.h"
+#include <QMessageBox>
+#include <QSqlQuery>
+#include <QSqlError>
+
+BatchStatusForm::BatchStatusForm(QWidget *parent) :
+    QDialog(parent),
+    ui(new Ui::BatchStatusForm),
+    model(new QSqlQueryModel(this))
+{
+    ui->setupUi(this);
+    setWindowTitle("Массовое обновление статусов");
+    resize(800, 500);
+
+    loadStatuses();
+
+    ui->tableView->setModel(model);
+    ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableView->setSelectionMode(QAbstractItemView::MultiSelection);
+    ui->tableView->setAlternatingRowColors(true);
+    ui->tableView->horizontalHeader()->setStretchLastSection(true);
+    ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+
+    loadTerminals(0);
+}
+
+BatchStatusForm::~BatchStatusForm()
+{
+    delete ui;
+}
+
+void BatchStatusForm::loadStatuses()
+{
+    ui->comboBoxCurrentStatus->clear();
+    ui->comboBoxCurrentStatus->addItem("Свободен (0)", 0);
+    ui->comboBoxCurrentStatus->addItem("В аренде (1)", 1);
+
+    ui->comboBoxNewStatus->clear();
+    ui->comboBoxNewStatus->addItem("Свободен (0)", 0);
+    ui->comboBoxNewStatus->addItem("В аренде (1)", 1);
+    ui->comboBoxNewStatus->setCurrentIndex(1);
+}
+
+void BatchStatusForm::loadTerminals(int currentStatus)
+{
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare(
+        "SELECT t.terminalid AS \"ID\", "
+        "t.serialnumber AS \"Серийный номер\", "
+        "COALESCE(m.modelname, '—') AS \"Модель\", "
+        "CASE WHEN t.status = 0 THEN 'Свободен' ELSE 'В аренде' END AS \"Статус\" "
+        "FROM tblterminals t "
+        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+        "WHERE t.status = :status "
+        "ORDER BY t.serialnumber"
+    );
+    query.bindValue(":status", currentStatus);
+
+    if (!query.exec()) {
+        QMessageBox::critical(this, "Ошибка", query.lastError().text());
+        return;
+    }
+
+    model->setQuery(std::move(query));
+    ui->tableView->resizeColumnsToContents();
+    ui->tableView->hideColumn(0);
+}
+
+void BatchStatusForm::on_comboBoxCurrentStatus_currentIndexChanged(int index)
+{
+    int status = ui->comboBoxCurrentStatus->itemData(index).toInt();
+    loadTerminals(status);
+}
+
+void BatchStatusForm::on_btnApply_clicked()
+{
+    QModelIndexList selected = ui->tableView->selectionModel()->selectedRows(0);
+
+    if (selected.isEmpty()) {
+        QMessageBox::warning(this, "Внимание", "Выберите хотя бы один терминал!");
+        return;
+    }
+
+    int newStatus = ui->comboBoxNewStatus->currentData().toInt();
+    QString statusText = (newStatus == 0) ? "Свободен" : "В аренде";
+
+    QMessageBox::StandardButton reply = QMessageBox::question(this, "Подтверждение",
+        QString("Изменить статус %1 терминалов на «%2»?").arg(selected.size()).arg(statusText),
+        QMessageBox::Yes | QMessageBox::No);
+
+    if (reply != QMessageBox::Yes) return;
+
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    if (!db.transaction()) {
+        QMessageBox::critical(this, "Ошибка", "Не удалось начать транзакцию");
+        return;
+    }
+
+    int updated = 0;
+    for (const QModelIndex &idx : selected) {
+        int terminalId = model->data(model->index(idx.row(), 0)).toInt();
+        QSqlQuery query(db);
+        query.prepare("UPDATE tblterminals SET status = :status WHERE terminalid = :id");
+        query.bindValue(":status", newStatus);
+        query.bindValue(":id", terminalId);
+
+        if (query.exec()) {
+            updated++;
+        } else {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Ошибка обновления терминала %1: %2").arg(terminalId).arg(query.lastError().text()));
+            return;
+        }
+    }
+
+    if (!db.commit()) {
+        db.rollback();
+        QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
+        return;
+    }
+
+    DatabaseManager::instance().notifyDataChanged();
+    QMessageBox::information(this, "Успех", QString("Обновлено терминалов: %1").arg(updated));
+    loadTerminals(ui->comboBoxCurrentStatus->currentData().toInt());
+}
+
+void BatchStatusForm::on_btnSelectAll_clicked()
+{
+    ui->tableView->selectAll();
+}
+
+void BatchStatusForm::on_btnDeselectAll_clicked()
+{
+    ui->tableView->clearSelection();
+}
+
+void BatchStatusForm::on_btnClose_clicked()
+{
+    close();
+}

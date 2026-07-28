@@ -1,6 +1,27 @@
 #include "databasemanager.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
+#include <QMap>
+
+static QMap<QString, QString> loadEnvFile(const QString &filePath)
+{
+    QMap<QString, QString> env;
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return env;
+
+    while (!file.atEnd()) {
+        QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty() || line.startsWith('#'))
+            continue;
+        int eq = line.indexOf('=');
+        if (eq < 0)
+            continue;
+        env.insert(line.left(eq).trimmed(), line.mid(eq + 1).trimmed());
+    }
+    return env;
+}
 
 DatabaseManager& DatabaseManager::instance()
 {
@@ -19,14 +40,31 @@ bool DatabaseManager::initialize(const QString& configPath)
         return false;
     }
 
+    // Ищем .env: рядом с executable, затем рядом с config.json, затем в корне проекта
+    QFileInfo configInfo(configPath);
+    QString appDir = QCoreApplication::applicationDirPath();
+    QStringList envCandidates = {
+        appDir + "/.env",
+        appDir + "/../.env",
+        configInfo.absolutePath() + "/.env",
+        configInfo.absolutePath() + "/../../.env"
+    };
+
+    QMap<QString, QString> env;
+    for (const QString &candidate : envCandidates) {
+        env = loadEnvFile(candidate);
+        if (!env.isEmpty()) break;
+    }
+
     QJsonObject dbConfig = m_config["database"].toObject();
 
     m_database = QSqlDatabase::addDatabase("QPSQL");
-    m_database.setHostName(dbConfig["host"].toString());
-    m_database.setPort(dbConfig["port"].toInt());
-    m_database.setDatabaseName(dbConfig["database"].toString());
-    m_database.setUserName(dbConfig["username"].toString());
-    m_database.setPassword(dbConfig["password"].toString());
+    m_database.setHostName(env.value("POC_DB_HOST", dbConfig["host"].toString()));
+    int port = env.contains("POC_DB_PORT") ? env["POC_DB_PORT"].toInt() : dbConfig["port"].toInt();
+    m_database.setPort(port);
+    m_database.setDatabaseName(env.value("POC_DB_NAME", dbConfig["database"].toString()));
+    m_database.setUserName(env.value("POC_DB_USER", dbConfig["username"].toString()));
+    m_database.setPassword(env.value("POC_DB_PASSWORD", dbConfig["password"].toString()));
 
     if (!m_database.open()) {
         showError("Ошибка подключения к базе данных: " + m_database.lastError().text());
@@ -147,11 +185,21 @@ void DatabaseManager::logAction(const QString& action, const QString& tableName,
     query.bindValue(":action", action);
     query.bindValue(":table", tableName);
     query.bindValue(":recid", recordId);
-    query.bindValue(":uname", username);
+    query.bindValue(":uname", username.isEmpty() ? m_currentUser : username);
     query.bindValue(":oldv", oldValues);
     query.bindValue(":newv", newValues);
 
     if (!query.exec()) {
         qDebug() << "[AuditLog] Ошибка логирования:" << query.lastError().text();
     }
+}
+
+void DatabaseManager::setCurrentUser(const QString& username)
+{
+    m_currentUser = username;
+}
+
+QString DatabaseManager::getCurrentUser() const
+{
+    return m_currentUser;
 }

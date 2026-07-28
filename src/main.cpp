@@ -1,4 +1,5 @@
 #include "ui/mainwindow.h"
+#include "ui/dialogs/loginform.h"
 #include "database/databasemanager.h"
 #include <QApplication>
 #include <QFile>
@@ -24,22 +25,28 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
 
 #ifdef Q_OS_WIN
-    // Устанавливаем UTF-8 для консоли Windows
     SetConsoleOutputCP(CP_UTF8);
 #endif
 
-    // Инициализация подключения к БД
     if (!DatabaseManager::instance().initialize()) {
         QMessageBox::critical(nullptr, "Критическая ошибка",
                              "Не удалось подключиться к базе данных.\n"
-                             "Проверьте конфигурационный файл config/config.json");
+                             "Проверьте конфигурационный файл config/config.json\n"
+                             "или переменную окружения POC_DB_PASSWORD");
         return -1;
     }
 
-    // Применяем тему
     applyStyle(a);
 
+    LoginForm loginDialog;
+    if (loginDialog.exec() != QDialog::Accepted) {
+        return 0;
+    }
+
+    DatabaseManager::instance().setCurrentUser(loginDialog.getUsername());
+
     MainWindow w;
+    w.setWindowTitle(QString("POC Terminal Tracker — %1").arg(loginDialog.getUsername()));
     w.show();
 
     return a.exec();
