@@ -75,7 +75,6 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         int row = ui->tableView->currentIndex().row();
         if (row < 0) return;
 
-        int statusCode = model->data(model->index(row, 2)).toInt();
         QString notes = model->data(model->index(row, 3)).toString();
 
         static int f9counter = 0;
@@ -87,7 +86,7 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         query.prepare("INSERT INTO tblsimcards (simnumber, status, notes) "
                       "VALUES (:num, :status, :notes) RETURNING simcardid");
         query.bindValue(":num", tempNumber);
-        query.bindValue(":status", statusCode);
+        query.bindValue(":status", 0);
         query.bindValue(":notes", notes);
 
         if (query.exec() && query.next()) {
