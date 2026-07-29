@@ -74,8 +74,10 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         int statusCode = model->data(model->index(row, 3)).toInt();
         QString notes = model->data(model->index(row, 4)).toString();
 
-        QString tempNumber = QString("TMP%1")
-            .arg(QDateTime::currentMSecsSinceEpoch() % 10000000);
+        static int f9counter = 0;
+        QString tempNumber = QString("TMP%1%2")
+            .arg(QDateTime::currentMSecsSinceEpoch())
+            .arg(f9counter++, 3, 10, QChar('0'));
 
         QSqlQuery query(DatabaseManager::instance().getDatabase());
         query.prepare("INSERT INTO tblsimcards (simnumber, status, notes) "
@@ -90,8 +92,12 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
 
             for (int r = 0; r < model->rowCount(); r++) {
                 if (model->data(model->index(r, 0)).toInt() == newId) {
+                    QModelIndex idx = model->index(r, 1);
                     ui->tableView->selectRow(r);
-                    ui->tableView->setCurrentIndex(model->index(r, 1));
+                    ui->tableView->setCurrentIndex(idx);
+                    QTimer::singleShot(100, [this, idx]() {
+                        ui->tableView->edit(idx);
+                    });
                     break;
                 }
             }
@@ -129,9 +135,11 @@ SIMCardsForm::~SIMCardsForm()
 
 void SIMCardsForm::on_btnAdd_clicked()
 {
-    // Генерируем временный номер SIM (макс. 19 символов)
-    QString tempNumber = QString("TMP%1")
-        .arg(QDateTime::currentMSecsSinceEpoch() % 10000000);
+    // Генерируем уникальный временный номер SIM (макс. 19 символов)
+    static int addCounter = 0;
+    QString tempNumber = QString("TMP%1%2")
+        .arg(QDateTime::currentMSecsSinceEpoch())
+        .arg(addCounter++, 3, 10, QChar('0'));
 
     // Вставляем НАПРЯМУЮ в таблицу tblsimcards (не в VIEW!)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
