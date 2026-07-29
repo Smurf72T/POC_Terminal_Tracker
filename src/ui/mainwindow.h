@@ -47,6 +47,7 @@ private slots:
     void onActionBatchStatus_triggered();
     void onActionReports_triggered();
     void onDatabaseDataChanged();
+    void onRecentDocDoubleClicked(const QModelIndex &index);
 
 private:
     Ui::MainWindow *ui;

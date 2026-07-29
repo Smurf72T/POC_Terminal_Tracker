@@ -68,6 +68,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tableViewRecentDocs->setAlternatingRowColors(true);
     ui->tableViewRecentDocs->horizontalHeader()->setStretchLastSection(true);
 
+    connect(ui->tableViewRecentDocs, &QTableView::doubleClicked,
+            this, &MainWindow::onRecentDocDoubleClicked);
+
     // Автообновление каждые 30 секунд
     connect(refreshTimer, &QTimer::timeout, this, [this]() {
         loadCounters();
@@ -224,15 +227,17 @@ void MainWindow::loadTopClients()
 void MainWindow::loadRecentDocuments()
 {
     QString queryStr =
-        "SELECT docnumber AS \"Номер\", docdate AS \"Дата\", 'Поступление' AS \"Тип\" FROM tblreceiptdocs "
+        "SELECT 1 AS doctype, receiptdocid AS docid, docnumber AS \"Номер\", docdate AS \"Дата\", 'Поступление' AS \"Тип\" FROM tblreceiptdocs "
         "UNION ALL "
-        "SELECT docnumber, docdate, 'Аренда' FROM tblrentaldocs "
+        "SELECT 2, rentaldocid, docnumber, docdate, 'Аренда' FROM tblrentaldocs "
         "UNION ALL "
-        "SELECT docnumber, docdate, 'Возврат' FROM tblreturndocs "
+        "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
         "ORDER BY \"Дата\" DESC "
         "LIMIT 15";
 
     recentDocsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    ui->tableViewRecentDocs->hideColumn(0);
+    ui->tableViewRecentDocs->hideColumn(1);
     ui->tableViewRecentDocs->resizeColumnsToContents();
 }
 
@@ -243,6 +248,28 @@ void MainWindow::onDatabaseDataChanged()
     loadRecentDocuments();
     ui->labelLastUpdate->setText("Последнее обновление: " +
         QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"));
+}
+
+void MainWindow::onRecentDocDoubleClicked(const QModelIndex &index)
+{
+    int docType = recentDocsModel->data(recentDocsModel->index(index.row(), 0)).toInt();
+    int docId = recentDocsModel->data(recentDocsModel->index(index.row(), 1)).toInt();
+    if (docId <= 0) return;
+
+    if (docType == 1) {
+        ReceiptForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    } else if (docType == 2) {
+        RentalForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    } else if (docType == 3) {
+        ReturnForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    }
+    loadRecentDocuments();
 }
 
 void MainWindow::onActionAbout_triggered()
