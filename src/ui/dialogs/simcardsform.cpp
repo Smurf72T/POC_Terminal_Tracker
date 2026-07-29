@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QCloseEvent>
 #include <QShortcut>
+#include <QShortcut>
 
 SIMCardsForm::SIMCardsForm(QWidget *parent) :
     QDialog(parent),
