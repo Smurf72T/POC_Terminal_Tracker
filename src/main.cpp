@@ -2,6 +2,7 @@
 #include "ui/dialogs/loginform.h"
 #include "database/databasemanager.h"
 #include <QApplication>
+#include <QIcon>
 #include <QFile>
 #include <QMessageBox>
 #ifdef Q_OS_WIN
@@ -23,6 +24,8 @@ static void applyStyle(QApplication& app)
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+
+    a.setWindowIcon(QIcon(":/media/70x70.png"));
 
 #ifdef Q_OS_WIN
     SetConsoleOutputCP(CP_UTF8);
