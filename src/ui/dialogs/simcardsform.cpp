@@ -20,10 +20,10 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     setWindowTitle("Справочник SIM-карт");
     resize(700, 500);
 
-    // ИСПОЛЬЗУЕМ VIEW вместо таблицы!
+    // Используем таблицу tblsimcards напрямую
     model = new QSqlTableModel(this, DatabaseManager::instance().getDatabase());
-    model->setTable("vsimcards");
-    model->setEditStrategy(QSqlTableModel::OnManualSubmit);
+    model->setTable("tblsimcards");
+    model->setEditStrategy(QSqlTableModel::OnFieldChange);
 
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка БД",
@@ -36,21 +36,23 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         return;
     }
 
-    // Порядок колонок в VIEW:
-    // 0: simcardid, 1: simnumber, 2: status_text, 3: status_code, 4: notes, 5: createdat
+    // Порядок колонок в tblsimcards:
+    // 0: simcardid, 1: simnumber, 2: status, 3: notes, [4: createdat]
     model->setHeaderData(0, Qt::Horizontal, "ID");
     model->setHeaderData(1, Qt::Horizontal, "Номер SIM");
     model->setHeaderData(2, Qt::Horizontal, "Статус");
-    model->setHeaderData(3, Qt::Horizontal, "Код статуса");
-    model->setHeaderData(4, Qt::Horizontal, "Примечание");
-    model->setHeaderData(5, Qt::Horizontal, "Дата создания");
+    model->setHeaderData(3, Qt::Horizontal, "Примечание");
+    if (model->columnCount() > 4) {
+        model->setHeaderData(4, Qt::Horizontal, "Дата создания");
+    }
 
     ui->tableView->setModel(model);
 
     // Скрываем служебные колонки
     ui->tableView->hideColumn(0); // ID
-    ui->tableView->hideColumn(3); // Код статуса (число, не нужно пользователю)
-    ui->tableView->hideColumn(5); // Дата создания
+    if (model->columnCount() > 4) {
+        ui->tableView->hideColumn(4); // Дата создания
+    }
 
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -60,9 +62,11 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     // Растягиваем колонки
     ui->tableView->setColumnWidth(1, 250);
     ui->tableView->setColumnWidth(2, 150);
-    ui->tableView->setColumnWidth(4, 200);
+    if (model->columnCount() > 3) {
+        ui->tableView->setColumnWidth(3, 200);
+    }
 
-    // ВАЖНО: Делаем колонку статуса (индекс 2) только для чтения
+    // Делаем колонку статуса только для чтения (отображаем число как текст)
     ui->tableView->setItemDelegateForColumn(2, new ReadOnlyDelegate(ui->tableView));
 
     // F9 для дублирования строки
@@ -71,8 +75,8 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         int row = ui->tableView->currentIndex().row();
         if (row < 0) return;
 
-        int statusCode = model->data(model->index(row, 3)).toInt();
-        QString notes = model->data(model->index(row, 4)).toString();
+        int statusCode = model->data(model->index(row, 2)).toInt();
+        QString notes = model->data(model->index(row, 3)).toString();
 
         static int f9counter = 0;
         QString tempNumber = QString("TMP%1%2")
@@ -149,7 +153,7 @@ void SIMCardsForm::on_btnAdd_clicked()
     if (query.exec() && query.next()) {
         int newId = query.value(0).toInt();
 
-        // Обновляем модель из VIEW
+        // Обновляем модель из таблицы
         if (!model->select()) {
             QMessageBox::critical(this, "Ошибка БД",
                 "Запись создана, но не удалось обновить таблицу: " + model->lastError().text() +
@@ -193,10 +197,10 @@ void SIMCardsForm::on_btnDelete_clicked()
     if (row >= 0) {
         int id = model->data(model->index(row, 0)).toInt();
         QString number = model->data(model->index(row, 1)).toString();
-        QString status = model->data(model->index(row, 2)).toString();
+        int status = model->data(model->index(row, 2)).toInt();
 
         // Проверяем, не установлена ли SIM-карта в терминал
-        if (status == "Установлена") {
+        if (status == 1) {
             QMessageBox::warning(this, "Ошибка удаления",
                 "Нельзя удалить SIM-карту, которая установлена в терминал!\n"
                 "Сначала извлеките SIM-карту из терминала.");
@@ -215,7 +219,7 @@ void SIMCardsForm::on_btnDelete_clicked()
             query.bindValue(":id", id);
 
             if (query.exec()) {
-                model->select(); // Обновляем VIEW
+                model->select(); // Обновляем таблицу
                 QMessageBox::information(this, "Успех", "SIM-карта удалена.");
             } else {
                 QMessageBox::warning(this, "Ошибка удаления",
@@ -235,14 +239,7 @@ void SIMCardsForm::on_btnClose_clicked()
 void SIMCardsForm::closeEvent(QCloseEvent *event)
 {
     if (model->isDirty()) {
-        if (!model->submitAll()) {
-            QMessageBox::critical(this, "Ошибка сохранения",
-                "Не удалось сохранить изменения:\n" + model->lastError().text());
-            event->ignore();
-            return;
-        }
-        qDebug() << "SIMCards: Все изменения сохранены";
+        model->submitAll();
     }
-    model->revertAll();
     event->accept();
 }
