@@ -10,7 +10,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QCloseEvent>
-#include <QKeyEvent>
+#include <QShortcut>
 
 SIMCardsForm::SIMCardsForm(QWidget *parent) :
     QDialog(parent),
@@ -66,7 +66,37 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     ui->tableView->setItemDelegateForColumn(2, new ReadOnlyDelegate(ui->tableView));
 
     // F9 для дублирования строки
-    ui->tableView->installEventFilter(this);
+    QShortcut *shortcutF9 = new QShortcut(QKeySequence(Qt::Key_F9), this);
+    connect(shortcutF9, &QShortcut::activated, this, [this]() {
+        int row = ui->tableView->currentIndex().row();
+        if (row < 0) return;
+
+        int statusCode = model->data(model->index(row, 3)).toInt();
+        QString notes = model->data(model->index(row, 4)).toString();
+
+        QString tempNumber = QString("999999999999999999A%1")
+            .arg(QDateTime::currentMSecsSinceEpoch() % 1000);
+
+        QSqlQuery query(DatabaseManager::instance().getDatabase());
+        query.prepare("INSERT INTO tblsimcards (simnumber, status, notes) "
+                      "VALUES (:num, :status, :notes) RETURNING simcardid");
+        query.bindValue(":num", tempNumber);
+        query.bindValue(":status", statusCode);
+        query.bindValue(":notes", notes);
+
+        if (query.exec() && query.next()) {
+            int newId = query.value(0).toInt();
+            model->select();
+
+            for (int r = 0; r < model->rowCount(); r++) {
+                if (model->data(model->index(r, 0)).toInt() == newId) {
+                    ui->tableView->selectRow(r);
+                    ui->tableView->setCurrentIndex(model->index(r, 1));
+                    break;
+                }
+            }
+        }
+    });
 
     // Debounce timer для поиска
     searchTimer = new QTimer(this);
@@ -207,46 +237,4 @@ void SIMCardsForm::closeEvent(QCloseEvent *event)
     }
     model->revertAll();
     event->accept();
-}
-
-bool SIMCardsForm::eventFilter(QObject *obj, QEvent *event)
-{
-    if (obj == ui->tableView && event->type() == QEvent::KeyPress) {
-        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-        if (keyEvent->key() == Qt::Key_F9) {
-            int row = ui->tableView->currentIndex().row();
-            if (row < 0) return true;
-
-            // Копируем данные из текущей строки
-            int statusCode = model->data(model->index(row, 3)).toInt();
-            QString notes = model->data(model->index(row, 4)).toString();
-
-            // Генерируем новый номер SIM
-            QString tempNumber = QString("999999999999999999A%1")
-                .arg(QDateTime::currentMSecsSinceEpoch() % 1000);
-
-            QSqlQuery query(DatabaseManager::instance().getDatabase());
-            query.prepare("INSERT INTO tblsimcards (simnumber, status, notes) "
-                          "VALUES (:num, :status, :notes) RETURNING simcardid");
-            query.bindValue(":num", tempNumber);
-            query.bindValue(":status", statusCode);
-            query.bindValue(":notes", notes);
-
-            if (query.exec() && query.next()) {
-                int newId = query.value(0).toInt();
-                model->select();
-
-                // Находим новую строку и выделяем её
-                for (int r = 0; r < model->rowCount(); r++) {
-                    if (model->data(model->index(r, 0)).toInt() == newId) {
-                        ui->tableView->selectRow(r);
-                        ui->tableView->setCurrentIndex(model->index(r, 1));
-                        break;
-                    }
-                }
-            }
-            return true;
-        }
-    }
-    return QDialog::eventFilter(obj, event);
 }
