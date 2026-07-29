@@ -301,5 +301,9 @@ void ArchiveDocumentsForm::on_btnExportPdf_clicked()
     }
     html += "</table></body></html>";
 
-    ReportExporter::exportHtmlToPdf(html, filePath, this);
+    if (ReportExporter::exportHtmlToPdf(html, filePath, this)) {
+        QMessageBox::information(this, "Успех", "PDF-отчёт успешно сохранён.");
+    } else {
+        QMessageBox::critical(this, "Ошибка", "Не удалось сохранить PDF-файл.");
+    }
 }

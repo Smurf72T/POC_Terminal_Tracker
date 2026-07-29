@@ -25,7 +25,6 @@ private slots:
 private:
     Ui::BulkImportForm *ui;
     QString selectedFilePath;
-    QSqlQueryModel *previewModel;
 
     void loadPreview();
     bool importData();

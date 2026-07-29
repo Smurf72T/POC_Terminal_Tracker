@@ -69,14 +69,7 @@ bool ReportExporter::exportModelToExcel(QSqlQueryModel* model,
         xlsx.setColumnWidth(col, 20);
     }
 
-    if (xlsx.saveAs(filePath)) {
-        QMessageBox::information(parent, "Экспорт",
-            QString("Файл успешно сохранён:\n%1").arg(filePath));
-        return true;
-    } else {
-        QMessageBox::critical(parent, "Ошибка", "Не удалось сохранить файл Excel!");
-        return false;
-    }
+    return xlsx.saveAs(filePath);
 }
 
 bool ReportExporter::exportHtmlToPdf(const QString& html,
@@ -93,13 +86,5 @@ bool ReportExporter::exportHtmlToPdf(const QString& html,
 
     doc.print(&printer);
 
-    if (!QFile::exists(filePath) || QFileInfo(filePath).size() == 0) {
-        QMessageBox::critical(parent, "Ошибка",
-            QString("Не удалось сохранить PDF-файл:\n%1").arg(filePath));
-        return false;
-    }
-
-    QMessageBox::information(parent, "Экспорт",
-        QString("PDF успешно сохранён:\n%1").arg(filePath));
-    return true;
+    return QFile::exists(filePath) && QFileInfo(filePath).size() > 0;
 }

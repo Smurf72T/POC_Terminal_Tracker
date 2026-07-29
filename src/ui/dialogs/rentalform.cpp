@@ -419,12 +419,12 @@ void RentalForm::on_btnPrintAct_clicked()
         return;
     }
 
-    // ПРЕДУПРЕЖДЕНИЕ: документ не проведён
     if (!isPosted) {
-        int btn = QMessageBox::warning(this, "Внимание",
+        QMessageBox::StandardButton btn = QMessageBox::warning(this, "Внимание",
             "Акт будет распечатан до проведения документа. "
             "После проведения данные могут измениться.\n\n"
-            "Распечатать как черновик?");
+            "Распечатать как черновик?",
+            QMessageBox::Yes | QMessageBox::No);
         if (btn != QMessageBox::Yes) return;
     }
 

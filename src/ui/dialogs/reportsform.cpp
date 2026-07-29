@@ -93,9 +93,6 @@ void ReportsForm::generateRevenueByClient()
 
 void ReportsForm::generateTerminalLoad()
 {
-    QString dateFrom = ui->dateEditFrom->date().toString("yyyy-MM-dd");
-    QString dateTo = ui->dateEditTo->date().toString("yyyy-MM-dd");
-
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare(
         "SELECT m.modelname AS \"Модель\", "
@@ -108,8 +105,6 @@ void ReportsForm::generateTerminalLoad()
         "GROUP BY m.modelname "
         "ORDER BY COUNT(t.terminalid) DESC"
     );
-    query.bindValue(":dateFrom", dateFrom);
-    query.bindValue(":dateTo", dateTo);
 
     if (!query.exec()) {
         QMessageBox::critical(this, "Ошибка", query.lastError().text());

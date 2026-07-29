@@ -4,12 +4,8 @@
 #include <QObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
-#include <QSqlError>
 #include <QString>
 #include <QJsonObject>
-#include <QJsonDocument>
-#include <QFile>
-#include <QMessageBox>
 
 class DatabaseManager : public QObject
 {

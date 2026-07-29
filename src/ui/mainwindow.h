@@ -56,10 +56,6 @@ private:
     QSqlQueryModel *recentDocsModel;
     QTimer *refreshTimer;
 
-    QString m_currentUser;
-    int m_currentUserId = 0;
-    QString m_currentUserRole;
-
     void setupUI();
     void updateStatusBar();
     void loadCounters();
@@ -67,14 +63,12 @@ private:
     void loadRecentDocuments();
     void updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel, const QString& value, const QString& label, const QString& color);
     void openForm(QWidget *form);
-    void openTerminalHistory(int terminalId, QString serialNumber);
     void openFreeDevicesReport();
     void openClientRentalReport(int clientId, const QString &clientName);
     void openBulkImport();
     void performBackup();
     void performFallbackBackup(const QString &filePath, const QString &dbname, const QString &password);
     void showExpiryNotifications();
-    void showLoginDialog();
 };
 
 #endif // MAINWINDOW_H

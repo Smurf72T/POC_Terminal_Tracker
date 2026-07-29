@@ -19,7 +19,6 @@ public:
 private slots:
     void on_btnExportExcel_clicked();
     void on_btnClose_clicked();
-    void on_tabWidget_tabBarClicked(int index);
 
 private:
     Ui::TerminalHistoryForm *ui;

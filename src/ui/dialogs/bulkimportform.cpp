@@ -17,8 +17,7 @@
 
 BulkImportForm::BulkImportForm(QWidget *parent) :
     QDialog(parent),
-    ui(new Ui::BulkImportForm),
-    previewModel(nullptr)
+    ui(new Ui::BulkImportForm)
 {
     ui->setupUi(this);
     setWindowTitle("Массовое поступление терминалов");
@@ -144,7 +143,7 @@ void BulkImportForm::loadPreview()
     stdModel->setHorizontalHeaderItem(1, new QStandardItem("IMEI 1"));
     stdModel->setHorizontalHeaderItem(2, new QStandardItem("IMEI 2"));
     stdModel->setHorizontalHeaderItem(3, new QStandardItem("Модель"));
-    stdModel->setHorizontalHeaderItem(4, new QStandardItem("Примеч��ние"));
+    stdModel->setHorizontalHeaderItem(4, new QStandardItem("Примечание"));
 
     int previewRows = qMin(maxRows - 1, 50);
     for (int row = 2; row <= 1 + previewRows; row++) {

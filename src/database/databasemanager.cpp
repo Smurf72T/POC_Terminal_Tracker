@@ -2,7 +2,10 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
+#include <QJsonDocument>
 #include <QMap>
+#include <QMessageBox>
 
 static QMap<QString, QString> loadEnvFile(const QString &filePath)
 {

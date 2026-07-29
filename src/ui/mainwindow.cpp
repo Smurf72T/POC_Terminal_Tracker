@@ -17,7 +17,6 @@
 #include "dialogs/expirynotificationsform.h"
 #include "dialogs/batchstatusform.h"
 #include "dialogs/reportsform.h"
-#include "dialogs/loginform.h"
 #include "utils/reportexporter.h"
 #include <QInputDialog>
 #include <QMessageBox>
@@ -667,21 +666,6 @@ void MainWindow::onActionBatchStatus_triggered()
 void MainWindow::onActionReports_triggered()
 {
     openForm(new ReportsForm(this));
-}
-
-void MainWindow::showLoginDialog()
-{
-    LoginForm loginDialog(this);
-    if (loginDialog.exec() == QDialog::Accepted) {
-        m_currentUser = loginDialog.getUsername();
-        m_currentUserId = loginDialog.getUserId();
-        m_currentUserRole = loginDialog.getRole();
-        DatabaseManager::instance().setCurrentUser(m_currentUser);
-        statusBar()->showMessage(statusBar()->currentMessage() +
-            " | Пользователь: " + m_currentUser);
-    } else {
-        QCoreApplication::quit();
-    }
 }
 
 void MainWindow::openBulkImport()

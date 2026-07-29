@@ -182,7 +182,3 @@ void TerminalHistoryForm::on_btnClose_clicked()
     close();
 }
 
-void TerminalHistoryForm::on_tabWidget_tabBarClicked(int index)
-{
-    Q_UNUSED(index);
-}

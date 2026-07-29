@@ -82,11 +82,6 @@ void AuditLogForm::applyFilter()
         "FROM tbl_audit_log "
         "WHERE performed_at BETWEEN :dateFrom AND :dateTo";
 
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare(queryStr);
-    query.bindValue(":dateFrom", dateFrom);
-    query.bindValue(":dateTo", dateTo);
-
     if (!action.isEmpty()) {
         queryStr += " AND action = :action";
     }
@@ -96,6 +91,7 @@ void AuditLogForm::applyFilter()
 
     queryStr += " ORDER BY performed_at DESC LIMIT 500";
 
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare(queryStr);
     query.bindValue(":dateFrom", dateFrom);
     query.bindValue(":dateTo", dateTo);
