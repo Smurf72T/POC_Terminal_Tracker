@@ -63,6 +63,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tableViewTopClients->setAlternatingRowColors(true);
     ui->tableViewTopClients->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
+    connect(ui->tableViewTopClients, &QTableView::doubleClicked,
+            this, &MainWindow::onTopClientDoubleClicked);
+
     ui->tableViewRecentDocs->setModel(recentDocsModel);
     ui->tableViewRecentDocs->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewRecentDocs->setAlternatingRowColors(true);
@@ -210,7 +213,7 @@ void MainWindow::openForm(QWidget *form)
 void MainWindow::loadTopClients()
 {
     QString queryStr =
-        "SELECT c.clientname AS \"Клиент\", "
+        "SELECT c.clientid, c.clientname AS \"Клиент\", "
         "COUNT(t.terminalid) AS \"Терминалов в аренде\" "
         "FROM tblclients c "
         "JOIN tblrentaldocs r ON c.clientid = r.clientid "
@@ -220,6 +223,7 @@ void MainWindow::loadTopClients()
         "ORDER BY c.clientname";
 
     topClientsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    ui->tableViewTopClients->hideColumn(0);
 }
 
 void MainWindow::loadRecentDocuments()
@@ -534,6 +538,118 @@ void MainWindow::openFreeDevicesReport()
     layout->addLayout(btnLayout);
 
     connect(btnClose, &QPushButton::clicked, dialog, &QDialog::accept);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->open();
+}
+
+void MainWindow::onTopClientDoubleClicked(const QModelIndex &index)
+{
+    int clientId = topClientsModel->data(topClientsModel->index(index.row(), 0)).toInt();
+    QString clientName = topClientsModel->data(topClientsModel->index(index.row(), 1)).toString();
+    if (clientId <= 0) return;
+    openClientRentalReport(clientId, clientName);
+}
+
+void MainWindow::openClientRentalReport(int clientId, const QString &clientName)
+{
+    QString title = QString("Клиент: %1 — Терминалы в аренде").arg(clientName);
+
+    QDialog *dialog = new QDialog(this);
+    dialog->setWindowTitle(title);
+    dialog->resize(900, 500);
+    dialog->setStyleSheet(
+        "QDialog { background-color: #1E1E1E; }"
+        "QLabel#headerLabel { font-size: 18px; font-weight: bold; color: #FFFFFF; padding: 12px; }"
+    );
+
+    auto *layout = new QVBoxLayout(dialog);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+
+    auto *headerLabel = new QLabel(title, dialog);
+    headerLabel->setObjectName("headerLabel");
+    layout->addWidget(headerLabel);
+
+    auto *groupBox = new QGroupBox("Арендованные терминалы", dialog);
+    groupBox->setStyleSheet(
+        "QGroupBox { font-size: 13px; font-weight: bold; color: #CCCCCC; "
+        "border: 1px solid #3C3C3C; border-radius: 6px; margin-top: 8px; padding-top: 16px; }"
+        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 6px; }"
+    );
+    auto *groupLayout = new QVBoxLayout(groupBox);
+
+    auto *model = new QSqlQueryModel(groupBox);
+    auto *tableView = new QTableView(groupBox);
+    tableView->setModel(model);
+    tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tableView->setSelectionMode(QAbstractItemView::SingleSelection);
+    tableView->setAlternatingRowColors(true);
+    tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    tableView->verticalHeader()->hide();
+    tableView->setStyleSheet(
+        "QTableView { background-color: #252526; alternate-background-color: #2A2A2A; "
+        "color: #E0E0E0; gridline-color: #333333; border: 1px solid #3C3C3C; border-radius: 4px; "
+        "selection-background-color: #1565C0; selection-color: white; }"
+        "QHeaderView::section { background: #2D2D2D; color: #FFFFFF; padding: 8px; "
+        "border: none; border-bottom: 2px solid #0D47A1; font-weight: bold; font-size: 12px; }"
+    );
+
+    QString queryStr =
+        "SELECT m.modelname AS \"Модель\", "
+        "t.serialnumber AS \"Серийный номер\", "
+        "COALESCE(s.simnumber, '—') AS \"SIM-карта\", "
+        "r.docdate::date AS \"Дата передачи\" "
+        "FROM tblrentaldocs r "
+        "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
+        "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
+        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+        "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
+        "WHERE r.clientid = :clientId "
+        "ORDER BY r.docdate DESC, t.serialnumber";
+
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare(queryStr);
+    query.bindValue(":clientId", clientId);
+    query.exec();
+    model->setQuery(std::move(query));
+
+    groupLayout->addWidget(tableView);
+    layout->addWidget(groupBox);
+
+    // Кнопки
+    auto *btnLayout = new QHBoxLayout();
+    auto *btnExport = new QPushButton("Экспорт в Excel", dialog);
+    btnExport->setStyleSheet(
+        "QPushButton { background-color: #1565C0; color: white; padding: 8px 20px; "
+        "border: none; border-radius: 4px; font-size: 13px; font-weight: bold; }"
+        "QPushButton:hover { background-color: #1976D2; }"
+    );
+    auto *btnClose = new QPushButton("Закрыть", dialog);
+    btnClose->setStyleSheet(
+        "QPushButton { background-color: #424242; color: white; padding: 8px 20px; "
+        "border: none; border-radius: 4px; font-size: 13px; }"
+        "QPushButton:hover { background-color: #616161; }"
+    );
+
+    connect(btnExport, &QPushButton::clicked, [model, clientName, dialog]() {
+        QString filePath = QFileDialog::getSaveFileName(dialog,
+            "Экспорт отчёта",
+            QString("terminals_%1.xlsx").arg(clientName.simplified().replace(' ', '_')),
+            "Excel (*.xlsx);;Все файлы (*)");
+        if (!filePath.isEmpty()) {
+            if (ReportExporter::exportModelToExcel(model, clientName, filePath)) {
+                QMessageBox::information(dialog, "Успех", "Отчёт экспортирован.");
+            }
+        }
+    });
+    connect(btnClose, &QPushButton::clicked, dialog, &QDialog::accept);
+
+    btnLayout->addWidget(btnExport);
+    btnLayout->addStretch();
+    btnLayout->addWidget(btnClose);
+    layout->addLayout(btnLayout);
+
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->open();
 }

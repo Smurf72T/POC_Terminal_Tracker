@@ -48,6 +48,7 @@ private slots:
     void onActionReports_triggered();
     void onDatabaseDataChanged();
     void onRecentDocDoubleClicked(const QModelIndex &index);
+    void onTopClientDoubleClicked(const QModelIndex &index);
 
 private:
     Ui::MainWindow *ui;
@@ -68,6 +69,7 @@ private:
     void openForm(QWidget *form);
     void openTerminalHistory(int terminalId, QString serialNumber);
     void openFreeDevicesReport();
+    void openClientRentalReport(int clientId, const QString &clientName);
     void openBulkImport();
     void performBackup();
     void performFallbackBackup(const QString &filePath, const QString &dbname, const QString &password);
