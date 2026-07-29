@@ -91,7 +91,7 @@ void ReceiptForm::loadForEdit(int docId)
 
     // Load details
     QSqlQuery detailQuery(db);
-    detailQuery.prepare("SELECT t.serialnumber, t.modelid, t.imei1, t.imei2 "
+    detailQuery.prepare("SELECT t.terminalid, t.serialnumber, t.modelid, t.imei1, t.imei2 "
                         "FROM tblreceiptdetails rd "
                         "JOIN tblterminals t ON rd.terminalid = t.terminalid "
                         "WHERE rd.receiptdocid = :id");
@@ -101,12 +101,15 @@ void ReceiptForm::loadForEdit(int docId)
             int row = rowsModel->rowCount();
             rowsModel->insertRow(row);
 
-            QString serial = detailQuery.value(0).toString();
-            int modelId = detailQuery.value(1).toInt();
-            QString imei1 = detailQuery.value(2).toString();
-            QString imei2 = detailQuery.value(3).toString();
+            int terminalId = detailQuery.value(0).toInt();
+            QString serial = detailQuery.value(1).toString();
+            int modelId = detailQuery.value(2).toInt();
+            QString imei1 = detailQuery.value(3).toString();
+            QString imei2 = detailQuery.value(4).toString();
 
-            rowsModel->setItem(row, 0, new QStandardItem(serial));
+            QStandardItem *serialItem = new QStandardItem(serial);
+            serialItem->setData(terminalId, Qt::UserRole);
+            rowsModel->setItem(row, 0, serialItem);
 
             // Find model name from m_models list
             QString modelName;
@@ -202,9 +205,21 @@ void ReceiptForm::on_btnPost_clicked()
         docId = query.value(0).toInt();
     }
 
-    // 2. Обрабатываем строки (только для новых документов)
-    if (!m_editMode) {
+    // В режиме редактирования — удаляем старые связи
+    if (m_editMode) {
+        QSqlQuery delDetails(db);
+        delDetails.prepare("DELETE FROM tblreceiptdetails WHERE receiptdocid = :id");
+        delDetails.bindValue(":id", docId);
+        if (!delDetails.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить старые связи: " + delDetails.lastError().text());
+            return;
+        }
+    }
+
+    // 2. Обрабатываем строки
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
         int modelId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
         QString imei1 = rowsModel->data(rowsModel->index(i, 2)).toString();
@@ -247,28 +262,49 @@ void ReceiptForm::on_btnPost_clicked()
             return;
         }
 
-        // Вставляем терминал
-        QSqlQuery termQuery(db);
-        termQuery.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status) "
-                          "VALUES (:sn, :mid, :i1, :i2, 0) RETURNING terminalid");
-        termQuery.bindValue(":sn", serial);
-        termQuery.bindValue(":mid", modelId);
-        termQuery.bindValue(":i1", imei1);
-        termQuery.bindValue(":i2", imei2);
+        int newTermId;
+        if (m_editMode && terminalId > 0) {
+            // Существующий терминал — UPDATE
+            QSqlQuery termQuery(db);
+            termQuery.prepare("UPDATE tblterminals SET serialnumber = :sn, modelid = :mid, "
+                              "imei1 = :i1, imei2 = :i2 WHERE terminalid = :tid");
+            termQuery.bindValue(":sn", serial);
+            termQuery.bindValue(":mid", modelId);
+            termQuery.bindValue(":i1", imei1);
+            termQuery.bindValue(":i2", imei2);
+            termQuery.bindValue(":tid", terminalId);
 
-        if (!termQuery.exec() || !termQuery.next()) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка БД",
-                QString("Ошибка при добавлении терминала %1:\n%2").arg(serial, termQuery.lastError().text()));
-            return;
+            if (!termQuery.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД",
+                    QString("Ошибка при обновлении терминала %1:\n%2").arg(serial, termQuery.lastError().text()));
+                return;
+            }
+            newTermId = terminalId;
+        } else {
+            // Новый терминал — INSERT
+            QSqlQuery termQuery(db);
+            termQuery.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status) "
+                              "VALUES (:sn, :mid, :i1, :i2, 0) RETURNING terminalid");
+            termQuery.bindValue(":sn", serial);
+            termQuery.bindValue(":mid", modelId);
+            termQuery.bindValue(":i1", imei1);
+            termQuery.bindValue(":i2", imei2);
+
+            if (!termQuery.exec() || !termQuery.next()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД",
+                    QString("Ошибка при добавлении терминала %1:\n%2").arg(serial, termQuery.lastError().text()));
+                return;
+            }
+            newTermId = termQuery.value(0).toInt();
         }
-        int termId = termQuery.value(0).toInt();
 
         // Вставляем связь с документом
         QSqlQuery detailQuery(db);
         detailQuery.prepare("INSERT INTO tblreceiptdetails (receiptdocid, terminalid) VALUES (:did, :tid)");
         detailQuery.bindValue(":did", docId);
-        detailQuery.bindValue(":tid", termId);
+        detailQuery.bindValue(":tid", newTermId);
 
         if (!detailQuery.exec()) {
             db.rollback();
@@ -276,8 +312,6 @@ void ReceiptForm::on_btnPost_clicked()
             return;
         }
     }
-
-    } // !m_editMode
 
     // 3. Фиксируем транзакцию
     if (!db.commit()) {
