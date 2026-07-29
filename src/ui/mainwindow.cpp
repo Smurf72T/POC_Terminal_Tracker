@@ -61,12 +61,12 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tableViewTopClients->setModel(topClientsModel);
     ui->tableViewTopClients->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewTopClients->setAlternatingRowColors(true);
-    ui->tableViewTopClients->horizontalHeader()->setStretchLastSection(true);
+    ui->tableViewTopClients->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
     ui->tableViewRecentDocs->setModel(recentDocsModel);
     ui->tableViewRecentDocs->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewRecentDocs->setAlternatingRowColors(true);
-    ui->tableViewRecentDocs->horizontalHeader()->setStretchLastSection(true);
+    ui->tableViewRecentDocs->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
     connect(ui->tableViewRecentDocs, &QTableView::doubleClicked,
             this, &MainWindow::onRecentDocDoubleClicked);
@@ -220,7 +220,6 @@ void MainWindow::loadTopClients()
         "ORDER BY c.clientname";
 
     topClientsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
-    ui->tableViewTopClients->resizeColumnsToContents();
 }
 
 void MainWindow::loadRecentDocuments()
@@ -237,7 +236,6 @@ void MainWindow::loadRecentDocuments()
     recentDocsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
     ui->tableViewRecentDocs->hideColumn(0);
     ui->tableViewRecentDocs->hideColumn(1);
-    ui->tableViewRecentDocs->resizeColumnsToContents();
 }
 
 void MainWindow::onDatabaseDataChanged()

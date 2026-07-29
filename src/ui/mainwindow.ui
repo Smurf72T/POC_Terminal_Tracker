@@ -297,20 +297,24 @@
     <addaction name="actionSIMCards"/>
     <addaction name="actionTerminals"/>
    </widget>
-   <widget class="QMenu" name="menuDocuments">
-    <property name="title">
-     <string>Документы</string>
-    </property>
-    <addaction name="actionReceipt"/>
-    <addaction name="actionRental"/>
-    <addaction name="actionReturn"/>
-    <addaction name="actionPayment"/>
-    <addaction name="separator"/>
-    <addaction name="actionArchiveReceipt"/>
-    <addaction name="actionArchiveRental"/>
-    <addaction name="actionArchiveReturn"/>
-    <addaction name="actionArchivePayment"/>
-   </widget>
+    <widget class="QMenu" name="menuDocuments">
+     <property name="title">
+      <string>Документы</string>
+     </property>
+     <addaction name="actionReceipt"/>
+     <addaction name="actionRental"/>
+     <addaction name="actionReturn"/>
+     <addaction name="actionPayment"/>
+    </widget>
+    <widget class="QMenu" name="menuArchives">
+     <property name="title">
+      <string>Архивы документов</string>
+     </property>
+     <addaction name="actionArchiveReceipt"/>
+     <addaction name="actionArchiveRental"/>
+     <addaction name="actionArchiveReturn"/>
+     <addaction name="actionArchivePayment"/>
+    </widget>
    <widget class="QMenu" name="menuFile">
     <property name="title">
      <string>Файл</string>
@@ -339,8 +343,9 @@
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
-   <addaction name="menuDocuments"/>
-   <addaction name="menuService"/>
+    <addaction name="menuDocuments"/>
+    <addaction name="menuArchives"/>
+    <addaction name="menuService"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -399,26 +404,26 @@
     <string>Отметка оплаты</string>
    </property>
   </action>
-  <action name="actionArchiveReceipt">
-   <property name="text">
-    <string>Архив: Поступление</string>
-   </property>
-  </action>
-  <action name="actionArchiveRental">
-   <property name="text">
-    <string>Архив: Передача в аренду</string>
-   </property>
-  </action>
-  <action name="actionArchiveReturn">
-   <property name="text">
-    <string>Архив: Возврат</string>
-   </property>
-  </action>
-  <action name="actionArchivePayment">
-   <property name="text">
-    <string>Архив: Оплата</string>
-   </property>
-  </action>
+   <action name="actionArchiveReceipt">
+    <property name="text">
+     <string>Поступление</string>
+    </property>
+   </action>
+   <action name="actionArchiveRental">
+    <property name="text">
+     <string>Передача в аренду</string>
+    </property>
+   </action>
+   <action name="actionArchiveReturn">
+    <property name="text">
+     <string>Возврат</string>
+    </property>
+   </action>
+   <action name="actionArchivePayment">
+    <property name="text">
+     <string>Оплата</string>
+    </property>
+   </action>
   <action name="actionTerminalHistory">
    <property name="text">
     <string>История терминала</string>
