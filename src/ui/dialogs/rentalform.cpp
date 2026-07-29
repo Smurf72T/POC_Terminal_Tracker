@@ -367,7 +367,7 @@ void RentalForm::on_btnPost_clicked()
                             "VALUES (:did, :tid, :sid, :comm)");
         detailQuery.bindValue(":did", docId);
         detailQuery.bindValue(":tid", terminalId);
-        detailQuery.bindValue(":sid", simId);
+        detailQuery.bindValue(":sid", simId > 0 ? QVariant(simId) : QVariant());
         detailQuery.bindValue(":comm", comment);
 
         if (!detailQuery.exec()) {

@@ -3,6 +3,8 @@
 
 #include <QDialog>
 #include <QCloseEvent>
+#include <QEvent>
+#include <QKeyEvent>
 #include <QSqlTableModel>
 #include <QTimer>
 #include "delegates/readonlydelegate.h"
@@ -26,6 +28,7 @@ private slots:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
     Ui::SIMCardsForm *ui;

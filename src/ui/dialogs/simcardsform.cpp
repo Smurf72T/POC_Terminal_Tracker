@@ -10,8 +10,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QCloseEvent>
-#include <QShortcut>
-#include <QShortcut>
+
 
 SIMCardsForm::SIMCardsForm(QWidget *parent) :
     QDialog(parent),
@@ -71,39 +70,7 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     ui->tableView->setItemDelegateForColumn(2, new ReadOnlyDelegate(ui->tableView));
 
     // F9 для дублирования строки
-    QShortcut *shortcutF9 = new QShortcut(QKeySequence(Qt::Key_F9), this);
-    connect(shortcutF9, &QShortcut::activated, this, [this]() {
-        int row = ui->tableView->currentIndex().row();
-        if (row < 0) return;
-
-        QString simNumber = model->data(model->index(row, 1)).toString();
-        int statusCode = model->data(model->index(row, 2)).toInt();
-        QString notes = model->data(model->index(row, 3)).toString();
-
-        QSqlQuery query(DatabaseManager::instance().getDatabase());
-        query.prepare("INSERT INTO tblsimcards (simnumber, status, notes) "
-                      "VALUES (:num, :status, :notes) RETURNING simcardid");
-        query.bindValue(":num", simNumber);
-        query.bindValue(":status", 0);
-        query.bindValue(":notes", notes);
-
-        if (query.exec() && query.next()) {
-            int newId = query.value(0).toInt();
-            model->select();
-
-            for (int r = 0; r < model->rowCount(); r++) {
-                if (model->data(model->index(r, 0)).toInt() == newId) {
-                    QModelIndex idx = model->index(r, 1);
-                    ui->tableView->selectRow(r);
-                    ui->tableView->setCurrentIndex(idx);
-                    QTimer::singleShot(100, [this, idx]() {
-                        ui->tableView->edit(idx);
-                    });
-                    break;
-                }
-            }
-        }
-    });
+    ui->tableView->installEventFilter(this);
 
     // Debounce timer для поиска
     searchTimer = new QTimer(this);
@@ -231,6 +198,46 @@ void SIMCardsForm::on_btnDelete_clicked()
 void SIMCardsForm::on_btnClose_clicked()
 {
     close();
+}
+
+bool SIMCardsForm::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == ui->tableView && event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_F9) {
+            int row = ui->tableView->currentIndex().row();
+            if (row < 0) return true;
+
+            QString simNumber = model->data(model->index(row, 1)).toString();
+            QString notes = model->data(model->index(row, 3)).toString();
+
+            QSqlQuery query(DatabaseManager::instance().getDatabase());
+            query.prepare("INSERT INTO tblsimcards (simnumber, status, notes) "
+                          "VALUES (:num, :status, :notes) RETURNING simcardid");
+            query.bindValue(":num", simNumber);
+            query.bindValue(":status", 0);
+            query.bindValue(":notes", notes);
+
+            if (query.exec() && query.next()) {
+                int newId = query.value(0).toInt();
+                model->select();
+
+                for (int r = 0; r < model->rowCount(); r++) {
+                    if (model->data(model->index(r, 0)).toInt() == newId) {
+                        QModelIndex idx = model->index(r, 1);
+                        ui->tableView->selectRow(r);
+                        ui->tableView->setCurrentIndex(idx);
+                        QTimer::singleShot(100, [this, idx]() {
+                            ui->tableView->edit(idx);
+                        });
+                        break;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+    return QDialog::eventFilter(obj, event);
 }
 
 void SIMCardsForm::closeEvent(QCloseEvent *event)
