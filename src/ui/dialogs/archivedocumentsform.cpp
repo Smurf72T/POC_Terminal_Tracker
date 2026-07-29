@@ -2,6 +2,10 @@
 #include "ui_archivedocumentsform.h"
 #include "database/databasemanager.h"
 #include "delegates/CheckBoxDelegate.h"
+#include "ui/dialogs/receiptform.h"
+#include "ui/dialogs/rentalform.h"
+#include "ui/dialogs/returnform.h"
+#include "ui/dialogs/paymentform.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -82,7 +86,8 @@ void ArchiveDocumentsForm::applyFilter()
     int clientId = ui->comboBoxClient->currentData().toInt();
 
     if (m_docType == 1) { // Поступление
-        queryStr = QString("SELECT docnumber AS \"Номер\", "
+        queryStr = QString("SELECT receiptdocid, "
+                           "docnumber AS \"Номер\", "
                            "docdate AS \"Дата\", "
                            "comments AS \"Комментарий\" "
                            "FROM tblreceiptdocs "
@@ -90,7 +95,8 @@ void ArchiveDocumentsForm::applyFilter()
                            "ORDER BY docdate DESC");
     } else if (m_docType == 2) { // Аренда — с возвратом и оплатой
         queryStr = QString(
-            "SELECT r.docnumber AS \"Номер\", "
+            "SELECT r.rentaldocid, "
+            "r.docnumber AS \"Номер\", "
             "r.docdate AS \"Дата\", "
             "c.clientname AS \"Клиент\", "
             "r.comments AS \"Комментарий\", "
@@ -108,7 +114,8 @@ void ArchiveDocumentsForm::applyFilter()
             "GROUP BY r.rentaldocid, r.docnumber, r.docdate, c.clientname, r.comments "
             "ORDER BY r.docdate DESC");
     } else if (m_docType == 3) { // Возврат
-        queryStr = QString("SELECT r.docnumber AS \"Номер\", "
+        queryStr = QString("SELECT r.returndocid, "
+                           "r.docnumber AS \"Номер\", "
                            "r.docdate AS \"Дата\", "
                            "c.clientname AS \"Клиент\", "
                            "r.comments AS \"Комментарий\" "
@@ -119,7 +126,7 @@ void ArchiveDocumentsForm::applyFilter()
                            "ORDER BY r.docdate DESC");
     } else if (m_docType == 4) { // Оплата
         queryStr = QString(
-            "SELECT p.paymentid AS \"ID\", "
+            "SELECT p.paymentid, "
             "p.paymentdate AS \"Дата\", "
             "c.clientname AS \"Клиент\", "
             "pm.monthname AS \"Месяц\", "
@@ -150,6 +157,7 @@ void ArchiveDocumentsForm::applyFilter()
     }
 
     model->setQuery(std::move(query));
+    ui->tableView->hideColumn(0);
 }
 
 void ArchiveDocumentsForm::on_btnFilter_clicked()
@@ -162,12 +170,67 @@ void ArchiveDocumentsForm::on_btnClose_clicked()
     close();
 }
 
+void ArchiveDocumentsForm::on_tableView_doubleClicked(const QModelIndex &index)
+{
+    int row = index.row();
+    int docId = getDocIdFromRow(row);
+    if (docId <= 0) return;
+
+    switch (m_docType) {
+        case 1: openReceiptForEdit(docId); break;
+        case 2: openRentalForEdit(docId); break;
+        case 3: openReturnForEdit(docId); break;
+        case 4: openPaymentForEdit(docId); break;
+    }
+}
+
+int ArchiveDocumentsForm::getDocIdFromRow(int row) const
+{
+    return model->data(model->index(row, 0)).toInt();
+}
+
+void ArchiveDocumentsForm::openReceiptForEdit(int docId)
+{
+    ReceiptForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
+void ArchiveDocumentsForm::openRentalForEdit(int docId)
+{
+    RentalForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
+void ArchiveDocumentsForm::openReturnForEdit(int docId)
+{
+    ReturnForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
+void ArchiveDocumentsForm::openPaymentForEdit(int docId)
+{
+    PaymentForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
 void ArchiveDocumentsForm::setupCheckBoxColumn()
 {
     // Для архива аренды (docType == 2) настраиваем отображение чекбокса
     if (m_docType == 2) {
-        // Колонка "Возврат" — теперь индекс 4 (Номер, Дата, Клиент, Комментарий, Возврат, Оплата)
-        int returnColumn = 4;
+        // Колонка "Возврат" — теперь индекс 5 (после скрытого ID)
+        int returnColumn = 5;
 
         // Устанавливаем делегат для отображения чекбокса
         ui->tableView->setItemDelegateForColumn(returnColumn, new CheckBoxDelegate(this));

@@ -16,6 +16,7 @@ class ReceiptForm : public QDialog
 public:
     explicit ReceiptForm(QWidget *parent = nullptr);
     ~ReceiptForm();
+    void loadForEdit(int docId);
 
 private slots:
     void on_btnAddRow_clicked();
@@ -34,6 +35,8 @@ private:
     void generateDocNumber();
 
     QList<QPair<int, QString>> m_models;
+    bool m_editMode = false;
+    int m_editDocId = 0;
 };
 
 #endif // RECEIPTFORM_H

@@ -17,6 +17,8 @@ public:
     explicit RentalForm(QWidget *parent = nullptr);
     ~RentalForm();
 
+    void loadForEdit(int docId);
+
 private slots:
     void on_btnAddRow_clicked();
     void on_btnDeleteRow_clicked();
@@ -29,6 +31,8 @@ private:
     Ui::RentalForm *ui;
     QStandardItemModel *rowsModel;
     bool isPosted = false;
+    bool m_editMode = false;
+    int m_editDocId = 0;
 
     void loadClientsToDelegate();
     void loadFreeTerminalsToDelegate();

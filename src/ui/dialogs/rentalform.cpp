@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QSqlRecord>
+#include <QSet>
 #include "utils/reportexporter.h"
 #include <QTextDocument>
 #include <QPrinter>
@@ -120,6 +121,89 @@ void RentalForm::generateDocNumber()
     }
 }
 
+void RentalForm::loadForEdit(int docId)
+{
+    m_editMode = true;
+    m_editDocId = docId;
+
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare("SELECT docnumber, docdate, clientid, comments FROM tblrentaldocs WHERE rentaldocid = :id");
+    query.bindValue(":id", docId);
+
+    if (!query.exec() || !query.next()) {
+        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить документ: " + query.lastError().text());
+        return;
+    }
+
+    QString docNumber = query.value(0).toString();
+    QDateTime docDate = query.value(1).toDateTime();
+    int clientId = query.value(2).toInt();
+    QString comments = query.value(3).toString();
+
+    ui->lineEditNumber->setText(docNumber);
+    ui->lineEditNumber->setReadOnly(true);
+    ui->dateEdit->setDate(docDate.date());
+    ui->textEditComment->setText(comments);
+
+    for (int i = 0; i < ui->comboBoxClient->count(); ++i) {
+        if (ui->comboBoxClient->itemData(i).toInt() == clientId) {
+            ui->comboBoxClient->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    QSqlQuery detailQuery(DatabaseManager::instance().getDatabase());
+    detailQuery.prepare("SELECT terminalid, simcardid, comment FROM tblrentaldetails WHERE rentaldocid = :id");
+    detailQuery.bindValue(":id", docId);
+
+    if (detailQuery.exec()) {
+        while (detailQuery.next()) {
+            int termId = detailQuery.value(0).toInt();
+            int simId = detailQuery.value(1).toInt();
+            QString comment = detailQuery.value(2).toString();
+
+            int row = rowsModel->rowCount();
+            rowsModel->insertRow(row);
+
+            QStandardItem *terminalItem = new QStandardItem();
+            terminalItem->setData(termId, Qt::UserRole);
+
+            QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
+            termQuery.prepare("SELECT serialnumber FROM tblterminals WHERE terminalid = :id");
+            termQuery.bindValue(":id", termId);
+            if (termQuery.exec() && termQuery.next()) {
+                terminalItem->setData(termQuery.value(0).toString(), Qt::DisplayRole);
+            } else {
+                terminalItem->setData("", Qt::DisplayRole);
+            }
+
+            QStandardItem *simItem = new QStandardItem();
+            simItem->setData(simId, Qt::UserRole);
+
+            if (simId > 0) {
+                QSqlQuery simQuery(DatabaseManager::instance().getDatabase());
+                simQuery.prepare("SELECT simnumber FROM tblsimcards WHERE simcardid = :id");
+                simQuery.bindValue(":id", simId);
+                if (simQuery.exec() && simQuery.next()) {
+                    simItem->setData(simQuery.value(0).toString(), Qt::DisplayRole);
+                } else {
+                    simItem->setData("", Qt::DisplayRole);
+                }
+            } else {
+                simItem->setData("", Qt::DisplayRole);
+            }
+
+            QStandardItem *commentItem = new QStandardItem(comment);
+
+            rowsModel->setItem(row, 0, terminalItem);
+            rowsModel->setItem(row, 1, simItem);
+            rowsModel->setItem(row, 2, commentItem);
+        }
+    }
+
+    setWindowTitle(QString("Редактирование аренды ID %1").arg(docId));
+}
+
 void RentalForm::on_btnAddRow_clicked()
 {
     int row = rowsModel->rowCount();
@@ -186,75 +270,98 @@ void RentalForm::on_btnPost_clicked()
 
     QSqlQuery query(db);
 
-    // 1. Создаем шапку документа
-    query.prepare("INSERT INTO tblrentaldocs (docnumber, docdate, clientid, comments) "
-                  "VALUES (:num, :date, :client, :comm) RETURNING rentaldocid");
-    query.bindValue(":num", ui->lineEditNumber->text());
-    query.bindValue(":date", QDateTime::currentDateTime());
-    query.bindValue(":client", clientId);
-    query.bindValue(":comm", ui->textEditComment->toPlainText());
+    int docId;
 
-    if (!query.exec() || !query.next()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
-        return;
+    if (m_editMode) {
+        query.prepare("UPDATE tblrentaldocs SET docdate = :date, clientid = :client, comments = :comm WHERE rentaldocid = :id");
+        query.bindValue(":id", m_editDocId);
+        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":client", clientId);
+        query.bindValue(":comm", ui->textEditComment->toPlainText());
+
+        if (!query.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
+            return;
+        }
+
+        docId = m_editDocId;
+
+        QSqlQuery deleteQuery(db);
+        deleteQuery.prepare("DELETE FROM tblrentaldetails WHERE rentaldocid = :id");
+        deleteQuery.bindValue(":id", docId);
+        if (!deleteQuery.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить старые строки: " + deleteQuery.lastError().text());
+            return;
+        }
+    } else {
+        query.prepare("INSERT INTO tblrentaldocs (docnumber, docdate, clientid, comments) "
+                      "VALUES (:num, :date, :client, :comm) RETURNING rentaldocid");
+        query.bindValue(":num", ui->lineEditNumber->text());
+        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":client", clientId);
+        query.bindValue(":comm", ui->textEditComment->toPlainText());
+
+        if (!query.exec() || !query.next()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
+            return;
+        }
+        docId = query.value(0).toInt();
     }
-    int docId = query.value(0).toInt();
 
-    // 2. Обрабатываем строки (главная часть с защитой от гонки)
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
         int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
         QString comment = rowsModel->data(rowsModel->index(i, 2), Qt::DisplayRole).toString();
 
-        // Проверяем, что терминал всё ещё свободен
-        QSqlQuery checkQuery(db);
-        checkQuery.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
-        checkQuery.bindValue(":id", terminalId);
+        if (!m_editMode) {
+            QSqlQuery checkQuery(db);
+            checkQuery.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+            checkQuery.bindValue(":id", terminalId);
 
-        if (!checkQuery.exec() || !checkQuery.next()) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Не удалось заблокировать терминал %1. Возможно, он уже сдан в аренду.").arg(terminalId));
-            return;
-        }
+            if (!checkQuery.exec() || !checkQuery.next()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Не удалось заблокировать терминал %1. Возможно, он уже сдан в аренду.").arg(terminalId));
+                return;
+            }
 
-        int status = checkQuery.value(0).toInt();
-        if (status != 0) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Терминал %1 больше не свободен!").arg(terminalId));
-            return;
-        }
+            int status = checkQuery.value(0).toInt();
+            if (status != 0) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Терминал %1 больше не свободен!").arg(terminalId));
+                return;
+            }
 
-        // Обновляем статус терминала и устанавливаем SIM
-        QSqlQuery updateQuery(db);
-        updateQuery.prepare("UPDATE tblterminals SET status = 1, currentsimcardid = :simid WHERE terminalid = :id");
-        updateQuery.bindValue(":id", terminalId);
-        updateQuery.bindValue(":simid", simId > 0 ? QVariant(simId) : QVariant());
+            QSqlQuery updateQuery(db);
+            updateQuery.prepare("UPDATE tblterminals SET status = 1, currentsimcardid = :simid WHERE terminalid = :id");
+            updateQuery.bindValue(":id", terminalId);
+            updateQuery.bindValue(":simid", simId > 0 ? QVariant(simId) : QVariant());
 
-        if (!updateQuery.exec()) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка БД",
-                QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
-            return;
-        }
-
-        // Обновляем статус SIM-карты
-        if (simId > 0) {
-            QSqlQuery simQuery(db);
-            simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
-            simQuery.bindValue(":id", simId);
-
-            if (!simQuery.exec()) {
+            if (!updateQuery.exec()) {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка БД",
-                    QString("Не удалось обновить SIM-карту %1: %2").arg(simId).arg(simQuery.lastError().text()));
+                    QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
                 return;
+            }
+
+            if (simId > 0) {
+                QSqlQuery simQuery(db);
+                simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
+                simQuery.bindValue(":id", simId);
+
+                if (!simQuery.exec()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка БД",
+                        QString("Не удалось обновить SIM-карту %1: %2").arg(simId).arg(simQuery.lastError().text()));
+                    return;
+                }
             }
         }
 
-        // Создаем запись в детали документа
         QSqlQuery detailQuery(db);
         detailQuery.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid, simcardid, comment) "
                             "VALUES (:did, :tid, :sid, :comm)");
@@ -270,14 +377,12 @@ void RentalForm::on_btnPost_clicked()
         }
     }
 
-    // 3. Фиксируем транзакцию
     if (!db.commit()) {
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
-        // Логирование действия
         DatabaseManager::instance().logAction("POST", "tblrentaldocs", docId);
-        
+
         isPosted = true;
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
         DatabaseManager::instance().notifyDataChanged();

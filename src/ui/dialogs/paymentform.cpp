@@ -56,6 +56,73 @@ void PaymentForm::loadClients()
     }
 }
 
+void PaymentForm::loadForEdit(int paymentId)
+{
+    m_editMode = true;
+    m_editPaymentId = paymentId;
+
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare("SELECT clientid, paymentdate, periodmonth, periodyear, amount, comment "
+                  "FROM tblpayments WHERE paymentid = :id");
+    query.bindValue(":id", paymentId);
+    if (!query.exec() || !query.next()) {
+        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить платёж");
+        reject();
+        return;
+    }
+
+    int clientId = query.value(0).toInt();
+    QDateTime docDate = query.value(1).toDateTime();
+    int month = query.value(2).toInt();
+    int year = query.value(3).toInt();
+    double amount = query.value(4).toDouble();
+    QString comment = query.value(5).toString();
+
+    ui->dateEdit->setDate(docDate.date());
+    ui->spinBoxYear->setValue(year);
+    ui->doubleSpinBoxAmount->setValue(amount);
+    ui->textEditComment->setText(comment);
+
+    // Устанавливаем клиента
+    for (int i = 0; i < ui->comboBoxClient->count(); ++i) {
+        if (ui->comboBoxClient->itemData(i).toInt() == clientId) {
+            ui->comboBoxClient->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    // Устанавливаем месяц
+    for (int i = 0; i < ui->comboBoxMonth->count(); ++i) {
+        if (ui->comboBoxMonth->itemData(i).toInt() == month) {
+            ui->comboBoxMonth->setCurrentIndex(i);
+            break;
+        }
+    }
+
+    // Загружаем привязанные документы аренды и отмечаем их
+    QSqlQuery linkQuery(DatabaseManager::instance().getDatabase());
+    linkQuery.prepare("SELECT rentaldocid FROM tblpayment_rental_links WHERE paymentid = :id");
+    linkQuery.bindValue(":id", paymentId);
+    linkQuery.exec();
+
+    QSet<int> linkedRentalIds;
+    while (linkQuery.next()) {
+        linkedRentalIds.insert(linkQuery.value(0).toInt());
+    }
+
+    QStandardItemModel* listModel = qobject_cast<QStandardItemModel*>(ui->listViewRentals->model());
+    if (listModel) {
+        for (int i = 0; i < listModel->rowCount(); ++i) {
+            QStandardItem* item = listModel->item(i);
+            if (item && linkedRentalIds.contains(item->data(Qt::UserRole).toInt())) {
+                item->setCheckState(Qt::Checked);
+            }
+        }
+    }
+
+    setWindowTitle(QString("Редактирование оплаты ID %1").arg(paymentId));
+}
+
 void PaymentForm::loadMonths()
 {
     ui->comboBoxMonth->clear();
@@ -170,52 +237,83 @@ void PaymentForm::on_btnSave_clicked()
         return;
     }
 
-    // 1. Обработка дубликата оплаты
-    if (checkExistingPayment(clientId, month, year)) {
-        QMessageBox::StandardButton reply = QMessageBox::question(
-            this, "Подтверждение",
-            QString("Оплата за %1 %2 года уже существует. Заменить её (включая привязанные документы)?")
-                .arg(ui->comboBoxMonth->currentText(), QString::number(year)),
-            QMessageBox::Yes | QMessageBox::No);
-        
-        if (reply != QMessageBox::Yes) {
+    int paymentId = m_editPaymentId;
+
+    if (m_editMode) {
+        // Режим редактирования — UPDATE существующего платежа
+        QSqlQuery updateQuery(db);
+        updateQuery.prepare("UPDATE tblpayments SET clientid = :cid, paymentdate = :date, "
+                           "periodmonth = :month, periodyear = :year, amount = :amount, comment = :comment "
+                           "WHERE paymentid = :id");
+        updateQuery.bindValue(":cid", clientId);
+        updateQuery.bindValue(":date", ui->dateEdit->dateTime());
+        updateQuery.bindValue(":month", month);
+        updateQuery.bindValue(":year", year);
+        updateQuery.bindValue(":amount", amount);
+        updateQuery.bindValue(":comment", ui->textEditComment->toPlainText());
+        updateQuery.bindValue(":id", paymentId);
+
+        if (!updateQuery.exec()) {
             db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить платёж: " + updateQuery.lastError().text());
             return;
         }
-        
-        QSqlQuery deleteQuery(db);
-        deleteQuery.prepare("DELETE FROM tblpayments "
-                            "WHERE clientid = :cid AND periodmonth = :month AND periodyear = :year");
-        deleteQuery.bindValue(":cid", clientId);
-        deleteQuery.bindValue(":month", month);
-        deleteQuery.bindValue(":year", year);
-        
-        if (!deleteQuery.exec()) {
+
+        // Удаляем старые связи
+        QSqlQuery deleteLinks(db);
+        deleteLinks.prepare("DELETE FROM tblpayment_rental_links WHERE paymentid = :id");
+        deleteLinks.bindValue(":id", paymentId);
+        if (!deleteLinks.exec()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить старую запись: " + deleteQuery.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить связи: " + deleteLinks.lastError().text());
             return;
         }
+    } else {
+        // Режим создания — проверка дубликата
+        if (checkExistingPayment(clientId, month, year)) {
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                this, "Подтверждение",
+                QString("Оплата за %1 %2 года уже существует. Заменить её (включая привязанные документы)?")
+                    .arg(ui->comboBoxMonth->currentText(), QString::number(year)),
+                QMessageBox::Yes | QMessageBox::No);
+            
+            if (reply != QMessageBox::Yes) {
+                db.rollback();
+                return;
+            }
+            
+            QSqlQuery deleteQuery(db);
+            deleteQuery.prepare("DELETE FROM tblpayments "
+                                "WHERE clientid = :cid AND periodmonth = :month AND periodyear = :year");
+            deleteQuery.bindValue(":cid", clientId);
+            deleteQuery.bindValue(":month", month);
+            deleteQuery.bindValue(":year", year);
+            
+            if (!deleteQuery.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить старую запись: " + deleteQuery.lastError().text());
+                return;
+            }
+        }
+
+        // Вставляем новую оплату
+        QSqlQuery query(db);
+        query.prepare("INSERT INTO tblpayments (clientid, paymentdate, periodmonth, periodyear, amount, comment) "
+                      "VALUES (:cid, :date, :month, :year, :amount, :comment) RETURNING paymentid");
+        query.bindValue(":cid", clientId);
+        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":month", month);
+        query.bindValue(":year", year);
+        query.bindValue(":amount", amount);
+        query.bindValue(":comment", ui->textEditComment->toPlainText());
+
+        if (!query.exec() || !query.next()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось сохранить оплату: " + query.lastError().text());
+            return;
+        }
+        paymentId = query.value(0).toInt();
     }
-
-    // 2. Вставляем новую оплату
-    QSqlQuery query(db);
-    query.prepare("INSERT INTO tblpayments (clientid, paymentdate, periodmonth, periodyear, amount, comment) "
-                  "VALUES (:cid, :date, :month, :year, :amount, :comment) RETURNING paymentid");
-    query.bindValue(":cid", clientId);
-    query.bindValue(":date", QDateTime::currentDateTime());
-    query.bindValue(":month", month);
-    query.bindValue(":year", year);
-    query.bindValue(":amount", amount);
-    query.bindValue(":comment", ui->textEditComment->toPlainText());
-
-    if (!query.exec() || !query.next()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка БД", "Не удалось сохранить оплату: " + query.lastError().text());
-        return;
-    }
-    int paymentId = query.value(0).toInt();
-
-    // 3. Сохраняем связи с документами аренды
     for (int rentalId : selectedRentalIds) {
         QSqlQuery linkQuery(db);
         linkQuery.prepare("INSERT INTO tblpayment_rental_links (paymentid, rentaldocid) VALUES (:pid, :rid)");

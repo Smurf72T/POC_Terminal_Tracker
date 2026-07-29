@@ -146,6 +146,77 @@ void ReturnForm::generateDocNumber()
     }
 }
 
+void ReturnForm::loadForEdit(int docId)
+{
+    m_editMode = true;
+    m_editDocId = docId;
+
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    QSqlQuery query(db);
+
+    query.prepare("SELECT docnumber, docdate, clientid, comments FROM tblreturndocs WHERE returndocid = :id");
+    query.bindValue(":id", docId);
+
+    if (!query.exec() || !query.next()) {
+        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить документ возврата");
+        return;
+    }
+
+    QString docNumber = query.value(0).toString();
+    QDateTime docDate = query.value(1).toDateTime();
+    int clientId = query.value(2).toInt();
+    QString comments = query.value(3).toString();
+
+    ui->lineEditNumber->setText(docNumber);
+    ui->lineEditNumber->setReadOnly(true);
+    ui->dateEdit->setDate(docDate.date());
+    ui->textEditComment->setText(comments);
+    setWindowTitle(QString("Редактирование возврата ID %1").arg(docId));
+
+    int clientIndex = ui->comboBoxClient->findData(clientId);
+    if (clientIndex >= 0) {
+        ui->comboBoxClient->setCurrentIndex(clientIndex);
+    }
+
+    QSqlQuery rentalQuery(db);
+    rentalQuery.prepare(
+        "SELECT DISTINCT rd.rentaldocid "
+        "FROM tblrentaldetails rd "
+        "JOIN tblreturndetails rtd ON rd.terminalid = rtd.terminalid "
+        "WHERE rtd.returndocid = :id "
+        "LIMIT 1");
+    rentalQuery.bindValue(":id", docId);
+
+    if (rentalQuery.exec() && rentalQuery.next()) {
+        int rentalDocId = rentalQuery.value(0).toInt();
+        int rentalIndex = ui->comboBoxRentalDoc->findData(rentalDocId);
+        if (rentalIndex >= 0) {
+            ui->comboBoxRentalDoc->setCurrentIndex(rentalIndex);
+        }
+    }
+
+    QSqlQuery termQuery(db);
+    termQuery.prepare("SELECT terminalid FROM tblreturndetails WHERE returndocid = :id");
+    termQuery.bindValue(":id", docId);
+
+    if (termQuery.exec()) {
+        QList<int> returnedTerminals;
+        while (termQuery.next()) {
+            returnedTerminals.append(termQuery.value(0).toInt());
+        }
+
+        for (int i = 0; i < rowsModel->rowCount(); ++i) {
+            QStandardItem *checkItem = rowsModel->item(i, 0);
+            if (checkItem) {
+                int termId = checkItem->data(Qt::UserRole).toInt();
+                if (returnedTerminals.contains(termId)) {
+                    checkItem->setCheckState(Qt::Checked);
+                }
+            }
+        }
+    }
+}
+
 void ReturnForm::on_btnPost_clicked()
 {
     int clientId = ui->comboBoxClient->currentData().toInt();
@@ -181,6 +252,51 @@ void ReturnForm::on_btnPost_clicked()
     }
 
     QSqlQuery query(db);
+
+    if (m_editMode) {
+        // Режим редактирования: обновляем шапку и детали
+        query.prepare("UPDATE tblreturndocs SET docdate = :date, clientid = :client, comments = :comm WHERE returndocid = :id");
+        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime(0, 0)));
+        query.bindValue(":client", clientId);
+        query.bindValue(":comm", ui->textEditComment->toPlainText());
+        query.bindValue(":id", m_editDocId);
+
+        if (!query.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
+            return;
+        }
+
+        query.prepare("DELETE FROM tblreturndetails WHERE returndocid = :id");
+        query.bindValue(":id", m_editDocId);
+        if (!query.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить детали: " + query.lastError().text());
+            return;
+        }
+
+        for (int termId : terminalsToReturn) {
+            query.prepare("INSERT INTO tblreturndetails (returndocid, terminalid) VALUES (:did, :tid)");
+            query.bindValue(":did", m_editDocId);
+            query.bindValue(":tid", termId);
+            if (!query.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + query.lastError().text());
+                return;
+            }
+        }
+
+        if (!db.commit()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
+        } else {
+            DatabaseManager::instance().logAction("UPDATE", "tblreturndocs", m_editDocId);
+            QMessageBox::information(this, "Успех", "Возврат успешно обновлен!");
+            DatabaseManager::instance().notifyDataChanged();
+            this->close();
+        }
+        return;
+    }
 
     // 1. Создаем шапку документа возврата
     query.prepare("INSERT INTO tblreturndocs (docnumber, docdate, clientid, comments) "

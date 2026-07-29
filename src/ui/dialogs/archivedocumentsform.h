@@ -19,9 +19,10 @@ public:
 
 private slots:
     void on_btnFilter_clicked();
-    void on_btnExportExcel_clicked();  // <-- Добавлено
-    void on_btnExportPdf_clicked();    // <-- Добавлено
+    void on_btnExportExcel_clicked();
+    void on_btnExportPdf_clicked();
     void on_btnClose_clicked();
+    void on_tableView_doubleClicked(const QModelIndex &index);
 
 private:
     Ui::ArchiveDocumentsForm *ui;
@@ -32,6 +33,11 @@ private:
     void loadClients();
     void applyFilter();
     void setupCheckBoxColumn();
+    int getDocIdFromRow(int row) const;
+    void openReceiptForEdit(int docId);
+    void openRentalForEdit(int docId);
+    void openReturnForEdit(int docId);
+    void openPaymentForEdit(int docId);
 };
 
 #endif // ARCHIVEDOCUMENTSFORM_H

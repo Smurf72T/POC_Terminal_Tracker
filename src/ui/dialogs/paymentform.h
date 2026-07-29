@@ -15,6 +15,8 @@ public:
     explicit PaymentForm(QWidget *parent = nullptr);
     ~PaymentForm();
 
+    void loadForEdit(int paymentId);
+
 private slots:
     void on_btnSave_clicked();
     void on_btnClose_clicked();
@@ -26,8 +28,11 @@ private:
     void loadClients();
     void loadMonths();
     void loadYears();
-    void loadRentalDocsForClient(int clientId); // <-- Добавлено
+    void loadRentalDocsForClient(int clientId);
     bool checkExistingPayment(int clientId, int month, int year);
+
+    bool m_editMode = false;
+    int m_editPaymentId = 0;
 };
 
 #endif // PAYMENTFORM_H

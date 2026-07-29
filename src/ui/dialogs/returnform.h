@@ -16,6 +16,8 @@ public:
     explicit ReturnForm(QWidget *parent = nullptr);
     ~ReturnForm();
 
+    void loadForEdit(int docId);
+
 private slots:
     void on_comboBoxClient_currentIndexChanged(int index);
     void on_comboBoxRentalDoc_currentIndexChanged(int index);
@@ -30,6 +32,9 @@ private:
     void loadRentalDocs(int clientId);
     void loadRentalDetails(int rentalDocId);
     void generateDocNumber();
+
+    bool m_editMode = false;
+    int m_editDocId = 0;
 };
 
 #endif // RETURNFORM_H

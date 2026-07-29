@@ -67,6 +67,68 @@ void ReceiptForm::generateDocNumber()
     }
 }
 
+void ReceiptForm::loadForEdit(int docId)
+{
+    m_editMode = true;
+    m_editDocId = docId;
+
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    QSqlQuery query(db);
+
+    // Load header
+    query.prepare("SELECT docnumber, docdate, comments FROM tblreceiptdocs WHERE receiptdocid = :id");
+    query.bindValue(":id", docId);
+    if (query.exec() && query.next()) {
+        QString docnumber = query.value(0).toString();
+        QDateTime docdate = query.value(1).toDateTime();
+        QString comments = query.value(2).toString();
+
+        ui->lineEditNumber->setText(docnumber);
+        ui->lineEditNumber->setReadOnly(true);
+        ui->dateEdit->setDate(docdate.date());
+        ui->textEditComment->setText(comments);
+    }
+
+    // Load details
+    QSqlQuery detailQuery(db);
+    detailQuery.prepare("SELECT t.serialnumber, t.modelid, t.imei1, t.imei2 "
+                        "FROM tblreceiptdetails rd "
+                        "JOIN tblterminals t ON rd.terminalid = t.terminalid "
+                        "WHERE rd.receiptdocid = :id");
+    detailQuery.bindValue(":id", docId);
+    if (detailQuery.exec()) {
+        while (detailQuery.next()) {
+            int row = rowsModel->rowCount();
+            rowsModel->insertRow(row);
+
+            QString serial = detailQuery.value(0).toString();
+            int modelId = detailQuery.value(1).toInt();
+            QString imei1 = detailQuery.value(2).toString();
+            QString imei2 = detailQuery.value(3).toString();
+
+            rowsModel->setItem(row, 0, new QStandardItem(serial));
+
+            // Find model name from m_models list
+            QString modelName;
+            for (const auto &pair : m_models) {
+                if (pair.first == modelId) {
+                    modelName = pair.second;
+                    break;
+                }
+            }
+            QStandardItem *modelItem = new QStandardItem();
+            modelItem->setText(modelName);
+            modelItem->setData(modelId, Qt::UserRole);
+            rowsModel->setItem(row, 1, modelItem);
+
+            rowsModel->setItem(row, 2, new QStandardItem(imei1));
+            rowsModel->setItem(row, 3, new QStandardItem(imei2));
+        }
+    }
+
+    setWindowTitle(QString("Редактирование поступления ID %1").arg(docId));
+}
+
 void ReceiptForm::on_btnAddRow_clicked()
 {
     int row = rowsModel->rowCount();
@@ -110,22 +172,38 @@ void ReceiptForm::on_btnPost_clicked()
     }
 
     QSqlQuery query(db);
+    int docId;
 
-    // 1. Создаем шапку документа
-    query.prepare("INSERT INTO tblreceiptdocs (docnumber, docdate, comments) "
-                  "VALUES (:num, :date, :comm) RETURNING receiptdocid");
-    query.bindValue(":num", ui->lineEditNumber->text());
-    query.bindValue(":date", QDateTime::currentDateTime());
-    query.bindValue(":comm", ui->textEditComment->toPlainText());
+    // 1. Создаем или обновляем шапку документа
+    if (m_editMode) {
+        query.prepare("UPDATE tblreceiptdocs SET docdate = :date, comments = :comm WHERE receiptdocid = :id");
+        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":comm", ui->textEditComment->toPlainText());
+        query.bindValue(":id", m_editDocId);
 
-    if (!query.exec() || !query.next()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
-        return;
+        if (!query.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
+            return;
+        }
+        docId = m_editDocId;
+    } else {
+        query.prepare("INSERT INTO tblreceiptdocs (docnumber, docdate, comments) "
+                      "VALUES (:num, :date, :comm) RETURNING receiptdocid");
+        query.bindValue(":num", ui->lineEditNumber->text());
+        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":comm", ui->textEditComment->toPlainText());
+
+        if (!query.exec() || !query.next()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
+            return;
+        }
+        docId = query.value(0).toInt();
     }
-    int docId = query.value(0).toInt();
 
-    // 2. Обрабатываем строки
+    // 2. Обрабатываем строки (только для новых документов)
+    if (!m_editMode) {
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
         int modelId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
@@ -198,6 +276,8 @@ void ReceiptForm::on_btnPost_clicked()
             return;
         }
     }
+
+    } // !m_editMode
 
     // 3. Фиксируем транзакцию
     if (!db.commit()) {
