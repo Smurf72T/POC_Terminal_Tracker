@@ -217,8 +217,7 @@ void MainWindow::loadTopClients()
         "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
         "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
         "GROUP BY c.clientid, c.clientname "
-        "ORDER BY COUNT(t.terminalid) DESC "
-        "LIMIT 10";
+        "ORDER BY c.clientname";
 
     topClientsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
     ui->tableViewTopClients->resizeColumnsToContents();
