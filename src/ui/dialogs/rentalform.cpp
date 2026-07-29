@@ -275,7 +275,7 @@ void RentalForm::on_btnPost_clicked()
     if (m_editMode) {
         query.prepare("UPDATE tblrentaldocs SET docdate = :date, clientid = :client, comments = :comm WHERE rentaldocid = :id");
         query.bindValue(":id", m_editDocId);
-        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":date", QDateTime::currentDateTimeUtc());
         query.bindValue(":client", clientId);
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 
@@ -299,7 +299,7 @@ void RentalForm::on_btnPost_clicked()
         query.prepare("INSERT INTO tblrentaldocs (docnumber, docdate, clientid, comments) "
                       "VALUES (:num, :date, :client, :comm) RETURNING rentaldocid");
         query.bindValue(":num", ui->lineEditNumber->text());
-        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":date", QDateTime::currentDateTimeUtc());
         query.bindValue(":client", clientId);
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 

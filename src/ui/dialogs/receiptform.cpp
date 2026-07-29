@@ -180,7 +180,7 @@ void ReceiptForm::on_btnPost_clicked()
     // 1. Создаем или обновляем шапку документа
     if (m_editMode) {
         query.prepare("UPDATE tblreceiptdocs SET docdate = :date, comments = :comm WHERE receiptdocid = :id");
-        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":date", QDateTime::currentDateTimeUtc());
         query.bindValue(":comm", ui->textEditComment->toPlainText());
         query.bindValue(":id", m_editDocId);
 
@@ -194,7 +194,7 @@ void ReceiptForm::on_btnPost_clicked()
         query.prepare("INSERT INTO tblreceiptdocs (docnumber, docdate, comments) "
                       "VALUES (:num, :date, :comm) RETURNING receiptdocid");
         query.bindValue(":num", ui->lineEditNumber->text());
-        query.bindValue(":date", QDateTime::currentDateTime());
+        query.bindValue(":date", QDateTime::currentDateTimeUtc());
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 
         if (!query.exec() || !query.next()) {

@@ -256,7 +256,7 @@ void ReturnForm::on_btnPost_clicked()
     if (m_editMode) {
         // Режим редактирования: обновляем шапку и детали
         query.prepare("UPDATE tblreturndocs SET docdate = :date, clientid = :client, comments = :comm WHERE returndocid = :id");
-        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime(0, 0)));
+        query.bindValue(":date", QDateTime::currentDateTimeUtc());
         query.bindValue(":client", clientId);
         query.bindValue(":comm", ui->textEditComment->toPlainText());
         query.bindValue(":id", m_editDocId);
@@ -302,7 +302,7 @@ void ReturnForm::on_btnPost_clicked()
     query.prepare("INSERT INTO tblreturndocs (docnumber, docdate, clientid, comments) "
                   "VALUES (:num, :date, :client, :comm) RETURNING returndocid");
     query.bindValue(":num", ui->lineEditNumber->text());
-    query.bindValue(":date", QDateTime::currentDateTime());
+    query.bindValue(":date", QDateTime::currentDateTimeUtc());
     query.bindValue(":client", clientId);
     query.bindValue(":comm", ui->textEditComment->toPlainText());
 
