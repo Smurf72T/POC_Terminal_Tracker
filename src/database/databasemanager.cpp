@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QMap>
 #include <QMessageBox>
+#include <QSqlError>
 
 static QMap<QString, QString> loadEnvFile(const QString &filePath)
 {
