@@ -23,6 +23,9 @@ private slots:
     void on_btnPost_clicked(); // Кнопка "Провести"
     void on_btnClose_clicked();
 
+protected:
+    bool eventFilter(QObject *obj, QEvent *event) override;
+
 private:
     Ui::ReceiptForm *ui;
     QStandardItemModel *rowsModel;

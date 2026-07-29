@@ -8,6 +8,7 @@
 #include <QSqlError>
 #include <QDateTime>
 #include <QDebug>
+#include <QKeyEvent>
 
 ReceiptForm::ReceiptForm(QWidget *parent) :
     QDialog(parent),
@@ -32,6 +33,9 @@ ReceiptForm::ReceiptForm(QWidget *parent) :
 
     // Загружаем модели для выпадающего списка
     loadModelsToDelegate();
+
+    // F9 для дублирования строки
+    ui->tableView->installEventFilter(this);
 }
 
 ReceiptForm::~ReceiptForm()
@@ -212,4 +216,28 @@ void ReceiptForm::on_btnPost_clicked()
 void ReceiptForm::on_btnClose_clicked()
 {
     close();
+}
+
+bool ReceiptForm::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == ui->tableView && event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_F9) {
+            int row = ui->tableView->currentIndex().row();
+            if (row < 0) return true;
+
+            int newRow = rowsModel->rowCount();
+            rowsModel->insertRow(newRow);
+
+            for (int col = 0; col < rowsModel->columnCount(); ++col) {
+                QModelIndex src = rowsModel->index(row, col);
+                QStandardItem *newItem = rowsModel->itemFromIndex(src)->clone();
+                rowsModel->setItem(newRow, col, newItem);
+            }
+
+            ui->tableView->setCurrentIndex(rowsModel->index(newRow, 0));
+            return true;
+        }
+    }
+    return QDialog::eventFilter(obj, event);
 }
