@@ -62,11 +62,10 @@ set(HEADERS
         src/ui/dialogs/simcardsform.h
         src/ui/dialogs/terminalsform.h
         src/ui/delegates/readonlydelegate.h
-        src/ui/delegates/CheckBoxDelegate.h
         src/ui/dialogs/receiptform.h
         src/ui/delegates/comboboxdelegate.h
-        src/ui/dialogs/rentalform.h
         src/ui/delegates/comboboxmodel.h
+        src/ui/dialogs/rentalform.h
         src/ui/dialogs/returnform.h
         src/ui/dialogs/archivedocumentsform.h
         src/ui/dialogs/paymentform.h

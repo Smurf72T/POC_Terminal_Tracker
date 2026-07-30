@@ -51,14 +51,14 @@ bool Validator::checkUniqueSerial(const QString& serial, int excludeTerminalId)
     }
 
     if (!query.exec()) {
-        return false;
+        return true;
     }
 
     if (query.next()) {
         return query.value(0).toInt() == 0;
     }
 
-    return false;
+    return true;
 }
 
 bool Validator::checkLuhn(const QString& number)
@@ -126,9 +126,9 @@ bool Validator::checkDuplicateIMEI(const QString& imei, int excludeTerminalId)
         query.bindValue(":imei", imei);
     }
 
-    if (!query.exec()) return false;
+    if (!query.exec()) return true;
     if (query.next()) return query.value(0).toInt() > 0;
-    return false;
+    return true;
 }
 
 QRegularExpression Validator::createIMEIValidator()

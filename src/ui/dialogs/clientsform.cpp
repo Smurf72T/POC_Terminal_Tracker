@@ -1,6 +1,7 @@
 #include "clientsform.h"
 #include "ui_clientsform.h"
 #include "database/databasemanager.h"
+#include "utils/validator.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -52,6 +53,20 @@ ClientsForm::ClientsForm(QWidget *parent) :
     ui->tableView->setColumnWidth(2, 100);
     ui->tableView->setColumnWidth(3, 200);
 
+    // Валидация ИНН при изменении данных
+    connect(model, &QSqlTableModel::dataChanged, this, [this](const QModelIndex &topLeft, const QModelIndex &) {
+        if (topLeft.column() == 2) {
+            QString inn = topLeft.data().toString();
+            if (!inn.isEmpty() && !Validator::validateINN(inn)) {
+                QMessageBox::warning(this, "Неверный ИНН",
+                    "ИНН должен быть 10 или 12 цифр с корректной контрольной суммой.\n"
+                    "Значение будет сброшено.");
+                model->setData(topLeft, QVariant());
+                model->submitAll();
+            }
+        }
+    });
+
     // Debounce timer для поиска
     searchTimer = new QTimer(this);
     searchTimer->setSingleShot(true);
@@ -62,6 +77,7 @@ ClientsForm::ClientsForm(QWidget *parent) :
             model->setFilter("");
         } else {
             QString escaped = searchText;
+            escaped.replace("\\", "\\\\");
             escaped.replace("'", "''");
             escaped.replace("%", "\\%");
             escaped.replace("_", "\\_");

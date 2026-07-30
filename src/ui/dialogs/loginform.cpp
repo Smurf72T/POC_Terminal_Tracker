@@ -5,6 +5,8 @@
 #include <QSqlQuery>
 #include <QCryptographicHash>
 #include <QInputDialog>
+#include <QDateTime>
+#include <QRegularExpression>
 
 LoginForm::LoginForm(QWidget *parent) :
     QDialog(parent),
@@ -57,17 +59,35 @@ void LoginForm::on_btnLogin_clicked()
         return;
     }
 
-    QByteArray hash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256).toHex();
-
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT user_id, username, display_name, role FROM tbl_users "
-                  "WHERE username = :uname AND password_hash = :hash AND is_active = TRUE");
+    query.prepare("SELECT user_id, username, display_name, role, password_hash FROM tbl_users "
+                  "WHERE username = :uname AND is_active = TRUE");
     query.bindValue(":uname", username);
-    query.bindValue(":hash", QString(hash));
 
     if (query.exec() && query.next()) {
+        QString storedHash = query.value(4).toString();
+        bool passwordOk = false;
+
+        if (storedHash.length() == 80) {
+            // Новый формат: 16 символов соль + 64 символа SHA-256
+            QString salt = storedHash.left(16);
+            QString hash = QString(QCryptographicHash::hash(
+                (salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
+            passwordOk = (hash == storedHash.mid(16));
+        } else if (storedHash.length() == 64) {
+            // Старый формат: plain SHA-256 (для совместимости с существующими БД)
+            QString hash = QString(QCryptographicHash::hash(
+                password.toUtf8(), QCryptographicHash::Sha256).toHex());
+            passwordOk = (hash == storedHash);
+        }
+
+        if (!passwordOk) {
+            ui->labelError->setText("Неверный пароль!");
+            return;
+        }
+
         m_userId = query.value(0).toInt();
-        m_username = query.value(2).toString();
+        m_username = query.value(1).toString();
         m_role = query.value(3).toString();
         accept();
     } else {
@@ -100,19 +120,32 @@ void LoginForm::on_btnRegister_clicked()
         return;
     }
 
-    if (password.length() < 4) {
-        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать минимум 4 символа!");
+    if (password.length() < 8) {
+        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать минимум 8 символов!");
+        return;
+    }
+    if (!password.contains(QRegularExpression("[A-ZА-Я]"))) {
+        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать хотя бы одну заглавную букву!");
+        return;
+    }
+    if (!password.contains(QRegularExpression("[0-9]"))) {
+        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать хотя бы одну цифру!");
         return;
     }
 
-    QByteArray hash = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256).toHex();
+    QString salt = QString(QCryptographicHash::hash(
+        (username + QByteArray::number(QDateTime::currentMSecsSinceEpoch())).toUtf8(),
+        QCryptographicHash::Sha256).toHex().left(16));
+    QString hash = QString(QCryptographicHash::hash(
+        (salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
+    QString storedHash = salt + hash;
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("INSERT INTO tbl_users (username, display_name, password_hash, role, is_active) "
                   "VALUES (:uname, :dname, :hash, 'user', TRUE)");
     query.bindValue(":uname", username.trimmed());
     query.bindValue(":dname", displayName.trimmed());
-    query.bindValue(":hash", QString(hash));
+    query.bindValue(":hash", storedHash);
 
     if (query.exec()) {
         QMessageBox::information(this, "Успех", "Пользователь '" + username.trimmed() + "' зарегистрирован!\nТеперь войдите в систему.");

@@ -13,10 +13,13 @@ CREATE TABLE IF NOT EXISTS tbl_users (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Вставляем дефолтного пользователя (пароль: admin123)
+-- ВНИМАНИЕ: Пароль по умолчанию с солью. Формат: 16 символов соли (hex) + SHA-256(соль+пароль) (hex) = 80 символов.
+-- Пароль: Admin123!   |   Соль: a1b2c3d4e5f6a7b8
+-- В ПРОДУКШЕНЕ СМЕНИТЕ ПАРОЛЬ СРАЗУ ПОСЛЕ УСТАНОВКИ!
+-- Как сгенерировать: echo -n "сольпароль" | sha256sum
 INSERT INTO tbl_users (username, display_name, password_hash, role, is_active)
 VALUES ('admin', 'Администратор',
-        '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9',
+        'a1b2c3d4e5f6a7b8e4e0e1680400b99f8d57de3bf3abec3f6c9ad99440eae0721df5d3fca66a2597',
         'admin', TRUE)
 ON CONFLICT (username) DO NOTHING;
 

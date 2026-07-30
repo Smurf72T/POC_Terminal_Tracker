@@ -7,6 +7,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDateTime>
+#include <QTime>
 #include <QDebug>
 #include <QSqlRecord>
 #include <QSet>
@@ -45,8 +46,8 @@ RentalForm::RentalForm(QWidget *parent) :
     connect(rowsModel, &QStandardItemModel::dataChanged,
             this, &RentalForm::onTableViewDataChanged);
 
-    // Проверяем/добавляем колонку comment в БД (один раз при открытии)
-    ensureCommentColumn();
+
+
 }
 
 RentalForm::~RentalForm()
@@ -233,22 +234,6 @@ void RentalForm::on_btnDeleteRow_clicked()
     }
 }
 
-void RentalForm::ensureCommentColumn()
-{
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT 1 FROM information_schema.columns "
-                  "WHERE table_name='tblrentaldetails' AND column_name='comment'");
-    
-    if (query.exec() && !query.next()) {
-        // Колонки нет, добавляем её
-        QSqlQuery alterQuery(DatabaseManager::instance().getDatabase());
-        if (!alterQuery.exec("ALTER TABLE tblrentaldetails ADD COLUMN comment TEXT")) {
-            QMessageBox::critical(this, "Ошибка БД",
-                "Не удалось добавить колонку comment: " + alterQuery.lastError().text());
-        }
-    }
-}
-
 void RentalForm::on_btnPost_clicked()
 {
     if (rowsModel->rowCount() == 0) {
@@ -275,7 +260,7 @@ void RentalForm::on_btnPost_clicked()
     if (m_editMode) {
         query.prepare("UPDATE tblrentaldocs SET docdate = :date, clientid = :client, comments = :comm WHERE rentaldocid = :id");
         query.bindValue(":id", m_editDocId);
-        query.bindValue(":date", QDateTime::currentDateTimeUtc());
+        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":client", clientId);
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 
@@ -299,7 +284,7 @@ void RentalForm::on_btnPost_clicked()
         query.prepare("INSERT INTO tblrentaldocs (docnumber, docdate, clientid, comments) "
                       "VALUES (:num, :date, :client, :comm) RETURNING rentaldocid");
         query.bindValue(":num", ui->lineEditNumber->text());
-        query.bindValue(":date", QDateTime::currentDateTimeUtc());
+        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":client", clientId);
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 

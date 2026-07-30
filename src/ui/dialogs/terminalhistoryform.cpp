@@ -75,13 +75,16 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
     paymentModel = new QSqlQueryModel(this);
     QSqlQuery paymentQuery(db);
     paymentQuery.prepare(
-        "SELECT p.paymentdocid, p.docnumber, p.docdate, c.clientname, rdo.docnumber as rent_doc "
-        "FROM tblpaymentdocs p "
-        "JOIN tblrentaldocs rdo ON p.rentaldocid = rdo.rentaldocid "
+        "SELECT p.paymentid, "
+        "('ОП-' || p.paymentid::text) AS docnumber, "
+        "p.paymentdate, c.clientname, rdo.docnumber AS rent_doc "
+        "FROM tblpayments p "
+        "JOIN tblpayment_rental_links prl ON p.paymentid = prl.paymentid "
+        "JOIN tblrentaldocs rdo ON prl.rentaldocid = rdo.rentaldocid "
         "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
         "JOIN tblclients c ON rdo.clientid = c.clientid "
         "WHERE rdet.terminalid = :tid "
-        "ORDER BY p.docdate DESC"
+        "ORDER BY p.paymentdate DESC"
     );
     paymentQuery.bindValue(":tid", terminalId);
     paymentQuery.exec();

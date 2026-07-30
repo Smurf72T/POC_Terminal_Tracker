@@ -70,9 +70,15 @@ bool DatabaseManager::initialize(const QString& configPath)
     m_database.setUserName(env.value("POC_DB_USER", dbConfig["username"].toString()));
     m_database.setPassword(env.value("POC_DB_PASSWORD", dbConfig["password"].toString()));
 
+    // Пытаемся подключиться с SSL, если сервер не поддерживает — пробуем без SSL
+    m_database.setConnectOptions("requiressl=1");
+
     if (!m_database.open()) {
-        showError("Ошибка подключения к базе данных: " + m_database.lastError().text());
-        return false;
+        m_database.setConnectOptions("requiressl=0");
+        if (!m_database.open()) {
+            showError("Ошибка подключения к базе данных: " + m_database.lastError().text());
+            return false;
+        }
     }
 
     m_initialized = true;

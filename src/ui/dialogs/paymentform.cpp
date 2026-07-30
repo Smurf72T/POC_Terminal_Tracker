@@ -6,6 +6,7 @@
 #include <QSqlError>
 #include <QSqlDatabase>
 #include <QDateTime>
+#include <QTime>
 #include <QStandardItemModel>
 #include <QDebug>
 
@@ -246,7 +247,7 @@ void PaymentForm::on_btnSave_clicked()
                            "periodmonth = :month, periodyear = :year, amount = :amount, comment = :comment "
                            "WHERE paymentid = :id");
         updateQuery.bindValue(":cid", clientId);
-        updateQuery.bindValue(":date", QDateTime::currentDateTimeUtc());
+        updateQuery.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         updateQuery.bindValue(":month", month);
         updateQuery.bindValue(":year", year);
         updateQuery.bindValue(":amount", amount);
@@ -301,7 +302,7 @@ void PaymentForm::on_btnSave_clicked()
         query.prepare("INSERT INTO tblpayments (clientid, paymentdate, periodmonth, periodyear, amount, comment) "
                       "VALUES (:cid, :date, :month, :year, :amount, :comment) RETURNING paymentid");
         query.bindValue(":cid", clientId);
-        query.bindValue(":date", QDateTime::currentDateTimeUtc());
+        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":month", month);
         query.bindValue(":year", year);
         query.bindValue(":amount", amount);

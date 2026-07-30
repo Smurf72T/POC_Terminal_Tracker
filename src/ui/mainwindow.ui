@@ -13,10 +13,7 @@
   <property name="windowTitle">
    <string>POC Terminal Tracker</string>
   </property>
-  <property name="windowIcon">
-   <iconset>
-    <normaloff>E:/Downloads/1925548.png</normaloff>E:/Downloads/1925548.png</iconset>
-  </property>
+
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>

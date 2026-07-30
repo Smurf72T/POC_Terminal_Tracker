@@ -1,7 +1,6 @@
 #include "archivedocumentsform.h"
 #include "ui_archivedocumentsform.h"
 #include "database/databasemanager.h"
-#include "delegates/CheckBoxDelegate.h"
 #include "ui/dialogs/receiptform.h"
 #include "ui/dialogs/rentalform.h"
 #include "ui/dialogs/returnform.h"
@@ -100,18 +99,18 @@ void ArchiveDocumentsForm::applyFilter()
             "r.docdate AS \"Дата\", "
             "c.clientname AS \"Клиент\", "
             "r.comments AS \"Комментарий\", "
-            "COUNT(DISTINCT rd_returned.terminalid)::text || ' из ' || COUNT(DISTINCT rd_rental.terminalid)::text AS \"Возврат\", "
-            "CASE WHEN COUNT(pl.linkid) > 0 THEN 'Оплачено' ELSE 'Не оплачено' END AS \"Оплата\" "
+            "COALESCE(ret.returned_cnt, 0)::text || ' из ' || COALESCE(det.total_cnt, 0)::text AS \"Возврат\", "
+            "CASE WHEN pay.payment_cnt > 0 THEN 'Оплачено' ELSE 'Не оплачено' END AS \"Оплата\" "
             "FROM tblrentaldocs r "
             "LEFT JOIN tblclients c ON r.clientid = c.clientid "
-            "LEFT JOIN tblrentaldetails rd_rental ON r.rentaldocid = rd_rental.rentaldocid "
-            "LEFT JOIN tblreturndocs ret ON ret.clientid = r.clientid AND ret.docdate >= r.docdate "
-            "LEFT JOIN tblreturndetails rd_returned ON rd_rental.terminalid = rd_returned.terminalid "
-            "AND rd_returned.returndocid = ret.returndocid "
-            "LEFT JOIN tblpayment_rental_links pl ON r.rentaldocid = pl.rentaldocid "
+            "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS total_cnt FROM tblrentaldetails GROUP BY rentaldocid) det ON r.rentaldocid = det.rentaldocid "
+            "LEFT JOIN (SELECT rd.rentaldocid, COUNT(DISTINCT rtd.terminalid) AS returned_cnt "
+            "          FROM tblreturndetails rtd "
+            "          JOIN tblrentaldetails rd ON rtd.terminalid = rd.terminalid "
+            "          GROUP BY rd.rentaldocid) ret ON r.rentaldocid = ret.rentaldocid "
+            "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS payment_cnt FROM tblpayment_rental_links GROUP BY rentaldocid) pay ON r.rentaldocid = pay.rentaldocid "
             "WHERE r.docdate BETWEEN :dateFrom AND :dateTo "
             "AND (:clientId = 0 OR r.clientid = :clientId) "
-            "GROUP BY r.rentaldocid, r.docnumber, r.docdate, c.clientname, r.comments "
             "ORDER BY r.docdate DESC");
     } else if (m_docType == 3) { // Возврат
         queryStr = QString("SELECT r.returndocid, "
@@ -227,15 +226,8 @@ void ArchiveDocumentsForm::openPaymentForEdit(int docId)
 
 void ArchiveDocumentsForm::setupCheckBoxColumn()
 {
-    // Для архива аренды (docType == 2) настраиваем отображение чекбокса
+    // Для архива аренды (docType == 2) колонка "Возврат" (индекс 5)
     if (m_docType == 2) {
-        // Колонка "Возврат" — теперь индекс 5 (после скрытого ID)
-        int returnColumn = 5;
-
-        // Устанавливаем делегат для отображения чекбокса
-        ui->tableView->setItemDelegateForColumn(returnColumn, new CheckBoxDelegate(this));
-
-        // Делаем колонку только для чтения
         ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
     }
 }

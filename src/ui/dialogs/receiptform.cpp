@@ -7,6 +7,7 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDateTime>
+#include <QTime>
 #include <QDebug>
 #include <QKeyEvent>
 
@@ -180,7 +181,7 @@ void ReceiptForm::on_btnPost_clicked()
     // 1. Создаем или обновляем шапку документа
     if (m_editMode) {
         query.prepare("UPDATE tblreceiptdocs SET docdate = :date, comments = :comm WHERE receiptdocid = :id");
-        query.bindValue(":date", QDateTime::currentDateTimeUtc());
+        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":comm", ui->textEditComment->toPlainText());
         query.bindValue(":id", m_editDocId);
 
@@ -194,7 +195,7 @@ void ReceiptForm::on_btnPost_clicked()
         query.prepare("INSERT INTO tblreceiptdocs (docnumber, docdate, comments) "
                       "VALUES (:num, :date, :comm) RETURNING receiptdocid");
         query.bindValue(":num", ui->lineEditNumber->text());
-        query.bindValue(":date", QDateTime::currentDateTimeUtc());
+        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 
         if (!query.exec() || !query.next()) {
@@ -241,10 +242,28 @@ void ReceiptForm::on_btnPost_clicked()
             return;
         }
 
-        // Валидация IMEI
+        // Валидация IMEI (очищаем от разделителей, но показываем пользователю итог)
         QRegularExpression digitRe("[^\\d]");
-        imei1.remove(digitRe);
-        imei2.remove(digitRe);
+        QString cleanImei1 = imei1;
+        QString cleanImei2 = imei2;
+        cleanImei1.remove(digitRe);
+        cleanImei2.remove(digitRe);
+
+        if (cleanImei1 != imei1 && !imei1.isEmpty()) {
+            QMessageBox::information(this, "Форматирование IMEI",
+                QString("Строка %1: IMEI 1 был очищен от разделителей:\n"
+                        "Было: %2\nСтало: %3")
+                .arg(i + 1).arg(imei1, cleanImei1));
+        }
+        if (cleanImei2 != imei2 && !imei2.isEmpty()) {
+            QMessageBox::information(this, "Форматирование IMEI",
+                QString("Строка %1: IMEI 2 был очищен от разделителей:\n"
+                        "Было: %2\nСтало: %3")
+                .arg(i + 1).arg(imei2, cleanImei2));
+        }
+
+        imei1 = cleanImei1;
+        imei2 = cleanImei2;
 
         if (!imei1.isEmpty() && imei1.length() != 15) {
             db.rollback();

@@ -38,7 +38,6 @@ private:
     void loadFreeTerminalsToDelegate();
     void loadFreeSIMsToDelegate();
     void generateDocNumber();
-    void ensureCommentColumn();
 };
 
 #endif // RENTALFORM_H

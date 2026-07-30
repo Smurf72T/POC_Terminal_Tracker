@@ -36,6 +36,7 @@
 #include <QPrinter>
 #include <QPrinterInfo>
 #include <QFileInfo>
+#include <QTemporaryFile>
 #include <QSqlRecord>
 #include <QPushButton>
 #include <QComboBox>
@@ -198,7 +199,6 @@ void MainWindow::openForm(QWidget *form)
 {
     form->setAttribute(Qt::WA_DeleteOnClose);
     form->setWindowModality(Qt::WindowModal);
-    form->setWindowFlags(form->windowFlags() | Qt::Window);
     form->show();
     form->activateWindow();
 
@@ -219,7 +219,7 @@ void MainWindow::loadTopClients()
         "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
         "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
         "GROUP BY c.clientid, c.clientname "
-        "ORDER BY c.clientname";
+        "ORDER BY COUNT(t.terminalid) DESC";
 
     topClientsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
     ui->tableViewTopClients->hideColumn(0);
@@ -705,6 +705,18 @@ void MainWindow::performBackup()
         "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
     if (!passwordOk) return;
 
+    // Создаём временный .pgpass для безопасной аутентификации
+    QTemporaryFile pgpassFile(QDir::tempPath() + "/pgpass_XXXXXX");
+    pgpassFile.setAutoRemove(true);
+    if (!pgpassFile.open()) {
+        QMessageBox::critical(this, "Ошибка", "Не удалось создать временный файл для аутентификации.");
+        return;
+    }
+    QString pgpassPath = pgpassFile.fileName();
+    pgpassFile.write(QString("localhost:%1:%2:%3:%4")
+                     .arg(port, dbname, user, password).toUtf8());
+    pgpassFile.close();
+
     // Формируем команду pg_dump
     QStringList args;
     args << "--format=plain"
@@ -716,20 +728,9 @@ void MainWindow::performBackup()
          << QString("--file=%1").arg(filePath)
          << dbname;
 
-    // Устанавливаем пароль в PGPASSWORD
     QProcess process;
     auto env = process.environment();
-    bool found = false;
-    for (int i = 0; i < env.size(); ++i) {
-        if (env[i].startsWith("PGPASSWORD=")) {
-            env[i] = "PGPASSWORD=" + password;
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
-        env.append("PGPASSWORD=" + password);
-    }
+    env.append(QString("PGPASSFILE=%1").arg(pgpassPath));
     process.setEnvironment(env);
     process.start("pg_dump", args);
 
@@ -815,12 +816,20 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
                 QVariant val = dataQuery.value(i);
                 if (val.isNull()) {
                     out << "NULL";
-                } else if (val.typeId() == QMetaType::QString || val.typeId() == QMetaType::QByteArray) {
-                    out << "'" << val.toString().replace("'", "''") << "'";
-                } else if (val.typeId() == QMetaType::QDateTime || val.typeId() == QMetaType::QDate) {
-                    out << "'" << val.toString() << "'";
                 } else {
-                    out << val.toString();
+                    QMetaType::Type t = static_cast<QMetaType::Type>(val.typeId());
+                    if (t == QMetaType::QString || t == QMetaType::QByteArray) {
+                        QString escaped = val.toString();
+                        escaped.replace("\\", "\\\\");
+                        escaped.replace("'", "''");
+                        out << "'" << escaped << "'";
+                    } else if (t == QMetaType::QDateTime || t == QMetaType::QDate) {
+                        out << "'" << val.toString() << "'";
+                    } else if (t == QMetaType::QByteArray) {
+                        out << "'\\x" << val.toByteArray().toHex() << "'";
+                    } else {
+                        out << val.toString();
+                    }
                 }
             }
             out << ");\n";

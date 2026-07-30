@@ -67,6 +67,7 @@ ModelsForm::ModelsForm(QWidget *parent) :
             model->setFilter("");
         } else {
             QString escaped = searchText;
+            escaped.replace("\\", "\\\\");
             escaped.replace("'", "''");
             escaped.replace("%", "\\%");
             escaped.replace("_", "\\_");
