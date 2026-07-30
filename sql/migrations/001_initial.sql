@@ -1,8 +1,7 @@
 -- 001_initial.sql
 -- Базовая схема: пользователи, аудит, таблицы данных
 -- Идемпотентный (IF NOT EXISTS)
-
-BEGIN;
+-- Транзакция управляется миграционным раннером
 
 -- Таблица пользователей
 CREATE TABLE IF NOT EXISTS tbl_users (
@@ -75,7 +74,7 @@ BEGIN
     END IF; RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-DROP TRIGGER IF EXISTS trg_audit_terminals ON tblterminals;
+DO $$ BEGIN DROP TRIGGER IF EXISTS trg_audit_terminals ON tblterminals; EXCEPTION WHEN undefined_table THEN NULL; END $$;
 CREATE TRIGGER trg_audit_terminals AFTER INSERT OR UPDATE OR DELETE ON tblterminals FOR EACH ROW EXECUTE FUNCTION audit_terminals_trigger();
 
 -- Триггеры аудита на tblclients
@@ -96,7 +95,7 @@ BEGIN
     END IF; RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-DROP TRIGGER IF EXISTS trg_audit_clients ON tblclients;
+DO $$ BEGIN DROP TRIGGER IF EXISTS trg_audit_clients ON tblclients; EXCEPTION WHEN undefined_table THEN NULL; END $$;
 CREATE TRIGGER trg_audit_clients AFTER INSERT OR UPDATE OR DELETE ON tblclients FOR EACH ROW EXECUTE FUNCTION audit_clients_trigger();
 
 -- Генератор номеров документов
@@ -111,5 +110,3 @@ BEGIN
     RETURN upper(doc_type) || '-' || year_str || '-' || LPAD(seq_num::TEXT, 6, '0');
 END;
 $$ LANGUAGE plpgsql;
-
-COMMIT;
