@@ -71,6 +71,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tableViewTopClients->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewTopClients->setAlternatingRowColors(true);
     ui->tableViewTopClients->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tableViewTopClients->verticalHeader()->setDefaultSectionSize(40);
 
     connect(ui->tableViewTopClients, &QTableView::doubleClicked,
             this, &MainWindow::onTopClientDoubleClicked);
@@ -79,6 +80,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->tableViewRecentDocs->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableViewRecentDocs->setAlternatingRowColors(true);
     ui->tableViewRecentDocs->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tableViewRecentDocs->verticalHeader()->setDefaultSectionSize(40);
 
     connect(ui->tableViewRecentDocs, &QTableView::doubleClicked,
             this, &MainWindow::onRecentDocDoubleClicked);
