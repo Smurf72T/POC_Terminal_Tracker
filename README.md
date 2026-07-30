@@ -59,6 +59,7 @@ POC_DB_PASSWORD=postgres
 2. Выполните миграции из `sql/`:
    ```bash
    psql -U postgres -d pocbase -f sql/audit_log.sql
+   psql -U postgres -d pocbase -f sql/add_indexes.sql
    ```
 3. Дефолтный пользователь: `admin` / `admin123`
 
