@@ -160,3 +160,17 @@ foreach(_qt_dll Qt6Charts.dll Qt6OpenGL.dll Qt6OpenGLWidgets.dll)
             COMMENT "Copying ${_qt_dll}"
     )
 endforeach()
+
+# Опциональная сборка тестов
+option(BUILD_TESTS "Build unit tests" OFF)
+if(BUILD_TESTS)
+    enable_testing()
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
+    add_executable(test_password_utils tests/test_password_utils.cpp)
+    target_include_directories(test_password_utils PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_password_utils PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME test_password_utils COMMAND test_password_utils)
+
+    # test_validator требует DatabaseManager — временно отключён
+endif()
