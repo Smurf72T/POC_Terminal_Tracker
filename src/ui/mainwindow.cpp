@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "database/databasemanager.h"
+#include "utils/logging.h"
 #include "dialogs/manufacturersform.h"
 #include "dialogs/modelsform.h"
 #include "dialogs/clientsform.h"
@@ -528,7 +529,7 @@ void MainWindow::onActionTerminalHistory_triggered()
     // Загружаем все серийные номера
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals ORDER BY serialnumber")) {
-        qDebug() << "Failed to load terminals:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to load terminals:" << query.lastError().text();
         return;
     }
 
@@ -781,7 +782,7 @@ void MainWindow::openClientRentalReport(int clientId, const QString &clientName)
     query.prepare(queryStr);
     query.bindValue(":clientId", clientId);
     if (!query.exec()) {
-        qDebug() << "Failed to load client rental report:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to load client rental report:" << query.lastError().text();
     }
     model->setQuery(std::move(query));
 
@@ -870,7 +871,7 @@ void MainWindow::performBackup()
     // Загружаем конфигурацию БД
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     if (!query.exec("SELECT current_setting('port'), current_database(), current_user") || !query.next()) {
-        qDebug() << "Failed to get database settings:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to get database settings:" << query.lastError().text();
         return;
     }
 
@@ -943,7 +944,7 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
 
     QSqlQuery tableQuery(db);
     if (!tableQuery.exec("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")) {
-        qDebug() << "Failed to list tables:" << tableQuery.lastError().text();
+        qCWarning(logSQL) << "Failed to list tables:" << tableQuery.lastError().text();
         return;
     }
 
@@ -960,7 +961,7 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
                          "ORDER BY ordinal_position");
         colQuery.bindValue(":tbl", table);
         if (!colQuery.exec()) {
-            qDebug() << "Failed to load columns for table" << table << ":" << colQuery.lastError().text();
+            qCWarning(logSQL) << "Failed to load columns for table" << table << ":" << colQuery.lastError().text();
             continue;
         }
 
@@ -981,7 +982,7 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
         QSqlQuery dataQuery(db);
         dataQuery.prepare(QString("SELECT * FROM \"%1\"").arg(table));
         if (!dataQuery.exec()) {
-            qDebug() << "Failed to load data from table" << table << ":" << dataQuery.lastError().text();
+            qCWarning(logSQL) << "Failed to load data from table" << table << ":" << dataQuery.lastError().text();
             continue;
         }
 

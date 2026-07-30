@@ -1,4 +1,6 @@
 #include "databasemanager.h"
+#include "utils/logging.h"
+#include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
 #include <QDirIterator>
@@ -176,7 +178,8 @@ void DatabaseManager::notifyDataChanged()
 
 void DatabaseManager::showError(const QString& message)
 {
-    QMessageBox::critical(nullptr, "Ошибка базы данных", message);
+    QWidget *parent = QApplication::activeWindow();
+    QMessageBox::critical(parent, "Ошибка базы данных", message);
 }
 
 QString DatabaseManager::generateDocNumber(const QString& docType)
@@ -207,7 +210,7 @@ void DatabaseManager::logAction(const QString& action, const QString& tableName,
     query.bindValue(":newv", newValues);
 
     if (!query.exec()) {
-        qDebug() << "[AuditLog] Ошибка логирования:" << query.lastError().text();
+        qCWarning(logAudit) << "Ошибка логирования:" << query.lastError().text();
     }
 }
 
@@ -251,7 +254,7 @@ QStringList DatabaseManager::pendingMigrations()
 {
     QStringList pending;
     if (!ensureMigrationsTable()) {
-        qDebug() << "[Migration] Не удалось создать schema_migrations:" << m_database.lastError().text();
+        qCCritical(logMigration) << "Не удалось создать schema_migrations:" << m_database.lastError().text();
         return pending;
     }
 
@@ -274,7 +277,7 @@ QStringList DatabaseManager::pendingMigrations()
         if (d.exists()) { migrationsDir = d.absolutePath(); break; }
     }
     if (migrationsDir.isEmpty()) {
-        qDebug() << "[Migration] Директория миграций не найдена";
+        qCInfo(logMigration) << "Директория миграций не найдена";
         return pending;
     }
 
@@ -298,12 +301,12 @@ bool DatabaseManager::runMigrations(const QString &migrationsDir)
         return true;
     }
 
-    qDebug() << "[Migration] Найдено ожидающих миграций:" << pending.size();
+    qCInfo(logMigration) << "Найдено ожидающих миграций:" << pending.size();
 
     for (const QString &filePath : pending) {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            qDebug() << "[Migration] Не удалось открыть:" << filePath;
+            qCWarning(logMigration) << "Не удалось открыть:" << filePath;
             return false;
         }
         QTextStream in(&file);
@@ -314,38 +317,34 @@ bool DatabaseManager::runMigrations(const QString &migrationsDir)
         QString version = fi.fileName();
 
         if (!m_database.transaction()) {
-            qDebug() << "[Migration] Не удалось начать транзакцию:" << m_database.lastError().text();
+            qCWarning(logMigration) << "Не удалось начать транзакцию:" << m_database.lastError().text();
             return false;
         }
 
         QSqlQuery q(m_database);
         if (!q.exec(sql)) {
-            qDebug() << "[Migration] Ошибка в" << version << ":" << q.lastError().text();
+            qCWarning(logMigration) << "Ошибка в" << version << ":" << q.lastError().text();
             m_database.rollback();
             return false;
         }
 
-        // executing the multi-statement file may already have committed the transaction.
-        // Use savepoints for proper rollback if needed — but for simple cases, assume
-        // the migration either begins/commits its own or we commit here.
         if (m_database.driver()->hasFeature(QSqlDriver::Transactions)) {
             if (!m_database.commit()) {
-                qDebug() << "[Migration] Не удалось закоммитить:" << m_database.lastError().text();
+                qCWarning(logMigration) << "Не удалось закоммитить:" << m_database.lastError().text();
                 m_database.rollback();
                 return false;
             }
         }
 
-        // Record this migration
         QSqlQuery rec(m_database);
         rec.prepare("INSERT INTO schema_migrations (version) VALUES (:v)");
         rec.bindValue(":v", version);
         if (!rec.exec()) {
-            qDebug() << "[Migration] Не удалось записать версию:" << rec.lastError().text();
+            qCWarning(logMigration) << "Не удалось записать версию:" << rec.lastError().text();
             return false;
         }
 
-        qDebug() << "[Migration] Применена:" << version;
+        qCInfo(logMigration) << "Применена:" << version;
     }
 
     return true;

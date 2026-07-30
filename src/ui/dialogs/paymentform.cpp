@@ -10,6 +10,7 @@
 #include <QStandardItemModel>
 #include <QDebug>
 #include <QPrinter>
+#include "utils/logging.h"
 #include <QPrintDialog>
 #include <QTextDocument>
 
@@ -152,7 +153,7 @@ void PaymentForm::loadRentalDocsForClient(int clientId)
 {
     QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->listViewRentals->model());
     if (!model) {
-        qDebug() << "[PaymentForm] Модель listViewRentals не инициализирована";
+        qCWarning(logApp) << "Модель listViewRentals не инициализирована";
         return;
     }
     model->removeRows(0, model->rowCount());
@@ -160,7 +161,7 @@ void PaymentForm::loadRentalDocsForClient(int clientId)
     if (clientId == 0) return;
 
     if (!DatabaseManager::instance().isConnected()) {
-        qDebug() << "[PaymentForm] База данных не подключена";
+        qCWarning(logApp) << "База данных не подключена";
         return;
     }
 

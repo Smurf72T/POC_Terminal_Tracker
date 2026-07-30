@@ -8,8 +8,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Ищем строго Qt6
-find_package(Qt6 6.11.1 REQUIRED COMPONENTS
+# Ищем Qt6 (минимальная версия 6.2 для поддержки Charts и всех используемых API)
+find_package(Qt6 6.2 REQUIRED COMPONENTS
         Core
         Gui
         Widgets
@@ -53,6 +53,7 @@ set(SOURCES
         src/ui/dialogs/reportsform.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
+        src/utils/logging.cpp
 )
 
 set(HEADERS
@@ -81,6 +82,7 @@ set(HEADERS
         src/ui/dialogs/reportsform.h
         src/utils/reportexporter.h
         src/utils/validator.h
+        src/utils/logging.h
 )
 
 set(UI_FILES
@@ -125,13 +127,6 @@ configure_file(
         COPYONLY
 )
 
-# Копируем .env в папку сборки
-configure_file(
-        ${CMAKE_SOURCE_DIR}/.env
-        ${CMAKE_BINARY_DIR}/.env
-        COPYONLY
-)
-
 # Копируем SQL-миграции в папку сборки
 file(COPY ${CMAKE_SOURCE_DIR}/sql/migrations/ DESTINATION ${CMAKE_BINARY_DIR}/sql/migrations/)
 
@@ -143,26 +138,42 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 # Копируем DLL PostgreSQL в папку сборки
-set(PG_DLL_DIR "${PostgreSQL_ROOT}/bin")
-foreach(_pg_dll libpq.dll libintl-9.dll libssl-3-x64.dll libcrypto-3-x64.dll)
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${PG_DLL_DIR}/${_pg_dll}"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${_pg_dll}"
-            COMMENT "Copying ${_pg_dll}"
-    )
-endforeach()
+if(DEFINED PostgreSQL_ROOT AND EXISTS "${PostgreSQL_ROOT}/bin")
+    set(PG_DLL_DIR "${PostgreSQL_ROOT}/bin")
+    foreach(_pg_dll libpq.dll libintl-9.dll libssl-3-x64.dll libcrypto-3-x64.dll)
+        if(EXISTS "${PG_DLL_DIR}/${_pg_dll}")
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${PG_DLL_DIR}/${_pg_dll}"
+                    "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${_pg_dll}"
+                    COMMENT "Copying ${_pg_dll}"
+            )
+        else()
+            message(WARNING "PostgreSQL DLL not found: ${PG_DLL_DIR}/${_pg_dll}")
+        endif()
+    endforeach()
+else()
+    message(WARNING "PostgreSQL_ROOT/bin not found, DLLs will not be copied")
+endif()
 
 # Копируем Qt Charts DLL
-set(QT_DLL_DIR "${CMAKE_PREFIX_PATH}/bin")
-foreach(_qt_dll Qt6Charts.dll Qt6OpenGL.dll Qt6OpenGLWidgets.dll)
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${QT_DLL_DIR}/${_qt_dll}"
-            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${_qt_dll}"
-            COMMENT "Copying ${_qt_dll}"
-    )
-endforeach()
+if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/bin")
+    set(QT_DLL_DIR "${CMAKE_PREFIX_PATH}/bin")
+    foreach(_qt_dll Qt6Charts.dll Qt6OpenGL.dll Qt6OpenGLWidgets.dll)
+        if(EXISTS "${QT_DLL_DIR}/${_qt_dll}")
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${QT_DLL_DIR}/${_qt_dll}"
+                    "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${_qt_dll}"
+                    COMMENT "Copying ${_qt_dll}"
+            )
+        else()
+            message(WARNING "Qt DLL not found: ${QT_DLL_DIR}/${_qt_dll}")
+        endif()
+    endforeach()
+else()
+    message(WARNING "CMAKE_PREFIX_PATH/bin not found, Qt DLLs will not be copied")
+endif()
 
 # Опциональная сборка тестов
 option(BUILD_TESTS "Build unit tests" OFF)

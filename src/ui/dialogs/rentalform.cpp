@@ -10,6 +10,7 @@
 #include <QTime>
 #include <QDebug>
 #include <QSqlRecord>
+#include "utils/logging.h"
 #include <QSet>
 #include "utils/reportexporter.h"
 #include <QTextDocument>
@@ -60,7 +61,7 @@ void RentalForm::loadClientsToDelegate()
     QList<QPair<int, QString>> clients;
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     if (!query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname")) {
-        qDebug() << "Failed to load clients:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to load clients:" << query.lastError().text();
         return;
     }
 
@@ -79,7 +80,7 @@ void RentalForm::loadFreeTerminalsToDelegate()
     QList<QPair<int, QString>> terminals;
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 ORDER BY serialnumber")) {
-        qDebug() << "Failed to load free terminals:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to load free terminals:" << query.lastError().text();
         return;
     }
 
@@ -109,7 +110,7 @@ void RentalForm::loadFreeSIMsToDelegate()
         ")"
         "ORDER BY s.simnumber"
     )) {
-        qDebug() << "Failed to load free SIMs:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to load free SIMs:" << query.lastError().text();
         return;
     }
 

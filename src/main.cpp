@@ -5,6 +5,7 @@
 #include <QIcon>
 #include <QFile>
 #include <QMessageBox>
+#include <QWidget>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
@@ -32,7 +33,10 @@ int main(int argc, char *argv[])
 #endif
 
     if (!DatabaseManager::instance().initialize()) {
-        QMessageBox::critical(nullptr, "Критическая ошибка",
+        QWidget splash;
+        splash.setWindowTitle("POC Terminal Tracker");
+        splash.resize(400, 100);
+        QMessageBox::critical(&splash, "Критическая ошибка",
                              "Не удалось подключиться к базе данных.\n"
                              "Проверьте конфигурационный файл config/config.json\n"
                              "или переменную окружения POC_DB_PASSWORD");

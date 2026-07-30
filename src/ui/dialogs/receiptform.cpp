@@ -10,6 +10,7 @@
 #include <QTime>
 #include <QDebug>
 #include <QKeyEvent>
+#include "utils/logging.h"
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QTextDocument>
@@ -52,7 +53,7 @@ void ReceiptForm::loadModelsToDelegate()
     m_models.clear();
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     if (!query.exec("SELECT modelid, modelname FROM tblmodels ORDER BY modelname")) {
-        qDebug() << "Failed to load models:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to load models:" << query.lastError().text();
         return;
     }
 

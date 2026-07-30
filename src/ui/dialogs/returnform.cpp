@@ -8,6 +8,7 @@
 #include <QTime>
 #include <QDebug>
 #include <QPrinter>
+#include "utils/logging.h"
 #include <QPrintDialog>
 #include <QTextDocument>
 
@@ -43,7 +44,7 @@ void ReturnForm::loadClientsToComboBox()
 {
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     if (!query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname")) {
-        qDebug() << "Failed to load clients:" << query.lastError().text();
+        qCWarning(logSQL) << "Failed to load clients:" << query.lastError().text();
         return;
     }
 
