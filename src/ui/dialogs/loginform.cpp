@@ -7,6 +7,10 @@
 #include <QInputDialog>
 #include <QDateTime>
 #include <QRegularExpression>
+#include <QApplication>
+
+QMap<QString, int> LoginForm::s_globalFailedAttempts;
+QMap<QString, qint64> LoginForm::s_globalLockUntil;
 
 LoginForm::LoginForm(QWidget *parent) :
     QDialog(parent),
@@ -59,6 +63,14 @@ void LoginForm::on_btnLogin_clicked()
         return;
     }
 
+    // Rate limiting: блокировка после 5 неудачных попыток
+    qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (s_globalLockUntil.contains(username) && now < s_globalLockUntil[username]) {
+        int secondsLeft = static_cast<int>((s_globalLockUntil[username] - now) / 1000) + 1;
+        ui->labelError->setText(QString("Слишком много попыток. Повторите через %1 с.").arg(secondsLeft));
+        return;
+    }
+
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("SELECT user_id, username, display_name, role, password_hash FROM tbl_users "
                   "WHERE username = :uname AND is_active = TRUE");
@@ -67,9 +79,21 @@ void LoginForm::on_btnLogin_clicked()
     if (query.exec() && query.next()) {
         QString storedHash = query.value(4).toString();
         if (!checkPassword(password, storedHash)) {
-            ui->labelError->setText("Неверный пароль!");
+            s_globalFailedAttempts[username]++;
+            if (s_globalFailedAttempts[username] >= 5) {
+                s_globalLockUntil[username] = QDateTime::currentMSecsSinceEpoch() + 30000;
+                s_globalFailedAttempts[username] = 0;
+                ui->labelError->setText("Слишком много попыток. Повторите через 30 с.");
+            } else {
+                ui->labelError->setText(QString("Неверный пароль! Осталось попыток: %1")
+                    .arg(5 - s_globalFailedAttempts[username]));
+            }
             return;
         }
+
+        // Сброс счётчика при успешном входе
+        s_globalFailedAttempts.remove(username);
+        s_globalLockUntil.remove(username);
 
         // Upgrade устаревшего хеша до PBKDF2 при успешном входе
         if (storedHash.count(':') != 2) {
@@ -86,7 +110,15 @@ void LoginForm::on_btnLogin_clicked()
         m_role = query.value(3).toString();
         accept();
     } else {
-        ui->labelError->setText("Неверный пароль!");
+        s_globalFailedAttempts[username]++;
+        if (s_globalFailedAttempts[username] >= 5) {
+            s_globalLockUntil[username] = QDateTime::currentMSecsSinceEpoch() + 30000;
+            s_globalFailedAttempts[username] = 0;
+            ui->labelError->setText("Слишком много попыток. Повторите через 30 с.");
+        } else {
+            ui->labelError->setText(QString("Неверный пароль! Осталось попыток: %1")
+                .arg(5 - s_globalFailedAttempts[username]));
+        }
     }
 }
 
