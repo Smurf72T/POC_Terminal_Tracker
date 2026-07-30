@@ -6,9 +6,11 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QSqlField>
+#include <QSqlDriver>
 #include <QTimer>
-#include <QLineEdit>      // <-- Добавлено для Clangd
-#include <QDateTime>      // <-- Добавлено для QDateTime::currentMSecsSinceEpoch()
+#include <QLineEdit>
+#include <QDateTime>
 
 ManufacturersForm::ManufacturersForm(QWidget *parent) :
     QDialog(parent),
@@ -69,11 +71,15 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
         } else {
             QString escaped = searchText;
             escaped.replace("\\", "\\\\");
-            escaped.replace("'", "''");
             escaped.replace("%", "\\%");
             escaped.replace("_", "\\_");
-            QString filter = QString("manufacturername LIKE '%%1%%' ESCAPE '\\'")
-                                .arg(escaped);
+
+            QSqlField f("", QMetaType::fromType<QString>());
+            f.setValue("%" + escaped + "%");
+            QString likeVal = DatabaseManager::instance().getDatabase().driver()->formatValue(f);
+
+            QString filter = QString("manufacturername LIKE %1 ESCAPE '\\'")
+                                .arg(likeVal);
             model->setFilter(filter);
         }
         model->select();
