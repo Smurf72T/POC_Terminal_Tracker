@@ -36,10 +36,16 @@ void BatchStatusForm::loadStatuses()
     ui->comboBoxCurrentStatus->clear();
     ui->comboBoxCurrentStatus->addItem("Свободен (0)", 0);
     ui->comboBoxCurrentStatus->addItem("В аренде (1)", 1);
+    ui->comboBoxCurrentStatus->addItem("В ремонте (2)", 2);
+    ui->comboBoxCurrentStatus->addItem("Списан (3)", 3);
+    ui->comboBoxCurrentStatus->addItem("Утерян (4)", 4);
 
     ui->comboBoxNewStatus->clear();
     ui->comboBoxNewStatus->addItem("Свободен (0)", 0);
     ui->comboBoxNewStatus->addItem("В аренде (1)", 1);
+    ui->comboBoxNewStatus->addItem("В ремонте (2)", 2);
+    ui->comboBoxNewStatus->addItem("Списан (3)", 3);
+    ui->comboBoxNewStatus->addItem("Утерян (4)", 4);
     ui->comboBoxNewStatus->setCurrentIndex(1);
 }
 
@@ -50,7 +56,7 @@ void BatchStatusForm::loadTerminals(int currentStatus)
         "SELECT t.terminalid AS \"ID\", "
         "t.serialnumber AS \"Серийный номер\", "
         "COALESCE(m.modelname, '—') AS \"Модель\", "
-        "CASE WHEN t.status = 0 THEN 'Свободен' ELSE 'В аренде' END AS \"Статус\" "
+        "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS \"Статус\" "
         "FROM tblterminals t "
         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
         "WHERE t.status = :status "

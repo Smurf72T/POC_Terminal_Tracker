@@ -68,7 +68,7 @@ void TerminalsForm::loadModel(const QString &filter)
         "SELECT t.terminalid, t.serialnumber, "
         "COALESCE(m.modelname, 'Неизвестная') AS modelname, "
         "t.imei1, t.imei2, "
-        "CASE WHEN t.status = 0 THEN 'Свободен' ELSE 'В аренде' END AS status, "
+        "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
         "COALESCE(s.simnumber, 'SIM не назначена') AS simnumber, "
         "t.purchasedate, t.notes "
         "FROM tblterminals t "

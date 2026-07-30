@@ -27,6 +27,7 @@
                     <item><widget class="QPushButton" name="btnDeleteRow"><property name="text"><string>Удалить строку</string></property></widget></item>
                     <item><spacer name="horizontalSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
                     <item><widget class="QPushButton" name="btnPost"><property name="text"><string>Провести</string></property></widget></item>
+                    <item><widget class="QPushButton" name="btnPrint"><property name="text"><string>Печать</string></property></widget></item>
                     <item><widget class="QPushButton" name="btnClose"><property name="text"><string>Закрыть</string></property></widget></item>
                 </layout>
             </item>

@@ -17,6 +17,7 @@
 #include "dialogs/expirynotificationsform.h"
 #include "dialogs/batchstatusform.h"
 #include "dialogs/reportsform.h"
+#include "dialogs/usermanagementform.h"
 #include "utils/reportexporter.h"
 #include <QInputDialog>
 #include <QMessageBox>
@@ -41,6 +42,14 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QCompleter>
+#include <QApplication>
+#include <QFile>
+#include <QShortcut>
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -82,7 +91,16 @@ MainWindow::MainWindow(QWidget *parent) :
         ui->labelLastUpdate->setText("Последнее обновление: " +
             QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"));
     });
+    setupCharts();
+
+    // Автообновление графиков
+    connect(refreshTimer, &QTimer::timeout, this, &MainWindow::updateCharts);
+
     refreshTimer->start(30000);
+
+    // Глобальный поиск Ctrl+K
+    auto *searchShortcut = new QShortcut(QKeySequence("Ctrl+K"), this);
+    connect(searchShortcut, &QShortcut::activated, this, &MainWindow::showGlobalSearch);
 
     // Первичная загрузка
     loadCounters();
@@ -101,6 +119,40 @@ void MainWindow::setupUI()
 {
     setWindowTitle("POC Terminal Tracker");
     resize(1200, 800);
+
+    auto *themeBtn = new QPushButton("☀️ Светлая тема", this);
+    themeBtn->setFixedHeight(24);
+    themeBtn->setStyleSheet(
+        "QPushButton { background: transparent; color: #E0E0E0; border: 1px solid #555; "
+        "border-radius: 3px; padding: 2px 8px; font-size: 12px; }"
+        "QPushButton:hover { background: #333; }"
+    );
+    statusBar()->addPermanentWidget(themeBtn);
+    connect(themeBtn, &QPushButton::clicked, this, [this, themeBtn]() {
+        m_darkTheme = !m_darkTheme;
+        QFile file(m_darkTheme ? ":/styles/modern.qss" : ":/styles/light.qss");
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QString style = QString::fromUtf8(file.readAll());
+            qApp->setStyleSheet(style);
+            file.close();
+        }
+        themeBtn->setText(m_darkTheme ? "☀️ Светлая тема" : "🌙 Тёмная тема");
+        // Обновляем тему графиков
+        if (chartStatusView && chartStatusView->chart())
+            chartStatusView->chart()->setTheme(m_darkTheme ? QChart::ChartThemeDark : QChart::ChartThemeLight);
+        if (chartRevenueView && chartRevenueView->chart())
+            chartRevenueView->chart()->setTheme(m_darkTheme ? QChart::ChartThemeDark : QChart::ChartThemeLight);
+        // Обновляем цвета кнопки под текущую тему
+        themeBtn->setStyleSheet(
+            QString("QPushButton { background: transparent; color: %1; border: 1px solid %2; "
+                    "border-radius: 3px; padding: 2px 8px; font-size: 12px; }"
+                    "QPushButton:hover { background: %3; }")
+            .arg(m_darkTheme ? "#E0E0E0" : "#212121")
+            .arg(m_darkTheme ? "#555" : "#999")
+            .arg(m_darkTheme ? "#333" : "#DDD")
+        );
+        updateStatusBar();
+    });
 
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onActionAbout_triggered);
     connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onActionExit_triggered);
@@ -125,6 +177,101 @@ void MainWindow::setupUI()
     connect(ui->actionAuditLog, &QAction::triggered, this, &MainWindow::onActionAuditLog_triggered);
     connect(ui->actionBatchStatus, &QAction::triggered, this, &MainWindow::onActionBatchStatus_triggered);
     connect(ui->actionReports, &QAction::triggered, this, &MainWindow::onActionReports_triggered);
+    connect(ui->actionUserManagement, &QAction::triggered, this, &MainWindow::onActionUserManagement_triggered);
+    connect(ui->actionGlobalSearch, &QAction::triggered, this, &MainWindow::showGlobalSearch);
+}
+
+void MainWindow::setupCharts()
+{
+    auto *chartsGroup = new QGroupBox("Аналитика", this);
+    chartsGroup->setStyleSheet(
+        "QGroupBox { font-size: 14px; font-weight: bold; color: #CCCCCC; "
+        "border: 1px solid #3C3C3C; border-radius: 8px; margin-top: 8px; padding-top: 18px; }"
+        "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 6px; }"
+    );
+    auto *chartsLayout = new QHBoxLayout(chartsGroup);
+
+    auto *pieChart = new QChart();
+    pieChart->setTitle("Статус терминалов");
+    pieChart->setTheme(QChart::ChartThemeDark);
+    pieChart->setAnimationOptions(QChart::SeriesAnimations);
+    pieChart->legend()->setAlignment(Qt::AlignBottom);
+    chartStatusView = new QChartView(pieChart, chartsGroup);
+    chartStatusView->setRenderHint(QPainter::Antialiasing);
+    chartsLayout->addWidget(chartStatusView);
+
+    auto *barChart = new QChart();
+    barChart->setTitle("Выручка по месяцам");
+    barChart->setTheme(QChart::ChartThemeDark);
+    barChart->setAnimationOptions(QChart::SeriesAnimations);
+    barChart->legend()->setAlignment(Qt::AlignBottom);
+    chartRevenueView = new QChartView(barChart, chartsGroup);
+    chartRevenueView->setRenderHint(QPainter::Antialiasing);
+    chartsLayout->addWidget(chartRevenueView);
+
+    // Вставляем в главный layout между counters и top clients
+    auto *mainLayout = qobject_cast<QVBoxLayout*>(ui->centralwidget->layout());
+    if (mainLayout) {
+        int idx = mainLayout->indexOf(ui->groupBoxTopClients);
+        if (idx >= 0)
+            mainLayout->insertWidget(idx, chartsGroup);
+        else
+            mainLayout->addWidget(chartsGroup);
+    }
+
+    updateCharts();
+}
+
+void MainWindow::updateCharts()
+{
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+
+    // Pie chart — статусы терминалов
+    auto *pieChart = qobject_cast<QChart*>(chartStatusView->chart());
+    if (pieChart) {
+        pieChart->removeAllSeries();
+        auto *pieSeries = new QPieSeries();
+        if (query.exec("SELECT CASE status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END, COUNT(*) FROM tblterminals GROUP BY status ORDER BY status")) {
+            while (query.next())
+                pieSeries->append(query.value(0).toString(), query.value(1).toInt());
+        }
+        pieChart->addSeries(pieSeries);
+    }
+
+    // Bar chart — выручка за последние 6 месяцев
+    auto *barChart = qobject_cast<QChart*>(chartRevenueView->chart());
+    if (barChart) {
+        barChart->removeAllSeries();
+        auto *barSet = new QBarSet("Оплаты");
+        barSet->setColor("#1976D2");
+        QStringList categories;
+
+        if (query.exec(
+            "SELECT to_char(periodyear || '-' || LPAD(periodmonth::text, 2, '0'), 'YYYY-MM') AS month, "
+            "COALESCE(SUM(amount), 0) AS total "
+            "FROM tblpayments "
+            "WHERE (periodyear * 12 + periodmonth) >= (EXTRACT(YEAR FROM CURRENT_DATE) * 12 + EXTRACT(MONTH FROM CURRENT_DATE) - 5) "
+            "GROUP BY periodyear, periodmonth ORDER BY periodyear, periodmonth")) {
+            while (query.next()) {
+                categories << query.value(0).toString();
+                *barSet << query.value(1).toDouble();
+            }
+        }
+
+        auto *barSeries = new QBarSeries();
+        barSeries->append(barSet);
+        barChart->addSeries(barSeries);
+
+        auto *axisX = new QBarCategoryAxis();
+        axisX->append(categories);
+        barChart->addAxis(axisX, Qt::AlignBottom);
+        barSeries->attachAxis(axisX);
+
+        auto *axisY = new QValueAxis();
+        axisY->setTitleText("Сумма, руб.");
+        barChart->addAxis(axisY, Qt::AlignLeft);
+        barSeries->attachAxis(axisY);
+    }
 }
 
 void MainWindow::updateStatusBar()
@@ -179,6 +326,7 @@ void MainWindow::loadCounters()
         updateCounterWidget(ui->labelValueClients, ui->labelNameClients,
             query.value(0).toString(), "Клиентов", "#f39c12");
     }
+
 }
 
 void MainWindow::updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel,
@@ -847,4 +995,139 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
 void MainWindow::showExpiryNotifications()
 {
     openForm(new ExpiryNotificationsForm(this));
+}
+
+void MainWindow::onActionUserManagement_triggered()
+{
+    openForm(new UserManagementForm(this));
+}
+
+void MainWindow::showGlobalSearch()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle("Глобальный поиск (Ctrl+K)");
+    dialog.resize(550, 400);
+    dialog.setStyleSheet("QDialog { background-color: #252526; }");
+
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(12);
+
+    auto *input = new QLineEdit(&dialog);
+    input->setPlaceholderText("Введите запрос (серийник, IMEI, клиент, SIM, модель...)");
+    input->setClearButtonEnabled(true);
+    layout->addWidget(input);
+
+    auto *list = new QListWidget(&dialog);
+    list->setAlternatingRowColors(true);
+    layout->addWidget(list);
+
+    auto *btnLayout = new QHBoxLayout();
+    auto *btnOpen = new QPushButton("Открыть", &dialog);
+    auto *btnCancel = new QPushButton("Отмена", &dialog);
+    btnLayout->addStretch();
+    btnLayout->addWidget(btnOpen);
+    btnLayout->addWidget(btnCancel);
+    layout->addLayout(btnLayout);
+
+    connect(btnCancel, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(btnOpen, &QPushButton::clicked, &dialog, &QDialog::accept);
+
+    // Поиск по мере ввода
+    connect(input, &QLineEdit::textChanged, &dialog, [list, input]() {
+        list->clear();
+        QString q = input->text().trimmed();
+        if (q.length() < 2) return;
+
+        list->addItem("Поиск...");
+
+        struct SearchResult {
+            int type; // 1=terminal, 2=client, 3=sim, 4=model, 5=manufacturer
+            int id;
+            QString text;
+        };
+        QList<SearchResult> results;
+        QSqlDatabase db = DatabaseManager::instance().getDatabase();
+        QString like = "%" + q.replace("\\", "\\\\").replace("'", "''").replace("%", "\\%").replace("_", "\\_") + "%";
+
+        QSqlQuery query(db);
+        query.prepare("SELECT terminalid, serialnumber, COALESCE(imei1,''), COALESCE(imei2,'') "
+                      "FROM tblterminals WHERE serialnumber ILIKE :q "
+                      "OR imei1 ILIKE :q2 OR imei2 ILIKE :q3 LIMIT 15");
+        query.bindValue(":q", like);
+        query.bindValue(":q2", like);
+        query.bindValue(":q3", like);
+        if (query.exec()) {
+            while (query.next())
+                results.append({1, query.value(0).toInt(), query.value(1).toString() + " (Терминал)"});
+        }
+
+        query.prepare("SELECT clientid, clientname FROM tblclients WHERE clientname ILIKE :q OR inn ILIKE :q2 LIMIT 10");
+        query.bindValue(":q", like);
+        query.bindValue(":q2", like);
+        if (query.exec()) {
+            while (query.next())
+                results.append({2, query.value(0).toInt(), query.value(1).toString() + " (Клиент)"});
+        }
+
+        query.prepare("SELECT simcardid, simnumber FROM tblsimcards WHERE simnumber ILIKE :q LIMIT 10");
+        query.bindValue(":q", like);
+        if (query.exec()) {
+            while (query.next())
+                results.append({3, query.value(0).toInt(), query.value(1).toString() + " (SIM)"});
+        }
+
+        query.prepare("SELECT modelid, modelname FROM tblmodels WHERE modelname ILIKE :q LIMIT 10");
+        query.bindValue(":q", like);
+        if (query.exec()) {
+            while (query.next())
+                results.append({4, query.value(0).toInt(), query.value(1).toString() + " (Модель)"});
+        }
+
+        query.prepare("SELECT manufacturerid, manufacturername FROM tblmanufacturers WHERE manufacturername ILIKE :q LIMIT 5");
+        query.bindValue(":q", like);
+        if (query.exec()) {
+            while (query.next())
+                results.append({5, query.value(0).toInt(), query.value(1).toString() + " (Производитель)"});
+        }
+
+        list->clear();
+        for (const auto &r : results) {
+            auto *item = new QListWidgetItem(r.text);
+            item->setData(Qt::UserRole, r.type);
+            item->setData(Qt::UserRole + 1, r.id);
+            list->addItem(item);
+        }
+        if (results.isEmpty())
+            list->addItem("Ничего не найдено");
+    });
+
+    // Двойной клик = открыть
+    connect(list, &QListWidget::itemDoubleClicked, &dialog, &QDialog::accept);
+
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    auto *item = list->currentItem();
+    if (!item || item->data(Qt::UserRole).isNull()) return;
+
+    int type = item->data(Qt::UserRole).toInt();
+    int id = item->data(Qt::UserRole + 1).toInt();
+
+    switch (type) {
+    case 1:
+        openForm(new TerminalsForm(this));
+        break;
+    case 2:
+        openForm(new ClientsForm(this));
+        break;
+    case 3:
+        openForm(new SIMCardsForm(this));
+        break;
+    case 4:
+        openForm(new ModelsForm(this));
+        break;
+    case 5:
+        openForm(new ManufacturersForm(this));
+        break;
+    }
 }

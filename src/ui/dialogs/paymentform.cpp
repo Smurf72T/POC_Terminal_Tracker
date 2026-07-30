@@ -9,6 +9,9 @@
 #include <QTime>
 #include <QStandardItemModel>
 #include <QDebug>
+#include <QPrinter>
+#include <QPrintDialog>
+#include <QTextDocument>
 
 PaymentForm::PaymentForm(QWidget *parent) :
     QDialog(parent),
@@ -339,6 +342,67 @@ void PaymentForm::on_btnSave_clicked()
         QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();
+    }
+}
+
+void PaymentForm::on_btnPrint_clicked()
+{
+    int clientId = ui->comboBoxClient->currentData().toInt();
+    if (clientId == 0) {
+        QMessageBox::warning(this, "Внимание", "Сначала выберите клиента!");
+        return;
+    }
+
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare("SELECT clientname, inn FROM tblclients WHERE clientid = :id");
+    query.bindValue(":id", clientId);
+    QString clientName, clientInn;
+    if (query.exec() && query.next()) {
+        clientName = query.value(0).toString();
+        clientInn = query.value(1).toString();
+    }
+
+    QStringList monthNames = {"", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+                              "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
+    int month = ui->comboBoxMonth->currentIndex();
+    int year = ui->spinBoxYear->value();
+    double amount = ui->doubleSpinBoxAmount->value();
+
+    QString html = "<html><head><meta charset='utf-8'>"
+                   "<style>"
+                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
+                   "h2 { text-align: center; }"
+                   "</style></head><body>";
+
+    html += "<h2>КВИТАНЦИЯ ОБ ОПЛАТЕ</h2>";
+    html += "<p><b>Платёж №</b> " + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + "</p>";
+    html += "<p><b>Дата:</b> " + ui->dateEdit->date().toString("dd.MM.yyyy") + "</p>";
+    html += "<p><b>Плательщик:</b> " + clientName;
+    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn + ")";
+    html += "</p>";
+    html += "<p><b>Получатель:</b> ООО «POC Terminal»</p>";
+    html += "<p><b>Период оплаты:</b> " + monthNames.value(month) + " " + QString::number(year) + "</p>";
+    html += "<hr>";
+    html += "<p style='font-size: 16px;'><b>Сумма:</b> " + QString::number(amount, 'f', 2) + " руб.</p>";
+    html += "<p style='font-size: 13px; color: #555;'>Сумма прописью: ...</p>";
+    html += "<hr>";
+
+    QString comment = ui->textEditComment->toPlainText().trimmed();
+    if (!comment.isEmpty())
+        html += "<p><b>Комментарий:</b> " + comment + "</p>";
+
+    html += "<div style='margin-top: 50px; display: flex; justify-content: space-between;'>"
+            "<div><p>Кассир: ________________</p></div>"
+            "<div><p>Плательщик: ________________</p></div>"
+            "</div>";
+    html += "</body></html>";
+
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog printDialog(&printer, this);
+    if (printDialog.exec() == QDialog::Accepted) {
+        QTextDocument doc;
+        doc.setHtml(html);
+        doc.print(&printer);
     }
 }
 

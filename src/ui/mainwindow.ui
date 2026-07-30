@@ -325,18 +325,22 @@
     <addaction name="actionAbout"/>
    </widget>
    <widget class="QMenu" name="menuService">
-    <property name="title">
-     <string>Сервис</string>
-    </property>
-    <addaction name="actionTerminalHistory"/>
+   <property name="title">
+      <string>Сервис</string>
+     </property>
+     <addaction name="actionGlobalSearch"/>
+     <addaction name="separator"/>
+     <addaction name="actionTerminalHistory"/>
     <addaction name="actionFreeDevicesReport"/>
     <addaction name="actionBulkImport"/>
     <addaction name="actionBatchStatus"/>
     <addaction name="actionReports"/>
     <addaction name="separator"/>
     <addaction name="actionBackup"/>
-    <addaction name="actionExpiryNotifications"/>
-    <addaction name="actionAuditLog"/>
+     <addaction name="actionExpiryNotifications"/>
+     <addaction name="actionAuditLog"/>
+     <addaction name="separator"/>
+     <addaction name="actionUserManagement"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
@@ -462,6 +466,19 @@
   <action name="actionReports">
    <property name="text">
     <string>Отчёты по периодам</string>
+   </property>
+  </action>
+  <action name="actionUserManagement">
+   <property name="text">
+    <string>Управление пользователями</string>
+   </property>
+  </action>
+  <action name="actionGlobalSearch">
+   <property name="text">
+    <string>Глобальный поиск</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+K</string>
    </property>
   </action>
  </widget>

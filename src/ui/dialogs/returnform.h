@@ -22,6 +22,7 @@ private slots:
     void on_comboBoxClient_currentIndexChanged(int index);
     void on_comboBoxRentalDoc_currentIndexChanged(int index);
     void on_btnPost_clicked();
+    void on_btnPrint_clicked();
     void on_btnClose_clicked();
 
 private:

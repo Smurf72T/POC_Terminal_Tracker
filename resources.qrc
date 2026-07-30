@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>styles/modern.qss</file>
+        <file>styles/light.qss</file>
         <file>media/16x16.png</file>
         <file>media/32x32.png</file>
         <file>media/70x70.png</file>

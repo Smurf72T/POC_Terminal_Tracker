@@ -15,6 +15,7 @@ find_package(Qt6 6.11.1 REQUIRED COMPONENTS
         Widgets
         Sql
         PrintSupport
+        Charts
 )
 
 # Ищем PostgreSQL
@@ -48,6 +49,7 @@ set(SOURCES
         src/ui/dialogs/loginform.cpp
         src/ui/dialogs/expirynotificationsform.cpp
         src/ui/dialogs/batchstatusform.cpp
+        src/ui/dialogs/usermanagementform.cpp
         src/ui/dialogs/reportsform.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
@@ -75,6 +77,7 @@ set(HEADERS
         src/ui/dialogs/loginform.h
         src/ui/dialogs/expirynotificationsform.h
         src/ui/dialogs/batchstatusform.h
+        src/ui/dialogs/usermanagementform.h
         src/ui/dialogs/reportsform.h
         src/utils/reportexporter.h
         src/utils/validator.h
@@ -110,6 +113,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Widgets
         Qt6::Sql
         Qt6::PrintSupport
+        Qt6::Charts
         PostgreSQL::PostgreSQL
         QXlsx::QXlsx
 )

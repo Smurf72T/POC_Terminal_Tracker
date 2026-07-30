@@ -42,6 +42,7 @@ void ReportsForm::loadReportTypes()
     ui->comboBoxReport->addItem("Загрузка терминалов", "load");
     ui->comboBoxReport->addItem("Конвертация аренды в оплату", "conversion");
     ui->comboBoxReport->addItem("Использование SIM-карт", "sim_usage");
+    ui->comboBoxReport->addItem("Задолженность клиентов", "debt");
 }
 
 void ReportsForm::on_btnGenerate_clicked()
@@ -52,6 +53,7 @@ void ReportsForm::on_btnGenerate_clicked()
     else if (reportType == "load") generateTerminalLoad();
     else if (reportType == "conversion") generateRentalConversion();
     else if (reportType == "sim_usage") generateSIMUsage();
+    else if (reportType == "debt") generateDebtReport();
 }
 
 void ReportsForm::generateRevenueByClient()
@@ -169,6 +171,33 @@ void ReportsForm::generateSIMUsage()
     model->setQuery(std::move(query));
     ui->tableView->resizeColumnsToContents();
     generateSummary("Общая статистика использования SIM-карт");
+}
+
+void ReportsForm::generateDebtReport()
+{
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare(
+        "SELECT c.clientname AS \"Клиент\", "
+        "COUNT(DISTINCT r.rentaldocid) AS \"Договоров аренды\", "
+        "COUNT(DISTINCT CASE WHEN pl.linkid IS NULL THEN r.rentaldocid END) AS \"Не оплачено\", "
+        "MIN(CASE WHEN pl.linkid IS NULL THEN r.docdate END)::date AS \"Старейший долг\", "
+        "MAX(r.docdate)::date AS \"Последняя аренда\" "
+        "FROM tblclients c "
+        "JOIN tblrentaldocs r ON c.clientid = r.clientid "
+        "LEFT JOIN tblpayment_rental_links pl ON r.rentaldocid = pl.rentaldocid "
+        "GROUP BY c.clientid, c.clientname "
+        "HAVING COUNT(DISTINCT CASE WHEN pl.linkid IS NULL THEN r.rentaldocid END) > 0 "
+        "ORDER BY COUNT(DISTINCT CASE WHEN pl.linkid IS NULL THEN r.rentaldocid END) DESC"
+    );
+
+    if (!query.exec()) {
+        QMessageBox::critical(this, "Ошибка", query.lastError().text());
+        return;
+    }
+
+    model->setQuery(std::move(query));
+    ui->tableView->resizeColumnsToContents();
+    generateSummary("Клиенты с неоплаченными договорами аренды");
 }
 
 void ReportsForm::generateSummary(const QString &text)

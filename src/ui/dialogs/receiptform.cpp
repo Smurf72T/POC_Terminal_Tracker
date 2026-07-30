@@ -10,6 +10,9 @@
 #include <QTime>
 #include <QDebug>
 #include <QKeyEvent>
+#include <QPrinter>
+#include <QPrintDialog>
+#include <QTextDocument>
 
 ReceiptForm::ReceiptForm(QWidget *parent) :
     QDialog(parent),
@@ -343,6 +346,58 @@ void ReceiptForm::on_btnPost_clicked()
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();
+    }
+}
+
+void ReceiptForm::on_btnPrint_clicked()
+{
+    QString html = "<html><head><meta charset='utf-8'>"
+                   "<style>"
+                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
+                   "h2 { text-align: center; }"
+                   "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
+                   "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
+                   "th { background-color: #f0f0f0; }"
+                   "</style></head><body>";
+
+    html += "<h2>ПРИХОДНАЯ НАКЛАДНАЯ № " + ui->lineEditNumber->text() + "</h2>";
+    html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
+    html += "<p><b>Поставщик:</b> ООО «POC Terminal»</p>";
+
+    QString comment = ui->textEditComment->toPlainText().trimmed();
+    if (!comment.isEmpty())
+        html += "<p><b>Комментарий:</b> " + comment + "</p>";
+
+    html += "<table><tr><th>№</th><th>Серийный номер</th><th>Модель</th><th>IMEI 1</th><th>IMEI 2</th></tr>";
+
+    for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
+        QString modelIdx = rowsModel->data(rowsModel->index(i, 1)).toString();
+        int modelId = modelIdx.toInt();
+        QString modelName;
+        for (const auto &m : m_models) {
+            if (m.first == modelId) { modelName = m.second; break; }
+        }
+        QString imei1 = rowsModel->data(rowsModel->index(i, 2)).toString();
+        QString imei2 = rowsModel->data(rowsModel->index(i, 3)).toString();
+
+        html += "<tr><td>" + QString::number(i + 1) + "</td>"
+                "<td>" + serial + "</td>"
+                "<td>" + modelName + "</td>"
+                "<td>" + imei1 + "</td>"
+                "<td>" + imei2 + "</td></tr>";
+    }
+    html += "</table>";
+
+    html += "<p style='margin-top: 40px;'>Принял: ________________ / ____________</p>";
+    html += "</body></html>";
+
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog printDialog(&printer, this);
+    if (printDialog.exec() == QDialog::Accepted) {
+        QTextDocument doc;
+        doc.setHtml(html);
+        doc.print(&printer);
     }
 }
 

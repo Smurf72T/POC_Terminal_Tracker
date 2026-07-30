@@ -7,6 +7,9 @@
 #include <QDateTime>
 #include <QTime>
 #include <QDebug>
+#include <QPrinter>
+#include <QPrintDialog>
+#include <QTextDocument>
 
 ReturnForm::ReturnForm(QWidget *parent) :
     QDialog(parent),
@@ -398,6 +401,79 @@ void ReturnForm::on_btnPost_clicked()
         QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();
+    }
+}
+
+void ReturnForm::on_btnPrint_clicked()
+{
+    int clientId = ui->comboBoxClient->currentData().toInt();
+    if (clientId == 0) {
+        QMessageBox::warning(this, "Внимание", "Сначала выберите клиента!");
+        return;
+    }
+
+    QString html = "<html><head><meta charset='utf-8'>"
+                   "<style>"
+                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
+                   "h2 { text-align: center; }"
+                   "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
+                   "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
+                   "th { background-color: #f0f0f0; }"
+                   "</style></head><body>";
+
+    html += "<h2>АКТ ВОЗВРАТА ТЕРМИНАЛОВ № " + ui->lineEditNumber->text() + "</h2>";
+    html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
+    html += "<p><b>Арендодатель:</b> ООО «POC Terminal»</p>";
+
+    QSqlQuery clientQuery(DatabaseManager::instance().getDatabase());
+    clientQuery.prepare("SELECT clientname, inn FROM tblclients WHERE clientid = :id");
+    clientQuery.bindValue(":id", clientId);
+    QString clientName, clientInn;
+    if (clientQuery.exec() && clientQuery.next()) {
+        clientName = clientQuery.value(0).toString();
+        clientInn = clientQuery.value(1).toString();
+    }
+    html += "<p><b>Арендатор:</b> " + clientName;
+    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn + ")";
+    html += "</p>";
+
+    html += "<table><tr><th>№</th><th>Серийный номер</th><th>Модель</th><th>IMEI 1</th></tr>";
+
+    for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        auto *item = rowsModel->item(i, 0);
+        if (!item || item->data(Qt::UserRole).toInt() == 0) continue;
+        int termId = item->data(Qt::UserRole).toInt();
+        QString serial = item->text();
+
+        QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
+        termQuery.prepare("SELECT imei1, COALESCE(m.modelname, '—') FROM tblterminals t "
+                          "LEFT JOIN tblmodels m ON t.modelid = m.modelid WHERE t.terminalid = :id");
+        termQuery.bindValue(":id", termId);
+        QString imei, modelName;
+        if (termQuery.exec() && termQuery.next()) {
+            imei = termQuery.value(0).toString();
+            modelName = termQuery.value(1).toString();
+        }
+
+        html += "<tr><td>" + QString::number(i + 1) + "</td>"
+                "<td>" + serial + "</td>"
+                "<td>" + modelName + "</td>"
+                "<td>" + imei + "</td></tr>";
+    }
+    html += "</table>";
+
+    html += "<div style='margin-top: 40px; display: flex; justify-content: space-between;'>"
+            "<div><p>Сдал (Арендатор):</p><p>________________ / ____________</p></div>"
+            "<div><p>Принял (Арендодатель):</p><p>________________ / ____________</p></div>"
+            "</div>";
+    html += "</body></html>";
+
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog printDialog(&printer, this);
+    if (printDialog.exec() == QDialog::Accepted) {
+        QTextDocument doc;
+        doc.setHtml(html);
+        doc.print(&printer);
     }
 }
 

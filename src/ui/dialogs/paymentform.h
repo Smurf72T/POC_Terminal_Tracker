@@ -19,6 +19,7 @@ public:
 
 private slots:
     void on_btnSave_clicked();
+    void on_btnPrint_clicked();
     void on_btnClose_clicked();
     void on_comboBoxClient_currentIndexChanged(int index); // <-- Добавлено
 

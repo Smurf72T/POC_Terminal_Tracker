@@ -30,6 +30,7 @@ private:
     void generateTerminalLoad();
     void generateRentalConversion();
     void generateSIMUsage();
+    void generateDebtReport();
     void generateSummary(const QString &text);
 };
 

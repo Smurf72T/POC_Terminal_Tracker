@@ -9,6 +9,12 @@
 #include <QDialog>
 #include <QGroupBox>
 #include <QMessageBox>
+#include <QtCharts/QChartView>
+#include <QtCharts/QPieSeries>
+#include <QtCharts/QBarSeries>
+#include <QtCharts/QBarSet>
+#include <QtCharts/QBarCategoryAxis>
+#include <QtCharts/QValueAxis>
 
 namespace Ui {
     class MainWindow;
@@ -46,6 +52,7 @@ private slots:
     void onActionAuditLog_triggered();
     void onActionBatchStatus_triggered();
     void onActionReports_triggered();
+    void onActionUserManagement_triggered();
     void onDatabaseDataChanged();
     void onRecentDocDoubleClicked(const QModelIndex &index);
     void onTopClientDoubleClicked(const QModelIndex &index);
@@ -55,8 +62,13 @@ private:
     QSqlQueryModel *topClientsModel;
     QSqlQueryModel *recentDocsModel;
     QTimer *refreshTimer;
+    bool m_darkTheme = true;
+    QChartView *chartStatusView = nullptr;
+    QChartView *chartRevenueView = nullptr;
 
     void setupUI();
+    void setupCharts();
+    void updateCharts();
     void updateStatusBar();
     void loadCounters();
     void loadTopClients();
@@ -69,6 +81,7 @@ private:
     void performBackup();
     void performFallbackBackup(const QString &filePath, const QString &dbname, const QString &password);
     void showExpiryNotifications();
+    void showGlobalSearch();
 };
 
 #endif // MAINWINDOW_H
