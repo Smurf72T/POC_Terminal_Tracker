@@ -79,7 +79,7 @@ private:
     void openClientRentalReport(int clientId, const QString &clientName);
     void openBulkImport();
     void performBackup();
-    void performFallbackBackup(const QString &filePath, const QString &dbname, const QString &password);
+    void performFallbackBackup(const QString &filePath, const QString &dbname);
     void showExpiryNotifications();
     void showGlobalSearch();
 };

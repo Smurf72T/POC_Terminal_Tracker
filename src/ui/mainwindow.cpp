@@ -884,19 +884,7 @@ void MainWindow::performBackup()
         "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
     if (!passwordOk) return;
 
-    // Создаём временный .pgpass для безопасной аутентификации
-    QTemporaryFile pgpassFile(QDir::tempPath() + "/pgpass_XXXXXX");
-    pgpassFile.setAutoRemove(true);
-    if (!pgpassFile.open()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось создать временный файл для аутентификации.");
-        return;
-    }
-    QString pgpassPath = pgpassFile.fileName();
-    pgpassFile.write(QString("localhost:%1:%2:%3:%4")
-                     .arg(port, dbname, user, password).toUtf8());
-    pgpassFile.close();
-
-    // Формируем команду pg_dump
+    // Формируем команду pg_dump (пароль передаём через PGPASSWORD, без файлов на диске)
     QStringList args;
     args << "--format=plain"
          << "--encoding=UTF8"
@@ -909,7 +897,7 @@ void MainWindow::performBackup()
 
     QProcess process;
     auto env = process.environment();
-    env.append(QString("PGPASSFILE=%1").arg(pgpassPath));
+    env.append(QString("PGPASSWORD=%1").arg(password));
     process.setEnvironment(env);
     process.start("pg_dump", args);
 
@@ -921,7 +909,7 @@ void MainWindow::performBackup()
             "Резервная копия будет создана через SQL-запросы.");
 
         // Фоллбэк: экспорт всех данных через SQL
-        performFallbackBackup(filePath, dbname, password);
+        performFallbackBackup(filePath, dbname);
     } else {
         QString output = process.readAllStandardOutput();
         QString error = process.readAllStandardError();
@@ -939,7 +927,7 @@ void MainWindow::performBackup()
     }
 }
 
-void MainWindow::performFallbackBackup(const QString &filePath, const QString &dbname, const QString &/*password*/)
+void MainWindow::performFallbackBackup(const QString &filePath, const QString &dbname)
 {
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
