@@ -337,6 +337,7 @@
     <addaction name="actionReports"/>
     <addaction name="separator"/>
     <addaction name="actionBackup"/>
+    <addaction name="actionRestore"/>
      <addaction name="actionExpiryNotifications"/>
      <addaction name="actionAuditLog"/>
      <addaction name="separator"/>
@@ -444,10 +445,15 @@
    </property>
   </action>
   <action name="actionBackup">
-   <property name="text">
-    <string>Резервное копирование БД</string>
-   </property>
-  </action>
+    <property name="text">
+     <string>Резервное копирование БД</string>
+    </property>
+   </action>
+  <action name="actionRestore">
+    <property name="text">
+     <string>Восстановление БД из резервной копии</string>
+    </property>
+   </action>
   <action name="actionExpiryNotifications">
    <property name="text">
     <string>Уведомления о просрочке</string>

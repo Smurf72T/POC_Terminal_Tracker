@@ -48,6 +48,7 @@ private slots:
     void onActionFreeDevicesReport_triggered();
     void onActionBulkImport_triggered();
     void onActionBackup_triggered();
+    void onActionRestore_triggered();
     void onActionExpiryNotifications_triggered();
     void onActionAuditLog_triggered();
     void onActionBatchStatus_triggered();
@@ -80,6 +81,8 @@ private:
     void openBulkImport();
     void performBackup();
     void performFallbackBackup(const QString &filePath, const QString &dbname);
+    void performRestore();
+    bool performFallbackRestore(const QString &filePath);
     void showExpiryNotifications();
     void showGlobalSearch();
 };

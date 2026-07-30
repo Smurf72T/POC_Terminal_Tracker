@@ -176,6 +176,7 @@ void MainWindow::setupUI()
     connect(ui->actionFreeDevicesReport, &QAction::triggered, this, &MainWindow::onActionFreeDevicesReport_triggered);
     connect(ui->actionBulkImport, &QAction::triggered, this, &MainWindow::onActionBulkImport_triggered);
     connect(ui->actionBackup, &QAction::triggered, this, &MainWindow::onActionBackup_triggered);
+    connect(ui->actionRestore, &QAction::triggered, this, &MainWindow::onActionRestore_triggered);
     connect(ui->actionExpiryNotifications, &QAction::triggered, this, &MainWindow::onActionExpiryNotifications_triggered);
     connect(ui->actionAuditLog, &QAction::triggered, this, &MainWindow::onActionAuditLog_triggered);
     connect(ui->actionBatchStatus, &QAction::triggered, this, &MainWindow::onActionBatchStatus_triggered);
@@ -188,6 +189,7 @@ void MainWindow::setupUI()
         ui->actionUserManagement->setVisible(false);
         ui->actionAuditLog->setVisible(false);
         ui->actionBackup->setVisible(false);
+        ui->actionRestore->setVisible(false);
     }
 }
 
@@ -1019,6 +1021,94 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
         QString("Резервная копия создана (SQL-метод):\n%1\nРазмер: %2 KB")
         .arg(filePath)
         .arg(QFileInfo(filePath).size() / 1024));
+}
+
+void MainWindow::onActionRestore_triggered()
+{
+    if (!DatabaseManager::instance().isCurrentUserAdmin()) {
+        QMessageBox::warning(this, "Доступ запрещён",
+            "Только администратор может восстанавливать базу данных.");
+        return;
+    }
+    performRestore();
+}
+
+void MainWindow::performRestore()
+{
+    QString filePath = QFileDialog::getOpenFileName(this,
+        "Выберите файл резервной копии",
+        QString(),
+        "SQL файлы (*.sql);;Все файлы (*)");
+
+    if (filePath.isEmpty()) return;
+
+    QMessageBox::StandardButton reply = QMessageBox::warning(this, "Подтверждение",
+        "Восстановление БД полностью заменит текущие данные!\n\n"
+        "Файл: " + filePath + "\n\n"
+        "Рекомендуется сначала сделать резервную копию текущего состояния.\n\n"
+        "Продолжить?", QMessageBox::Yes | QMessageBox::No);
+
+    if (reply != QMessageBox::Yes) return;
+
+    // Пытаемся через psql
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    if (!query.exec("SELECT current_setting('port'), current_database(), current_user") || !query.next()) {
+        qCWarning(logSQL) << "Failed to get database settings:" << query.lastError().text();
+        return;
+    }
+
+    QString port = query.value(0).toString();
+    QString dbname = query.value(1).toString();
+    QString user = query.value(2).toString();
+
+    bool passwordOk;
+    QString password = QInputDialog::getText(this, "Пароль PostgreSQL",
+        "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
+    if (!passwordOk) return;
+
+    QStringList args;
+    args << "--host=localhost"
+         << QString("--port=%1").arg(port)
+         << QString("--username=%1").arg(user)
+         << QString("--dbname=%1").arg(dbname)
+         << QString("--file=%1").arg(filePath);
+
+    QProcess process;
+    auto env = process.environment();
+    env.append(QString("PGPASSWORD=%1").arg(password));
+    process.setEnvironment(env);
+    process.start("psql", args);
+
+    if (!process.waitForFinished(120000)) {
+        QMessageBox::warning(this, "Ошибка восстановления",
+            "psql не завершился за 120 секунд.\n\n"
+            "Попробуйте восстановить вручную:\n"
+            "psql -U " + user + " -d " + dbname + " -f \"" + filePath + "\"");
+        return;
+    }
+
+    QString error = process.readAllStandardError();
+    int exitCode = process.exitCode();
+
+    if (exitCode != 0) {
+        // psql выдаёт NOTICE/WARNING даже при успехе — не пугаем пользователя
+        if (error.contains("ERROR", Qt::CaseInsensitive)) {
+            QMessageBox::critical(this, "Ошибка восстановления",
+                "psql завершился с ошибками (код " + QString::number(exitCode) + "):\n"
+                + error.left(2000));
+            return;
+        }
+    }
+
+    // Обновляем данные на дашборде
+    loadCounters();
+    loadTopClients();
+    loadRecentDocuments();
+    updateCharts();
+
+    QMessageBox::information(this, "Успех",
+        "База данных восстановлена из резервной копии.\n"
+        "Файл: " + QFileInfo(filePath).fileName());
 }
 
 void MainWindow::showExpiryNotifications()
