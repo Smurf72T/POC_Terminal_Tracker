@@ -244,6 +244,11 @@ void MainWindow::updateCharts()
     auto *barChart = qobject_cast<QChart*>(chartRevenueView->chart());
     if (barChart) {
         barChart->removeAllSeries();
+        // Удаляем старые оси, чтобы не накапливались при каждом обновлении
+        const auto oldAxes = barChart->axes();
+        for (auto *axis : oldAxes)
+            barChart->removeAxis(axis);
+
         auto *barSet = new QBarSet("Оплаты");
         barSet->setColor("#1976D2");
         QStringList categories;
