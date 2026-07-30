@@ -1,12 +1,15 @@
 #include "databasemanager.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QDirIterator>
 #include <QFileInfo>
 #include <QFile>
 #include <QJsonDocument>
 #include <QMap>
 #include <QMessageBox>
+#include <QSqlDriver>
 #include <QSqlError>
+#include <QTextStream>
 
 static QMap<QString, QString> loadEnvFile(const QString &filePath)
 {
@@ -79,6 +82,12 @@ bool DatabaseManager::initialize(const QString& configPath)
             showError("Ошибка подключения к базе данных: " + m_database.lastError().text());
             return false;
         }
+    }
+
+    if (!runMigrations()) {
+        showError("Не удалось применить миграции базы данных: " + m_database.lastError().text());
+        close();
+        return false;
     }
 
     m_initialized = true;
@@ -227,4 +236,119 @@ QString DatabaseManager::getCurrentUserRole() const
 bool DatabaseManager::isCurrentUserAdmin() const
 {
     return m_currentUserRole == "admin";
+}
+
+bool DatabaseManager::ensureMigrationsTable()
+{
+    QSqlQuery q(m_database);
+    return q.exec(
+        "CREATE TABLE IF NOT EXISTS schema_migrations ("
+        "  version VARCHAR(255) PRIMARY KEY,"
+        "  applied_at TIMESTAMP DEFAULT NOW()"
+        ")"
+    );
+}
+
+QStringList DatabaseManager::pendingMigrations()
+{
+    QStringList pending;
+    if (!ensureMigrationsTable()) {
+        qDebug() << "[Migration] Не удалось создать schema_migrations:" << m_database.lastError().text();
+        return pending;
+    }
+
+    QSet<QString> applied;
+    QSqlQuery q(m_database);
+    if (q.exec("SELECT version FROM schema_migrations ORDER BY version")) {
+        while (q.next()) {
+            applied.insert(q.value(0).toString());
+        }
+    }
+
+    QString migrationsDir;
+    QStringList candidates = {
+        QCoreApplication::applicationDirPath() + "/sql/migrations/",
+        QCoreApplication::applicationDirPath() + "/../sql/migrations/",
+        QCoreApplication::applicationDirPath() + "/../../sql/migrations/"
+    };
+    for (const QString &c : candidates) {
+        QDir d(c);
+        if (d.exists()) { migrationsDir = d.absolutePath(); break; }
+    }
+    if (migrationsDir.isEmpty()) {
+        qDebug() << "[Migration] Директория миграций не найдена";
+        return pending;
+    }
+
+    QDirIterator it(migrationsDir, QStringList() << "*.sql", QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        it.next();
+        QString fileName = it.fileName();
+        if (!applied.contains(it.fileName())) {
+            pending.append(it.filePath());
+        }
+    }
+    pending.sort();
+    return pending;
+}
+
+bool DatabaseManager::runMigrations(const QString &migrationsDir)
+{
+    Q_UNUSED(migrationsDir);
+    QStringList pending = pendingMigrations();
+    if (pending.isEmpty()) {
+        return true;
+    }
+
+    qDebug() << "[Migration] Найдено ожидающих миграций:" << pending.size();
+
+    for (const QString &filePath : pending) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            qDebug() << "[Migration] Не удалось открыть:" << filePath;
+            return false;
+        }
+        QTextStream in(&file);
+        QString sql = in.readAll();
+        file.close();
+
+        QFileInfo fi(filePath);
+        QString version = fi.fileName();
+
+        if (!m_database.transaction()) {
+            qDebug() << "[Migration] Не удалось начать транзакцию:" << m_database.lastError().text();
+            return false;
+        }
+
+        QSqlQuery q(m_database);
+        if (!q.exec(sql)) {
+            qDebug() << "[Migration] Ошибка в" << version << ":" << q.lastError().text();
+            m_database.rollback();
+            return false;
+        }
+
+        // executing the multi-statement file may already have committed the transaction.
+        // Use savepoints for proper rollback if needed — but for simple cases, assume
+        // the migration either begins/commits its own or we commit here.
+        if (m_database.driver()->hasFeature(QSqlDriver::Transactions)) {
+            if (!m_database.commit()) {
+                qDebug() << "[Migration] Не удалось закоммитить:" << m_database.lastError().text();
+                m_database.rollback();
+                return false;
+            }
+        }
+
+        // Record this migration
+        QSqlQuery rec(m_database);
+        rec.prepare("INSERT INTO schema_migrations (version) VALUES (:v)");
+        rec.bindValue(":v", version);
+        if (!rec.exec()) {
+            qDebug() << "[Migration] Не удалось записать версию:" << rec.lastError().text();
+            return false;
+        }
+
+        qDebug() << "[Migration] Применена:" << version;
+    }
+
+    return true;
 }

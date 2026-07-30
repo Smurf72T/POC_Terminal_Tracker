@@ -132,6 +132,9 @@ configure_file(
         COPYONLY
 )
 
+# Копируем SQL-миграции в папку сборки
+file(COPY ${CMAKE_SOURCE_DIR}/sql/migrations/ DESTINATION ${CMAKE_BINARY_DIR}/sql/migrations/)
+
 # Добавляем include директории
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/src

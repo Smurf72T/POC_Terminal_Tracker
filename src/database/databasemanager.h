@@ -4,8 +4,10 @@
 #include <QObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QString>
 #include <QJsonObject>
+#include <QStringList>
 
 class DatabaseManager : public QObject
 {
@@ -17,6 +19,10 @@ public:
     bool initialize(const QString& configPath = "config/config.json");
     bool isConnected() const;
     void close();
+
+    // Миграции БД
+    bool runMigrations(const QString &migrationsDir = "sql/migrations/");
+    QStringList pendingMigrations();
 
     QSqlDatabase& getDatabase();
     QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true);
@@ -44,6 +50,7 @@ private:
 
     bool loadConfig(const QString& configPath);
     void showError(const QString& message);
+    bool ensureMigrationsTable();
 
     QSqlDatabase m_database;
     QJsonObject m_config;
