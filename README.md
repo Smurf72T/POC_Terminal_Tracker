@@ -16,7 +16,8 @@
 - **Журнал аудита:** Фильтры по дате/действию/таблице, экспорт в Excel
 - **Массовое обновление статусов:** Множественный выбор терминалов для смены статуса (свободен/в аренде/в ремонте/списан/утерян)
 - **Отчёты по периодам:** Выручка по клиентам, загрузка терминалов, конвертация аренды, использование SIM-карт, задолженность клиентов
-- **Вход/регистрация:** Аутентификация пользователей (SHA-256), роли admin/user
+- **Вход/регистрация:** Аутентификация (PBKDF2-HMAC-SHA256, 100k итераций), rate limiting (5 попыток → 30 сек блокировка), принудительная смена пароля при первом входе
+- **Ролевая модель:** admin (полный доступ), user (ограниченное меню, без аудита/бекапа/управления пользователями)
 - **Управление пользователями:** Смена ролей, деактивация, сброс пароля (Сервис → Управление пользователями)
 - **Печать документов:** Квитанция поступления, акт возврата, квитанция об оплате (HTML → QPrinter)
 - **Глобальный поиск:** Ctrl+K, поиск по всем справочникам (ILIKE), открытие найденной формы
@@ -24,24 +25,27 @@
 
 ## Требования
 
-- Qt 6.11.1+ (с модулем Charts)
-- PostgreSQL 17+
+- Qt 6.2+ (с модулем Charts)
+- PostgreSQL 14+
 - CMake 3.20+
-- MinGW (сборка через CLion)
+- MinGW (сборка через CLion) или любой C++17 компилятор
 
 ## Сборка
 
 ```bash
 mkdir build && cd build
-cmake .. -G Ninja
+cmake .. -G Ninja -DBUILD_TESTS=ON
 cmake --build .
+
+# Запуск тестов
+ctest --output-on-failure
 ```
 
 ## Конфигурация
 
 ### Пароль базы данных
 
-Пароль хранится в `.env` в корне проекта (не коммитится в репозиторий):
+Пароль передаётся через переменную окружения или `.env` в корне проекта (не коммитится):
 
 ```env
 POC_DB_HOST=localhost
@@ -56,23 +60,42 @@ POC_DB_PASSWORD=postgres
 ### Начальная настройка БД
 
 1. Создайте базу данных `pocbase`
-2. Выполните миграции из `sql/`:
-   ```bash
-   psql -U postgres -d pocbase -f sql/audit_log.sql
-   psql -U postgres -d pocbase -f sql/add_indexes.sql
-   ```
+2. Запустите приложение — миграции применятся автоматически из `sql/migrations/`
 3. Дефолтный пользователь: `admin` / `admin123`
+
+Если авто-миграции не сработали (нет прав на создание таблиц), выполните вручную:
+
+```bash
+psql -U postgres -d pocbase -f sql/migrations/001_initial.sql
+```
+
+## Логирование
+
+Приложение использует `QLoggingCategory`. Для включения отладки установите переменную окружения:
+
+```env
+QT_LOGGING_RULES="app.sql=true;app.migration=true"
+```
+
+Категории:
+| Категория    | Назначение                          |
+|-------------|-------------------------------------|
+| `app.database` | Ошибки подключения/запросов к БД |
+| `app.audit`    | Сбои логирования аудита           |
+| `app.migration`| Ход выполнения миграций БД        |
+| `app.sql`      | Ошибки SQL-запросов в UI-формах   |
+| `app.general`  | Общие ошибки приложения           |
 
 ## Структура проекта
 
 ```
 src/
   main.cpp                    — Точка входа, показ формы входа
-  database/databasemanager.*  — Подключение к БД, выполнение запросов, .env
+  database/databasemanager.*  — Подключение к БД, миграции, аудит, .env
   ui/
     mainwindow.*              — Главное окно, дашборд
     dialogs/
-      loginform.*             — Вход/регистрация
+      loginform.*             — Вход/регистрация с rate limiting
       terminalsform.*         — Справочник терминалов
       clientsform.*           — Справочник клиентов
       manufacturersform.*     — Справочник производителей
@@ -91,16 +114,23 @@ src/
       usermanagementform.*    — Управление пользователями
       reportsform.*           — Отчёты по периодам
   utils/
+    password_utils.h          — PBKDF2-HMAC-SHA256 (100k итераций), обратная совместимость
     validator.*               — Валидация ИНН, IMEI (Luhn), данных
     reportexporter.*          — Экспорт в Excel (QXlsx) и PDF
+    logging.h                 — QLoggingCategory: app.database, app.audit, app.migration, app.sql, app.general
 styles/
-  light.qss                   — Светлая тема
+  modern.qss / light.qss      — Тёмная/светлая тема
 sql/
-  audit_log.sql               — Таблицы аудита, триггеры, tbl_users
+  migrations/001_initial.sql  — Миграции БД (применяются автоматически)
+  add_indexes.sql             — Индексы и ограничения
 libs/
   QXlsx/                      — Git submodule (QtExcel/QXlsx)
 config/
-  config.json                 — Настройки БД (пароль пустой, см. .env)
+  config.json                 — Настройки БД (пароль через .env)
+tests/
+  test_password_utils.cpp     — Unit-тесты PBKDF2, обратная совместимость
+  test_validator.cpp          — Unit-тесты IMEI, INN, Luhn, серийных номеров
+  stub_databasemanager.cpp    — Стаб DatabaseManager для тестов
 ```
 
 ## Архитектура открытия форм
