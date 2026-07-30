@@ -1,0 +1,99 @@
+#ifndef PASSWORD_UTILS_H
+#define PASSWORD_UTILS_H
+
+#include <QString>
+#include <QByteArray>
+#include <QCryptographicHash>
+#include <QMessageAuthenticationCode>
+#include <QDataStream>
+#include <QIODevice>
+#include <QRandomGenerator>
+#include <QDateTime>
+
+constexpr int PBKDF2_ITERATIONS = 100000;
+constexpr int SALT_BYTES = 16;
+constexpr int KEY_BYTES = 32;
+
+inline QByteArray pbkdf2HmacSha256(const QByteArray &password, const QByteArray &salt,
+                                     int iterations, int dkLen = KEY_BYTES)
+{
+    const int hLen = 32;
+    const int blocks = (dkLen + hLen - 1) / hLen;
+    QByteArray derivedKey;
+    derivedKey.reserve(blocks * hLen);
+
+    for (int block = 1; block <= blocks; ++block) {
+        QByteArray u;
+        {
+            QMessageAuthenticationCode mac(QCryptographicHash::Sha256);
+            mac.setKey(password);
+            mac.addData(salt);
+            QByteArray blockBytes;
+            QDataStream stream(&blockBytes, QIODevice::WriteOnly);
+            stream.setByteOrder(QDataStream::BigEndian);
+            stream << quint32(block);
+            mac.addData(blockBytes);
+            u = mac.result();
+        }
+        QByteArray t = u;
+        for (int j = 2; j <= iterations; ++j) {
+            QMessageAuthenticationCode mac(QCryptographicHash::Sha256);
+            mac.setKey(password);
+            mac.addData(u);
+            u = mac.result();
+            for (int k = 0; k < u.size(); ++k)
+                t[k] = t[k] ^ u[k];
+        }
+        derivedKey.append(t);
+    }
+    return derivedKey.left(dkLen);
+}
+
+inline QString generateSalt()
+{
+    QByteArray salt;
+    salt.resize(SALT_BYTES);
+    for (int i = 0; i < SALT_BYTES; ++i)
+        salt[i] = static_cast<char>(QRandomGenerator::global()->bounded(256));
+    return QString::fromLatin1(salt.toHex());
+}
+
+inline QString hashPassword(const QString &password, const QString &salt)
+{
+    QByteArray dk = pbkdf2HmacSha256(password.toUtf8(), QByteArray::fromHex(salt.toLatin1()),
+                                       PBKDF2_ITERATIONS, KEY_BYTES);
+    return QString::number(PBKDF2_ITERATIONS) + ':' + salt + ':' + QString::fromLatin1(dk.toHex());
+}
+
+inline QString hashPassword(const QString &password)
+{
+    return hashPassword(password, generateSalt());
+}
+
+inline bool checkPassword(const QString &password, const QString &storedHash)
+{
+    if (storedHash.count(':') == 2) {
+        QStringList parts = storedHash.split(':');
+        bool ok;
+        int iterations = parts[0].toInt(&ok);
+        if (!ok) return false;
+        QString salt = parts[1];
+        QString expected = parts[2];
+        QString actual = hashPassword(password, salt);
+        return actual == storedHash;
+    }
+    if (storedHash.length() == 80) {
+        QString salt = storedHash.left(16);
+        QString hash = QString(QCryptographicHash::hash(
+            (salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
+        return hash == storedHash.mid(16);
+    }
+    if (storedHash.length() == 64) {
+        QString hash = QString(QCryptographicHash::hash(
+            password.toUtf8(), QCryptographicHash::Sha256).toHex());
+        return hash == storedHash;
+    }
+    return false;
+}
+
+#endif

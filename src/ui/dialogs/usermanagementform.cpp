@@ -1,5 +1,6 @@
 #include "usermanagementform.h"
 #include "database/databasemanager.h"
+#include "utils/password_utils.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -8,8 +9,6 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QLabel>
-#include <QCryptographicHash>
-#include <QRandomGenerator>
 
 UserManagementForm::UserManagementForm(QWidget *parent)
     : QDialog(parent)
@@ -166,12 +165,7 @@ void UserManagementForm::onResetPassword(int userId, const QString &username)
         return;
     }
 
-    QString salt;
-    for (int i = 0; i < 16; i++)
-        salt += QString::number(QRandomGenerator::global()->bounded(16), 16);
-    QString hash = QCryptographicHash::hash(
-        (salt + newPass).toUtf8(), QCryptographicHash::Sha256).toHex();
-    QString saltedHash = salt + hash;
+    QString saltedHash = hashPassword(newPass);
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("UPDATE tbl_users SET password_hash = :hash WHERE user_id = :id");

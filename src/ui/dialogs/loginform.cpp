@@ -1,9 +1,9 @@
 #include "loginform.h"
 #include "ui_loginform.h"
 #include "database/databasemanager.h"
+#include "utils/password_utils.h"
 #include <QMessageBox>
 #include <QSqlQuery>
-#include <QCryptographicHash>
 #include <QInputDialog>
 #include <QDateTime>
 #include <QRegularExpression>
@@ -66,24 +66,19 @@ void LoginForm::on_btnLogin_clicked()
 
     if (query.exec() && query.next()) {
         QString storedHash = query.value(4).toString();
-        bool passwordOk = false;
-
-        if (storedHash.length() == 80) {
-            // Новый формат: 16 символов соль + 64 символа SHA-256
-            QString salt = storedHash.left(16);
-            QString hash = QString(QCryptographicHash::hash(
-                (salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
-            passwordOk = (hash == storedHash.mid(16));
-        } else if (storedHash.length() == 64) {
-            // Старый формат: plain SHA-256 (для совместимости с существующими БД)
-            QString hash = QString(QCryptographicHash::hash(
-                password.toUtf8(), QCryptographicHash::Sha256).toHex());
-            passwordOk = (hash == storedHash);
-        }
-
-        if (!passwordOk) {
+        if (!checkPassword(password, storedHash)) {
             ui->labelError->setText("Неверный пароль!");
             return;
+        }
+
+        // Upgrade устаревшего хеша до PBKDF2 при успешном входе
+        if (storedHash.count(':') != 2) {
+            QString newHash = hashPassword(password);
+            QSqlQuery update(DatabaseManager::instance().getDatabase());
+            update.prepare("UPDATE tbl_users SET password_hash = :hash WHERE user_id = :id");
+            update.bindValue(":hash", newHash);
+            update.bindValue(":id", query.value(0).toInt());
+            update.exec();
         }
 
         m_userId = query.value(0).toInt();
@@ -133,12 +128,7 @@ void LoginForm::on_btnRegister_clicked()
         return;
     }
 
-    QString salt = QString(QCryptographicHash::hash(
-        (username + QByteArray::number(QDateTime::currentMSecsSinceEpoch())).toUtf8(),
-        QCryptographicHash::Sha256).toHex().left(16));
-    QString hash = QString(QCryptographicHash::hash(
-        (salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
-    QString storedHash = salt + hash;
+    QString storedHash = hashPassword(password);
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("INSERT INTO tbl_users (username, display_name, password_hash, role, is_active) "
