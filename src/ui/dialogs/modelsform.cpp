@@ -9,6 +9,8 @@
 #include <QLineEdit>
 #include <QDateTime>
 #include <QDebug>
+#include <QSqlField>
+#include <QSqlDriver>
 #include "terminalsform.h"
 
 ModelsForm::ModelsForm(QWidget *parent) :
@@ -68,11 +70,15 @@ ModelsForm::ModelsForm(QWidget *parent) :
         } else {
             QString escaped = searchText;
             escaped.replace("\\", "\\\\");
-            escaped.replace("'", "''");
             escaped.replace("%", "\\%");
             escaped.replace("_", "\\_");
-            QString filter = QString("modelname LIKE '%%1%%' ESCAPE '\\' OR manufacturername LIKE '%%1%%' ESCAPE '\\'")
-                                .arg(escaped);
+
+            QSqlField f("", QMetaType::fromType<QString>());
+            f.setValue("%" + escaped + "%");
+            QString likeVal = DatabaseManager::instance().getDatabase().driver()->formatValue(f);
+
+            QString filter = QString("modelname LIKE %1 ESCAPE '\\' OR manufacturername LIKE %1 ESCAPE '\\'")
+                                .arg(likeVal);
             model->setFilter(filter);
         }
         model->select();

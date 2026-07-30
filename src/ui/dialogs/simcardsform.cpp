@@ -10,6 +10,8 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QCloseEvent>
+#include <QSqlField>
+#include <QSqlDriver>
 #include <QStyledItemDelegate>
 
 // Делегат для отображения статуса SIM-карты текстом вместо цифр
@@ -105,11 +107,15 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         } else {
             QString escaped = searchText;
             escaped.replace("\\", "\\\\");
-            escaped.replace("'", "''");
             escaped.replace("%", "\\%");
             escaped.replace("_", "\\_");
-            QString filter = QString("simnumber LIKE '%%1%%' ESCAPE '\\'")
-                                .arg(escaped);
+
+            QSqlField f("", QMetaType::fromType<QString>());
+            f.setValue("%" + escaped + "%");
+            QString likeVal = DatabaseManager::instance().getDatabase().driver()->formatValue(f);
+
+            QString filter = QString("simnumber LIKE %1 ESCAPE '\\'")
+                                .arg(likeVal);
             model->setFilter(filter);
         }
         model->select();

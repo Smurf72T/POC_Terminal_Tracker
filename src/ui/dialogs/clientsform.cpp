@@ -9,6 +9,8 @@
 #include <QLineEdit>
 #include <QDateTime>
 #include <QDebug>
+#include <QSqlField>
+#include <QSqlDriver>
 
 ClientsForm::ClientsForm(QWidget *parent) :
     QDialog(parent),
@@ -78,11 +80,15 @@ ClientsForm::ClientsForm(QWidget *parent) :
         } else {
             QString escaped = searchText;
             escaped.replace("\\", "\\\\");
-            escaped.replace("'", "''");
             escaped.replace("%", "\\%");
             escaped.replace("_", "\\_");
-            QString filter = QString("clientname LIKE '%%1%%' ESCAPE '\\' OR inn LIKE '%%1%%' ESCAPE '\\'")
-                                .arg(escaped);
+
+            QSqlField f("", QMetaType::fromType<QString>());
+            f.setValue("%" + escaped + "%");
+            QString likeVal = DatabaseManager::instance().getDatabase().driver()->formatValue(f);
+
+            QString filter = QString("clientname LIKE %1 ESCAPE '\\' OR inn LIKE %1 ESCAPE '\\'")
+                                .arg(likeVal);
             model->setFilter(filter);
         }
         model->select();
