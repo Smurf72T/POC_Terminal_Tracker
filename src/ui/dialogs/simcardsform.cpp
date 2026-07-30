@@ -10,6 +10,28 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QCloseEvent>
+#include <QStyledItemDelegate>
+
+// Делегат для отображения статуса SIM-карты текстом вместо цифр
+class SimStatusDelegate : public QStyledItemDelegate
+{
+public:
+    explicit SimStatusDelegate(QObject *parent = nullptr)
+        : QStyledItemDelegate(parent) {}
+
+    QString displayText(const QVariant &value, const QLocale &) const override
+    {
+        bool ok;
+        int status = value.toInt(&ok);
+        if (ok) {
+            switch (status) {
+                case 0: return QString::fromUtf8("Свободна");
+                case 1: return QString::fromUtf8("Установлена");
+            }
+        }
+        return value.toString();
+    }
+};
 
 
 SIMCardsForm::SIMCardsForm(QWidget *parent) :
@@ -66,8 +88,8 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
         ui->tableView->setColumnWidth(3, 200);
     }
 
-    // Делаем колонку статуса только для чтения (отображаем число как текст)
-    ui->tableView->setItemDelegateForColumn(2, new ReadOnlyDelegate(ui->tableView));
+    // Делаем колонку статуса только для чтения с текстовым отображением
+    ui->tableView->setItemDelegateForColumn(2, new SimStatusDelegate(ui->tableView));
 
     // F9 для дублирования строки
     ui->tableView->installEventFilter(this);
