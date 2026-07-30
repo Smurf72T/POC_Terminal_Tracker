@@ -42,7 +42,10 @@ ReturnForm::~ReturnForm()
 void ReturnForm::loadClientsToComboBox()
 {
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname");
+    if (!query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname")) {
+        qDebug() << "Failed to load clients:" << query.lastError().text();
+        return;
+    }
 
     while (query.next()) {
         ui->comboBoxClient->addItem(query.value(1).toString(), query.value(0).toInt());

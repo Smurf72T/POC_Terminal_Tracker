@@ -59,7 +59,10 @@ void RentalForm::loadClientsToDelegate()
 {
     QList<QPair<int, QString>> clients;
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname");
+    if (!query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname")) {
+        qDebug() << "Failed to load clients:" << query.lastError().text();
+        return;
+    }
 
     while (query.next()) {
         clients.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
@@ -75,7 +78,10 @@ void RentalForm::loadFreeTerminalsToDelegate()
     // Загрузим только свободные терминалы
     QList<QPair<int, QString>> terminals;
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 ORDER BY serialnumber");
+    if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 ORDER BY serialnumber")) {
+        qDebug() << "Failed to load free terminals:" << query.lastError().text();
+        return;
+    }
 
     while (query.next()) {
         terminals.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
@@ -92,7 +98,7 @@ void RentalForm::loadFreeSIMsToDelegate()
     // ИСПРАВЛЕНО: Загружаем SIM-карты, которые:
     // 1. status = 0 (свободны), ИЛИ
     // 2. status = 1 (в аренде), но привязаны к терминалу со статусом 0 (возвращены)
-    query.exec(
+    if (!query.exec(
         "SELECT s.simcardid, s.simnumber "
         "FROM tblsimcards s "
         "WHERE s.status = 0 "
@@ -102,7 +108,10 @@ void RentalForm::loadFreeSIMsToDelegate()
         "    AND t.status = 0"
         ")"
         "ORDER BY s.simnumber"
-    );
+    )) {
+        qDebug() << "Failed to load free SIMs:" << query.lastError().text();
+        return;
+    }
 
     while (query.next()) {
         sims.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));

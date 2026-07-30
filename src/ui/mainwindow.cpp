@@ -527,7 +527,10 @@ void MainWindow::onActionTerminalHistory_triggered()
 
     // Загружаем все серийные номера
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT terminalid, serialnumber FROM tblterminals ORDER BY serialnumber");
+    if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals ORDER BY serialnumber")) {
+        qDebug() << "Failed to load terminals:" << query.lastError().text();
+        return;
+    }
 
     struct TermInfo { int id; QString serial; };
     QList<TermInfo> terminals;
@@ -777,7 +780,9 @@ void MainWindow::openClientRentalReport(int clientId, const QString &clientName)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare(queryStr);
     query.bindValue(":clientId", clientId);
-    query.exec();
+    if (!query.exec()) {
+        qDebug() << "Failed to load client rental report:" << query.lastError().text();
+    }
     model->setQuery(std::move(query));
 
     groupLayout->addWidget(tableView);
@@ -864,8 +869,10 @@ void MainWindow::performBackup()
 
     // Загружаем конфигурацию БД
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT current_setting('port'), current_database(), current_user");
-    if (!query.next()) return;
+    if (!query.exec("SELECT current_setting('port'), current_database(), current_user") || !query.next()) {
+        qDebug() << "Failed to get database settings:" << query.lastError().text();
+        return;
+    }
 
     QString port = query.value(0).toString();
     QString dbname = query.value(1).toString();
@@ -947,7 +954,10 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
     out << "-- Создана: " << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n\n";
 
     QSqlQuery tableQuery(db);
-    tableQuery.exec("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename");
+    if (!tableQuery.exec("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")) {
+        qDebug() << "Failed to list tables:" << tableQuery.lastError().text();
+        return;
+    }
 
     while (tableQuery.next()) {
         QString table = tableQuery.value(0).toString();
@@ -961,7 +971,10 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
                          "WHERE table_schema = 'public' AND table_name = :tbl "
                          "ORDER BY ordinal_position");
         colQuery.bindValue(":tbl", table);
-        colQuery.exec();
+        if (!colQuery.exec()) {
+            qDebug() << "Failed to load columns for table" << table << ":" << colQuery.lastError().text();
+            continue;
+        }
 
         QStringList columnDefs;
         QStringList columnNames;
@@ -979,7 +992,10 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
 
         QSqlQuery dataQuery(db);
         dataQuery.prepare(QString("SELECT * FROM \"%1\"").arg(table));
-        dataQuery.exec();
+        if (!dataQuery.exec()) {
+            qDebug() << "Failed to load data from table" << table << ":" << dataQuery.lastError().text();
+            continue;
+        }
 
         while (dataQuery.next()) {
             out << "INSERT INTO \"" << table << "\" (" << columnNames.join(", ") << ") VALUES (";

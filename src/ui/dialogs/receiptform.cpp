@@ -51,7 +51,10 @@ void ReceiptForm::loadModelsToDelegate()
 {
     m_models.clear();
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT modelid, modelname FROM tblmodels ORDER BY modelname");
+    if (!query.exec("SELECT modelid, modelname FROM tblmodels ORDER BY modelname")) {
+        qDebug() << "Failed to load models:" << query.lastError().text();
+        return;
+    }
 
     while (query.next()) {
         m_models.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
