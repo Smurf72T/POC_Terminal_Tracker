@@ -149,3 +149,14 @@ foreach(_pg_dll libpq.dll libintl-9.dll libssl-3-x64.dll libcrypto-3-x64.dll)
             COMMENT "Copying ${_pg_dll}"
     )
 endforeach()
+
+# Копируем Qt Charts DLL
+set(QT_DLL_DIR "${CMAKE_PREFIX_PATH}/bin")
+foreach(_qt_dll Qt6Charts.dll Qt6OpenGL.dll Qt6OpenGLWidgets.dll)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QT_DLL_DIR}/${_qt_dll}"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${_qt_dll}"
+            COMMENT "Copying ${_qt_dll}"
+    )
+endforeach()
