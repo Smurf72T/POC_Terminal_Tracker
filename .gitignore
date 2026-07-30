@@ -78,5 +78,10 @@ compile_commands.json
 # Logs
 *.log
 
+# Run artifacts
+stderr.txt
+stdout.txt
+test_result.txt
+
 # Project-specific
 /План_улучшений_POC_Terminal_Tracker.txt

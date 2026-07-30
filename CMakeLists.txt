@@ -175,5 +175,8 @@ if(BUILD_TESTS)
     target_link_libraries(test_password_utils PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_password_utils COMMAND test_password_utils)
 
-    # test_validator требует DatabaseManager — временно отключён
+    add_executable(test_validator tests/test_validator.cpp src/utils/validator.cpp tests/stub_databasemanager.cpp)
+    target_include_directories(test_validator PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/database)
+    target_link_libraries(test_validator PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
+    add_test(NAME test_validator COMMAND test_validator)
 endif()
