@@ -75,13 +75,33 @@ bool DatabaseManager::initialize(const QString& configPath)
     m_database.setUserName(env.value("POC_DB_USER", dbConfig["username"].toString()));
     m_database.setPassword(env.value("POC_DB_PASSWORD", dbConfig["password"].toString()));
 
-    // SSL обязателен — не делаем fallback без SSL
-    m_database.setConnectOptions("requiressl=1");
+    // SSL mode: require | prefer | disable
+    QString sslMode = env.value("POC_DB_SSLMODE", dbConfig["sslmode"].toString("prefer")).toLower().trimmed();
 
-    if (!m_database.open()) {
-        showError("Ошибка подключения к базе данных: сервер не поддерживает SSL или SSL-соединение не удалось.\n"
-                  + m_database.lastError().text());
-        return false;
+    if (sslMode == "require") {
+        m_database.setConnectOptions("requiressl=1");
+        if (!m_database.open()) {
+            showError("Ошибка подключения к БД: сервер не поддерживает SSL (sslmode=require).\n"
+                      + m_database.lastError().text());
+            return false;
+        }
+    } else if (sslMode == "disable") {
+        m_database.setConnectOptions("requiressl=0");
+        if (!m_database.open()) {
+            showError("Ошибка подключения к базе данных:\n" + m_database.lastError().text());
+            return false;
+        }
+    } else {
+        // prefer — пробуем SSL, при неудаче предупреждаем и подключаемся без SSL
+        m_database.setConnectOptions("requiressl=1");
+        if (!m_database.open()) {
+            qCWarning(logDB) << "SSL не поддерживается сервером, подключаемся без SSL";
+            m_database.setConnectOptions("requiressl=0");
+            if (!m_database.open()) {
+                showError("Ошибка подключения к базе данных:\n" + m_database.lastError().text());
+                return false;
+            }
+        }
     }
 
     if (!runMigrations()) {
