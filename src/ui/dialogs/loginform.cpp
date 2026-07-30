@@ -4,6 +4,7 @@
 #include "utils/password_utils.h"
 #include <QMessageBox>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QInputDialog>
 #include <QDateTime>
 #include <QRegularExpression>
@@ -96,7 +97,8 @@ void LoginForm::on_btnLogin_clicked()
         s_globalLockUntil.remove(username);
 
         // Upgrade устаревшего хеша до PBKDF2 при успешном входе
-        if (storedHash.count(':') != 2) {
+        bool wasOldHash = (storedHash.count(':') != 2);
+        if (wasOldHash) {
             QString newHash = hashPassword(password);
             QSqlQuery update(DatabaseManager::instance().getDatabase());
             update.prepare("UPDATE tbl_users SET password_hash = :hash WHERE user_id = :id");
@@ -108,6 +110,38 @@ void LoginForm::on_btnLogin_clicked()
         m_userId = query.value(0).toInt();
         m_username = query.value(1).toString();
         m_role = query.value(3).toString();
+
+        // Принудительная смена пароля для пользователей со старым хешем
+        if (wasOldHash) {
+            bool ok;
+            QString newPass = QInputDialog::getText(this, "Смена пароля",
+                "Необходимо сменить пароль по умолчанию.\n"
+                "Новый пароль (мин. 8 символов, заглавная буква, цифра):",
+                QLineEdit::Password, QString(), &ok);
+            if (ok && !newPass.isEmpty()) {
+                if (newPass.length() < 8 || !newPass.contains(QRegularExpression("[A-ZА-Я]")) || !newPass.contains(QRegularExpression("[0-9]"))) {
+                    QMessageBox::warning(this, "Ошибка",
+                        "Пароль должен быть минимум 8 символов, содержать заглавную букву и цифру.");
+                    reject();
+                    return;
+                }
+                QString newHash = hashPassword(newPass);
+                QSqlQuery updatePwd(DatabaseManager::instance().getDatabase());
+                updatePwd.prepare("UPDATE tbl_users SET password_hash = :hash WHERE user_id = :id");
+                updatePwd.bindValue(":hash", newHash);
+                updatePwd.bindValue(":id", m_userId);
+                if (!updatePwd.exec()) {
+                    QMessageBox::critical(this, "Ошибка",
+                        "Не удалось обновить пароль: " + updatePwd.lastError().text());
+                    reject();
+                    return;
+                }
+            } else {
+                reject();
+                return;
+            }
+        }
+
         accept();
     } else {
         s_globalFailedAttempts[username]++;
