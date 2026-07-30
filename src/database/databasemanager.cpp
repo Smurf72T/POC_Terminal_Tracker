@@ -213,3 +213,18 @@ QString DatabaseManager::getCurrentUser() const
 {
     return m_currentUser;
 }
+
+void DatabaseManager::setCurrentUserRole(const QString& role)
+{
+    m_currentUserRole = role;
+}
+
+QString DatabaseManager::getCurrentUserRole() const
+{
+    return m_currentUserRole;
+}
+
+bool DatabaseManager::isCurrentUserAdmin() const
+{
+    return m_currentUserRole == "admin";
+}

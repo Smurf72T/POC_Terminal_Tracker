@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
     }
 
     DatabaseManager::instance().setCurrentUser(loginDialog.getUsername());
+    DatabaseManager::instance().setCurrentUserRole(loginDialog.getRole());
 
     MainWindow w;
     w.setWindowTitle(QString("POC Terminal Tracker — %1").arg(loginDialog.getUsername()));

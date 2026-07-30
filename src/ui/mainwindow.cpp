@@ -181,6 +181,13 @@ void MainWindow::setupUI()
     connect(ui->actionReports, &QAction::triggered, this, &MainWindow::onActionReports_triggered);
     connect(ui->actionUserManagement, &QAction::triggered, this, &MainWindow::onActionUserManagement_triggered);
     connect(ui->actionGlobalSearch, &QAction::triggered, this, &MainWindow::showGlobalSearch);
+
+    // Скрываем admin-only пункты меню для обычных пользователей
+    if (!DatabaseManager::instance().isCurrentUserAdmin()) {
+        ui->actionUserManagement->setVisible(false);
+        ui->actionAuditLog->setVisible(false);
+        ui->actionBackup->setVisible(false);
+    }
 }
 
 void MainWindow::setupCharts()
@@ -583,6 +590,11 @@ void MainWindow::onActionBulkImport_triggered()
 
 void MainWindow::onActionBackup_triggered()
 {
+    if (!DatabaseManager::instance().isCurrentUserAdmin()) {
+        QMessageBox::warning(this, "Доступ запрещён",
+            "Только администратор может создавать резервные копии.");
+        return;
+    }
     performBackup();
 }
 
@@ -810,6 +822,11 @@ void MainWindow::openClientRentalReport(int clientId, const QString &clientName)
 
 void MainWindow::onActionAuditLog_triggered()
 {
+    if (!DatabaseManager::instance().isCurrentUserAdmin()) {
+        QMessageBox::warning(this, "Доступ запрещён",
+            "Только администратор может просматривать журнал аудита.");
+        return;
+    }
     openForm(new AuditLogForm(this));
 }
 
@@ -1006,6 +1023,11 @@ void MainWindow::showExpiryNotifications()
 
 void MainWindow::onActionUserManagement_triggered()
 {
+    if (!DatabaseManager::instance().isCurrentUserAdmin()) {
+        QMessageBox::warning(this, "Доступ запрещён",
+            "Только администратор может управлять пользователями.");
+        return;
+    }
     openForm(new UserManagementForm(this));
 }
 

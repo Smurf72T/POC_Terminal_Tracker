@@ -29,6 +29,9 @@ public:
     void notifyDataChanged();
     void setCurrentUser(const QString& username);
     QString getCurrentUser() const;
+    void setCurrentUserRole(const QString& role);
+    QString getCurrentUserRole() const;
+    bool isCurrentUserAdmin() const;
 
 signals:
     void dataChanged();
@@ -46,6 +49,7 @@ private:
     QJsonObject m_config;
     bool m_initialized = false;
     QString m_currentUser = "admin";
+    QString m_currentUserRole = "admin";
 };
 
 #endif // DATABASEMANAGER_H
