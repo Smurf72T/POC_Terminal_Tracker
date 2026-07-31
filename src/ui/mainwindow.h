@@ -20,6 +20,8 @@ namespace Ui {
     class MainWindow;
 }
 
+class OpsScheduler;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -51,6 +53,8 @@ private slots:
     void onActionBulkImport_triggered();
     void onActionBackup_triggered();
     void onActionRestore_triggered();
+    void onActionIntegrityCheck_triggered();
+    void onActionOpsLog_triggered();
     void onActionExpiryNotifications_triggered();
     void onActionAuditLog_triggered();
     void onActionBatchStatus_triggered();
@@ -68,6 +72,8 @@ private:
     bool m_darkTheme = true;
     QChartView *chartStatusView = nullptr;
     QChartView *chartRevenueView = nullptr;
+    OpsScheduler *m_opsScheduler = nullptr;
+    QLabel *m_backupStatusLabel = nullptr;
 
     void setupUI();
     void setupCharts();
@@ -82,7 +88,6 @@ private:
     void openClientRentalReport(int clientId, const QString &clientName);
     void openBulkImport();
     void performBackup();
-    void performFallbackBackup(const QString &filePath, const QString &dbname);
     void performRestore();
     void showExpiryNotifications();
     void showGlobalSearch();

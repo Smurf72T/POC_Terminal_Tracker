@@ -2,6 +2,9 @@
 #include "ui_mainwindow.h"
 #include "database/databasemanager.h"
 #include "utils/logging.h"
+#include "ops/backupmanager.h"
+#include "ops/opslog.h"
+#include "ops/opsscheduler.h"
 #include "dialogs/manufacturersform.h"
 #include "dialogs/modelsform.h"
 #include "dialogs/clientsform.h"
@@ -53,6 +56,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QDir>
+#include <QJsonObject>
+#include <memory>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -114,6 +122,35 @@ MainWindow::MainWindow(QWidget *parent) :
     loadRecentDocuments();
     ui->labelLastUpdate->setText("Последнее обновление: " +
         QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss"));
+
+    // Эксплуатация: журнал операций + планировщик автобэкапов и проверки целостности
+    QJsonObject opsConfig = DatabaseManager::instance().configObject();
+    QString logDir = opsConfig["log_directory"].toString().trimmed();
+    if (!logDir.isEmpty()) {
+        if (QDir::isRelativePath(logDir))
+            logDir = QCoreApplication::applicationDirPath() + "/" + logDir;
+        OpsLog::instance().setLogDirectory(logDir);
+    }
+    OpsLog::instance().info(QString("Приложение запущено (пользователь: %1, роль: %2)")
+                                .arg(DatabaseManager::instance().getCurrentUser(),
+                                     DatabaseManager::instance().getCurrentUserRole()));
+
+    m_opsScheduler = new OpsScheduler(opsConfig, this);
+    connect(m_opsScheduler, &OpsScheduler::backupFinished, this, [this](bool ok, const QString &filePath, const QString &message) {
+        statusBar()->showMessage(message, 15000);
+        if (m_backupStatusLabel) {
+            m_backupStatusLabel->setText(QString("Бэкап: %1").arg(ok ? "OK" : "ОШИБКА"));
+            m_backupStatusLabel->setToolTip(message + (ok ? "\nФайл: " + filePath : QString()));
+        }
+        if (!ok)
+            qCWarning(logApp) << message;
+    });
+    connect(m_opsScheduler, &OpsScheduler::integrityFinished, this, [this](bool ok, const QString &summary) {
+        statusBar()->showMessage(summary, 15000);
+        if (!ok)
+            qCWarning(logApp) << summary;
+    });
+    m_opsScheduler->start();
 }
 
 MainWindow::~MainWindow()
@@ -134,6 +171,9 @@ void MainWindow::setupUI()
         "QPushButton:hover { background: #333; }"
     );
     statusBar()->addPermanentWidget(themeBtn);
+    m_backupStatusLabel = new QLabel("Бэкап: —", this);
+    m_backupStatusLabel->setToolTip("Статус автоматического резервного копирования");
+    statusBar()->addPermanentWidget(m_backupStatusLabel);
     connect(themeBtn, &QPushButton::clicked, this, [this, themeBtn]() {
         m_darkTheme = !m_darkTheme;
         QSettings("POC", "TerminalTracker").setValue("darkTheme", m_darkTheme);
@@ -183,6 +223,8 @@ void MainWindow::setupUI()
     connect(ui->actionBulkImport, &QAction::triggered, this, &MainWindow::onActionBulkImport_triggered);
     connect(ui->actionBackup, &QAction::triggered, this, &MainWindow::onActionBackup_triggered);
     connect(ui->actionRestore, &QAction::triggered, this, &MainWindow::onActionRestore_triggered);
+    connect(ui->actionIntegrityCheck, &QAction::triggered, this, &MainWindow::onActionIntegrityCheck_triggered);
+    connect(ui->actionOpsLog, &QAction::triggered, this, &MainWindow::onActionOpsLog_triggered);
     connect(ui->actionExpiryNotifications, &QAction::triggered, this, &MainWindow::onActionExpiryNotifications_triggered);
     connect(ui->actionAuditLog, &QAction::triggered, this, &MainWindow::onActionAuditLog_triggered);
     connect(ui->actionBatchStatus, &QAction::triggered, this, &MainWindow::onActionBatchStatus_triggered);
@@ -196,6 +238,8 @@ void MainWindow::setupUI()
         ui->actionAuditLog->setVisible(false);
         ui->actionBackup->setVisible(false);
         ui->actionRestore->setVisible(false);
+        ui->actionIntegrityCheck->setVisible(false);
+        ui->actionOpsLog->setVisible(false);
     }
 }
 
@@ -879,7 +923,7 @@ void MainWindow::performBackup()
 {
     QString filePath = QFileDialog::getSaveFileName(this,
         "Сохранить резервную копию БД",
-        QString("backup_poc_%1.sql").arg(QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss")),
+        QString("backup_poc_%1.sql").arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")),
         "SQL файлы (*.sql);;Все файлы (*)");
 
     if (filePath.isEmpty()) return;
@@ -892,276 +936,33 @@ void MainWindow::performBackup()
 
     if (reply != QMessageBox::Yes) return;
 
-    // Host/port/db/user берём из активного подключения.
-    // current_setting('host') не существует в PostgreSQL (host — параметр libpq, а не серверный GUC).
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    QString host = db.hostName();
-    QString port = QString::number(db.port());
-    QString dbname = db.databaseName();
     QString user = db.userName();
 
-    // Показываем диалог для ввода пароля
     bool passwordOk;
     QString password = QInputDialog::getText(this, "Пароль PostgreSQL",
         "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
     if (!passwordOk) return;
 
-    // Формируем команду pg_dump (пароль передаём через PGPASSWORD, без файлов на диске)
-    // --clean/--if-exists добавляют в дамп DROP-инструкции, чтобы дамп можно было
-    // восстановить в уже заполненную базу (psql без этого падает на существующих таблицах).
-    QStringList args;
-    args << "--format=plain"
-         << "--encoding=UTF8"
-         << "--no-password"
-         << "--clean"
-         << "--if-exists"
-         << QString("--host=%1").arg(host)
-         << QString("--port=%1").arg(port)
-         << QString("--username=%1").arg(user)
-         << QString("--file=%1").arg(filePath)
-         << dbname;
+    BackupManager::BackupResult result = BackupManager::createBackup(
+        DatabaseManager::instance().getDatabase(), filePath, password);
 
-    QProcess process;
-    auto env = process.environment();
-    env.append(QString("PGPASSWORD=%1").arg(password));
-    process.setEnvironment(env);
-    process.start("pg_dump", args);
-
-    if (!process.waitForFinished(60000)) {
-        process.kill();
-        process.waitForFinished(5000);
-        QMessageBox::warning(this, "Резервное копирование",
-            "pg_dump не завершился за 60 секунд и был остановлен.\n"
-            "Будет создан резервный SQL-дамп через Qt SQL (fallback).");
-        performFallbackBackup(filePath, dbname);
-        return;
-    }
-
-    QString error = process.readAllStandardError();
-    int exitCode = process.exitCode();
-    if (exitCode != 0) {
-        QMessageBox::warning(this, "Ошибка резервного копирования",
-            "pg_dump завершился с ошибкой (код " + QString::number(exitCode) + "):\n"
-            + error.left(2000));
-        performFallbackBackup(filePath, dbname);
-        return;
-    }
-
-    QMessageBox::information(this, "Успех",
-        QString("Резервная копия создана:\n%1")
-        .arg(filePath) +
-        QString("\nРазмер: %1 KB")
-        .arg(QFileInfo(filePath).size() / 1024));
-}
-
-namespace {
-QString escapeSqlLiteral(const QString &value)
-{
-    QString escaped = value;
-    escaped.replace("\\", "\\\\");
-    escaped.replace("'", "''");
-    return "'" + escaped + "'";
-}
-
-QString formatSqlValue(const QVariant &val)
-{
-    if (val.isNull())
-        return "NULL";
-
-    switch (static_cast<QMetaType::Type>(val.typeId())) {
-    case QMetaType::QDateTime:
-        return escapeSqlLiteral(val.toDateTime().toString(Qt::ISODateWithMs));
-    case QMetaType::QDate:
-        return escapeSqlLiteral(val.toDate().toString(Qt::ISODate));
-    case QMetaType::QTime:
-        return escapeSqlLiteral(val.toTime().toString("HH:mm:ss"));
-    case QMetaType::Bool:
-        return val.toBool() ? "TRUE" : "FALSE";
-    case QMetaType::QByteArray:
-        return "'\\x" + QString::fromLatin1(val.toByteArray().toHex()) + "'";
-    case QMetaType::Double:
-        return QString::number(val.toDouble(), 'g', 17);
-    case QMetaType::QString:
-    case QMetaType::Char:
-    case QMetaType::QChar:
-    case QMetaType::QStringList:
-    case QMetaType::QJsonObject:
-    case QMetaType::QJsonArray:
-    case QMetaType::QJsonValue:
-        return escapeSqlLiteral(val.toString());
-    default:
-        return val.toString();
-    }
-}
-} // namespace
-
-void MainWindow::performFallbackBackup(const QString &filePath, const QString &dbname)
-{
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось создать файл резервной копии.");
-        return;
-    }
-
-    QTextStream out(&file);
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-
-    out << "-- Резервная копия БД " << dbname << "\n";
-    out << "-- Создана: " << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n";
-    out << "-- Восстановление: psql -U <user> -d <dbname> -f <file>\n\n";
-
-    QSqlQuery tableQuery(db);
-    if (!tableQuery.exec("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")) {
-        qCWarning(logSQL) << "Failed to list tables:" << tableQuery.lastError().text();
-        return;
-    }
-    QStringList tables;
-    while (tableQuery.next())
-        tables.append(tableQuery.value(0).toString());
-
-    out << "-- 1. Удаление старых таблиц\n";
-    for (const QString &table : tables)
-        out << "DROP TABLE IF EXISTS \"" << table << "\" CASCADE;\n";
-    out << "\n";
-
-    out << "-- 2. Последовательности (после DROP, т.к. owned-последовательности удаляются вместе с таблицей)\n";
-    QSqlQuery seqQuery(db);
-    if (seqQuery.exec("SELECT schemaname, sequencename FROM pg_sequences "
-                      "WHERE schemaname = 'public' ORDER BY sequencename")) {
-        while (seqQuery.next()) {
-            QString seq = seqQuery.value(1).toString();
-            QSqlQuery stateQuery(db);
-            if (stateQuery.exec("SELECT last_value, is_called FROM \"" + seq + "\"") && stateQuery.next()) {
-                qint64 lastValue = stateQuery.value(0).toLongLong();
-                bool isCalled = stateQuery.value(1).toBool();
-                out << "CREATE SEQUENCE IF NOT EXISTS \"" << seq << "\" START 1;\n";
-                out << "SELECT setval('" << seq << "', " << lastValue << ", "
-                    << (isCalled ? "TRUE" : "FALSE") << ");\n";
-            }
-        }
+    if (result.ok) {
+        QString msg = QString("Резервная копия создана:\n%1\nРазмер: %2 KB")
+            .arg(result.filePath)
+            .arg(QString::number(result.size / 1024));
+        if (result.method == "fallback")
+            msg += "\nМетод: SQL-дамп через Qt SQL (fallback)";
+        QMessageBox::information(this, "Успех", msg);
+        OpsLog::instance().info(QString("Ручной бэкап создан (метод: %1): %2, размер %3 KB")
+                                    .arg(result.method, result.filePath)
+                                    .arg(QString::number(result.size / 1024)));
+        if (m_opsScheduler)
+            m_opsScheduler->resetLastBackup();
     } else {
-        qCWarning(logSQL) << "Failed to list sequences:" << seqQuery.lastError().text();
+        QMessageBox::critical(this, "Ошибка резервного копирования", result.error);
+        OpsLog::instance().error(QString("Ручной бэкап не удался: %1").arg(result.error));
     }
-    out << "\n";
-
-    out << "-- 3. Создание таблиц (FK добавляются в конце)\n";
-    for (const QString &table : tables) {
-        QSqlQuery colQuery(db);
-        colQuery.prepare("SELECT column_name, data_type, is_nullable, column_default "
-                         "FROM information_schema.columns "
-                         "WHERE table_schema = 'public' AND table_name = :tbl "
-                         "ORDER BY ordinal_position");
-        colQuery.bindValue(":tbl", table);
-        if (!colQuery.exec()) {
-            qCWarning(logSQL) << "Failed to load columns for table" << table << ":" << colQuery.lastError().text();
-            continue;
-        }
-
-        QStringList columnDefs;
-        while (colQuery.next()) {
-            QString name = colQuery.value(0).toString();
-            QString type = colQuery.value(1).toString();
-            QString nullable = colQuery.value(2).toString();
-            QString defaultValue = colQuery.value(3).toString();
-            if (type.toUpper().startsWith("INT")) type = "INTEGER";
-            QString def = "    \"" + name + "\" " + type +
-                          (nullable == "YES" ? " NULL" : " NOT NULL");
-            if (!defaultValue.isEmpty())
-                def += " DEFAULT " + defaultValue;
-            columnDefs.append(def);
-        }
-        out << "CREATE TABLE \"" << table << "\" (\n"
-            << columnDefs.join(",\n") << "\n);\n\n";
-    }
-
-    out << "-- 4. Данные\n";
-    for (const QString &table : tables) {
-        QSqlQuery colQuery(db);
-        colQuery.prepare("SELECT column_name FROM information_schema.columns "
-                         "WHERE table_schema = 'public' AND table_name = :tbl "
-                         "ORDER BY ordinal_position");
-        colQuery.bindValue(":tbl", table);
-        QStringList columnNames;
-        if (colQuery.exec()) {
-            while (colQuery.next())
-                columnNames.append("\"" + colQuery.value(0).toString() + "\"");
-        }
-        if (columnNames.isEmpty()) {
-            qCWarning(logSQL) << "No columns for table" << table;
-            continue;
-        }
-
-        QSqlQuery dataQuery(db);
-        dataQuery.prepare(QString("SELECT * FROM \"%1\"").arg(table));
-        if (!dataQuery.exec()) {
-            qCWarning(logSQL) << "Failed to load data from table" << table << ":" << dataQuery.lastError().text();
-            continue;
-        }
-
-        while (dataQuery.next()) {
-            out << "INSERT INTO \"" << table << "\" (" << columnNames.join(", ") << ") VALUES (";
-            for (int i = 0; i < dataQuery.record().count(); ++i) {
-                if (i > 0) out << ", ";
-                out << formatSqlValue(dataQuery.value(i));
-            }
-            out << ");\n";
-        }
-        out << "\n";
-    }
-
-    out << "-- 5. Функции\n";
-    QSqlQuery funcQuery(db);
-    if (funcQuery.exec("SELECT pg_get_functiondef(p.oid) FROM pg_proc p "
-                       "JOIN pg_namespace n ON n.oid = p.pronamespace "
-                       "WHERE n.nspname = 'public' ORDER BY p.oid")) {
-        while (funcQuery.next())
-            out << funcQuery.value(0).toString() << "\n";
-    }
-    out << "\n";
-
-    out << "-- 6. Триггеры\n";
-    QSqlQuery triggerQuery(db);
-    if (triggerQuery.exec("SELECT pg_get_triggerdef(t.oid) FROM pg_trigger t "
-                          "JOIN pg_class c ON c.oid = t.tgrelid "
-                          "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                          "WHERE NOT t.tgisinternal AND n.nspname = 'public'")) {
-        while (triggerQuery.next())
-            out << triggerQuery.value(0).toString() << ";\n";
-    }
-    out << "\n";
-
-    out << "-- 7. Индексы (индексы ограничений создаются вместе с ограничениями)\n";
-    QSqlQuery indexQuery(db);
-    if (indexQuery.exec("SELECT pg_get_indexdef(i.indexrelid) FROM pg_index i "
-                        "JOIN pg_class c ON c.oid = i.indexrelid "
-                        "JOIN pg_namespace n ON n.oid = c.relnamespace "
-                        "LEFT JOIN pg_constraint con ON con.conindid = i.indexrelid "
-                        "WHERE n.nspname = 'public' AND con.oid IS NULL "
-                        "ORDER BY c.relname")) {
-        while (indexQuery.next())
-            out << indexQuery.value(0).toString() << ";\n";
-    }
-    out << "\n";
-
-    out << "-- 8. Ограничения (FK в конце)\n";
-    QSqlQuery conQuery(db);
-    if (conQuery.exec("SELECT c.conrelid::regclass::text, c.conname, pg_get_constraintdef(c.oid) "
-                      "FROM pg_constraint c WHERE c.connamespace = 'public'::regnamespace "
-                      "AND c.contype IN ('p','u','c','f') "
-                      "ORDER BY (c.contype = 'f'), c.conname")) {
-        while (conQuery.next()) {
-            out << "ALTER TABLE " << conQuery.value(0).toString()
-                << " ADD CONSTRAINT " << conQuery.value(1).toString() << " "
-                << conQuery.value(2).toString() << ";\n";
-        }
-    }
-    out << "\n";
-
-    file.close();
-    QMessageBox::information(this, "Успех",
-        QString("Резервная копия создана (SQL-метод):\n%1\nРазмер: %2 KB")
-        .arg(filePath)
-        .arg(QFileInfo(filePath).size() / 1024));
 }
 
 void MainWindow::onActionRestore_triggered()
@@ -1191,11 +992,7 @@ void MainWindow::performRestore()
 
     if (reply != QMessageBox::Yes) return;
 
-    // Host/port/db/user берём из активного подключения (см. performBackup)
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    QString host = db.hostName();
-    QString port = QString::number(db.port());
-    QString dbname = db.databaseName();
     QString user = db.userName();
 
     bool passwordOk;
@@ -1203,40 +1000,10 @@ void MainWindow::performRestore()
         "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
     if (!passwordOk) return;
 
-    QStringList args;
-    args << QString("--host=%1").arg(host)
-         << QString("--port=%1").arg(port)
-         << QString("--username=%1").arg(user)
-         << QString("--dbname=%1").arg(dbname)
-         << QString("--file=%1").arg(filePath)
-         << "--single-transaction";
-
-    QProcess process;
-    auto env = process.environment();
-    env.append(QString("PGPASSWORD=%1").arg(password));
-    process.setEnvironment(env);
-    process.start("psql", args);
-
-    if (!process.waitForFinished(120000)) {
-        process.kill();
-        process.waitForFinished(5000);
-        QMessageBox::critical(this, "Ошибка восстановления",
-            "psql не завершился за 120 секунд и был остановлен.\n"
-            "Данные могли остаться в прежнем состоянии (restore выполняется "
-            "в одной транзакции).\n\n"
-            "Попробуйте восстановить вручную:\n"
-            "psql -U " + user + " -d " + dbname + " -f \"" + filePath + "\"");
-        return;
-    }
-
-    QString error = process.readAllStandardError();
-    int exitCode = process.exitCode();
-
-    // psql возвращает ненулевой код только при реальных ошибках (NOTICE/WARNING не считаются)
-    if (exitCode != 0) {
-        QMessageBox::critical(this, "Ошибка восстановления",
-            "psql завершился с ошибками (код " + QString::number(exitCode) + "):\n"
-            + error.left(2000));
+    QString error;
+    if (!BackupManager::restoreDatabase(DatabaseManager::instance().getDatabase(), filePath, password, &error)) {
+        QMessageBox::critical(this, "Ошибка восстановления", error);
+        OpsLog::instance().error(QString("Восстановление БД не удалось: %1").arg(error));
         return;
     }
 
@@ -1249,6 +1016,46 @@ void MainWindow::performRestore()
     QMessageBox::information(this, "Успех",
         "База данных восстановлена из резервной копии.\n"
         "Файл: " + QFileInfo(filePath).fileName());
+    OpsLog::instance().info(QString("БД восстановлена из резервной копии: %1").arg(filePath));
+    if (m_opsScheduler)
+        m_opsScheduler->resetIntegrityCheck();
+}
+
+void MainWindow::onActionIntegrityCheck_triggered()
+{
+    if (!DatabaseManager::instance().isCurrentUserAdmin()) {
+        QMessageBox::warning(this, "Доступ запрещён",
+            "Только администратор может запускать проверку целостности БД.");
+        return;
+    }
+    if (!m_opsScheduler)
+        return;
+
+    statusBar()->showMessage("Проверка целостности БД...", 5000);
+    auto conn = std::make_shared<QMetaObject::Connection>();
+    *conn = connect(m_opsScheduler, &OpsScheduler::integrityFinished, this,
+                    [this, conn](bool, const QString &summary) {
+                        QMessageBox::information(this, "Проверка целостности БД", summary);
+                        disconnect(*conn);
+                    });
+    m_opsScheduler->runIntegrityCheck();
+}
+
+void MainWindow::onActionOpsLog_triggered()
+{
+    if (!DatabaseManager::instance().isCurrentUserAdmin()) {
+        QMessageBox::warning(this, "Доступ запрещён",
+            "Только администратор может открывать журнал операций.");
+        return;
+    }
+
+    QString path = OpsLog::instance().logFilePath();
+    if (!QFile::exists(path)) {
+        QMessageBox::information(this, "Журнал операций",
+            "Журнал операций пока пуст.\nПуть: " + path);
+        return;
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 }
 
 void MainWindow::showExpiryNotifications()

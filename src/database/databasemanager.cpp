@@ -170,6 +170,11 @@ QSqlDatabase& DatabaseManager::getDatabase()
     return m_database;
 }
 
+QJsonObject DatabaseManager::configObject() const
+{
+    return m_config;
+}
+
 QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMessage)
 {
     QSqlQuery sqlQuery(m_database);

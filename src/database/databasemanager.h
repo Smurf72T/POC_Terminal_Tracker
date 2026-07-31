@@ -25,6 +25,7 @@ public:
     QStringList pendingMigrations();
 
     QSqlDatabase& getDatabase();
+    QJsonObject configObject() const;
     QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true);
     bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc);
     QString generateDocNumber(const QString& docType); // receipt, rental, return, payment

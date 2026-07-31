@@ -22,6 +22,7 @@
 - **Печать документов:** Квитанция поступления, акт возврата, квитанция об оплате (HTML → QPrinter)
 - **Глобальный поиск:** Ctrl+K, поиск по всем справочникам (ILIKE), открытие найденной формы
 - **Переключалка темы:** Тёмная/светлая тема (кнопка в статусбаре, `modern.qss` ↔ `light.qss`), выбор сохраняется в QSettings
+- **Эксплуатация (v1.3.0):** автоматические бэкапы по расписанию (интервал + retention), журнал операций `ops.log`, автоматическая проверка целостности БД (терминалы/SIM), статус бэкапа в статусбаре — подробности в [docs/OPS.md](docs/OPS.md)
 
 ## Требования
 
@@ -57,6 +58,26 @@ POC_DB_PASSWORD=postgres
 
 Приоритет: `.env` > переменная окружения `POC_DB_PASSWORD` > `config/config.json`.
 
+### Эксплуатация и автобэкапы
+
+Автоматические бэкапы, журнал операций и проверка целостности БД настраиваются
+в `config/config.json` (секции `backup` и `monitoring`):
+
+```json
+"backup": {
+  "enabled": true,
+  "interval_hours": 24,
+  "directory": "backups",
+  "retention_count": 14
+},
+"monitoring": {
+  "integrity_enabled": true,
+  "integrity_interval_hours": 24
+}
+```
+
+Подробное руководство по эксплуатации — [docs/OPS.md](docs/OPS.md).
+
 ### Начальная настройка БД
 
 1. Создайте базу данных `pocbase`
@@ -70,6 +91,8 @@ psql -U postgres -d pocbase -f sql/migrations/000_base_schema.sql
 psql -U postgres -d pocbase -f sql/migrations/001_initial.sql
 psql -U postgres -d pocbase -f sql/migrations/002_status_change_docs.sql
 psql -U postgres -d pocbase -f sql/migrations/003_doc_number_sequences.sql
+psql -U postgres -d pocbase -f sql/migrations/004_role_enforcement.sql
+psql -U postgres -d pocbase -f sql/migrations/005_login_security.sql
 ```
 
 ## Логирование
@@ -121,6 +144,10 @@ src/
     validator.*               — Валидация ИНН, IMEI (Luhn), данных
     reportexporter.*          — Экспорт в Excel (QXlsx) и PDF
     logging.h                 — QLoggingCategory: app.database, app.audit, app.migration, app.sql, app.general
+  ops/
+    backupmanager.*           — Бэкап (pg_dump + fallback) и восстановление (psql), без UI
+    opslog.*                  — Журнал операций logs/ops.log (ротация 1 МБ)
+    opsscheduler.*            — Планировщик автобэкапов и проверки целостности БД
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/

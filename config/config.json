@@ -10,6 +10,17 @@
   },
   "application": {
     "name": "POC Terminal Tracker",
-    "version": "1.1.0"
+    "version": "1.3.0"
+  },
+  "log_directory": "",
+  "backup": {
+    "enabled": false,
+    "interval_hours": 24,
+    "directory": "",
+    "retention_count": 14
+  },
+  "monitoring": {
+    "integrity_enabled": true,
+    "integrity_interval_hours": 24
   }
 }

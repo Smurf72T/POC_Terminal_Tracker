@@ -56,6 +56,9 @@ set(SOURCES
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
         src/utils/logging.cpp
+        src/ops/backupmanager.cpp
+        src/ops/opslog.cpp
+        src/ops/opsscheduler.cpp
 )
 
 set(HEADERS
@@ -87,6 +90,9 @@ set(HEADERS
         src/utils/reportexporter.h
         src/utils/validator.h
         src/utils/logging.h
+        src/ops/backupmanager.h
+        src/ops/opslog.h
+        src/ops/opsscheduler.h
 )
 
 set(UI_FILES
@@ -196,7 +202,10 @@ if(BUILD_TESTS)
     target_link_libraries(test_validator PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_validator COMMAND test_validator)
 
-    add_executable(test_db_integration tests/test_db_integration.cpp)
+    add_executable(test_db_integration tests/test_db_integration.cpp
+            src/ops/backupmanager.cpp
+            src/ops/opslog.cpp
+            src/utils/logging.cpp)
     target_include_directories(test_db_integration PRIVATE ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(test_db_integration PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_db_integration COMMAND test_db_integration)

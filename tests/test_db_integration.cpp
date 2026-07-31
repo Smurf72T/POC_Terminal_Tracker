@@ -11,6 +11,8 @@
 #include <QMap>
 #include <QDateTime>
 #include <QCoreApplication>
+#include "ops/backupmanager.h"
+#include "ops/opslog.h"
 
 class TestDbIntegration : public QObject
 {
@@ -27,6 +29,7 @@ private slots:
     void test_role_enforcement();
     void test_rate_limiting();
     void test_business_flow();
+    void test_backup_and_opslog();
 
 private:
     QSqlDatabase m_testDb;
@@ -674,6 +677,49 @@ void TestDbIntegration::test_business_flow()
                                QString::number(termId));
     QVERIFY2(auditCount >= 3, qPrintable("Аудит терминала: ожидалось >= 3 записей, получено " +
                                          QString::number(auditCount)));
+}
+
+void TestDbIntegration::test_backup_and_opslog()
+{
+    QString tempDir = QDir::temp().filePath("poc_ops_test");
+    QDir(tempDir).mkpath(".");
+    QString dbname = m_testDb.databaseName();
+
+    // Fallback-дамп не зависит от внешних утилит и должен содержать структуру и данные
+    QString err;
+    QString backupFile = tempDir + "/backup_test.sql";
+    QVERIFY2(BackupManager::createFallbackBackup(m_testDb, backupFile, dbname, &err),
+             qPrintable(err));
+    QVERIFY2(QFileInfo(backupFile).size() > 0, qPrintable("fallback-дамп пустой"));
+    QFile f(backupFile);
+    QVERIFY(f.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString content = QString::fromUtf8(f.readAll());
+    f.close();
+    QVERIFY2(content.contains("CREATE TABLE"), qPrintable("дамп не содержит CREATE TABLE"));
+    QVERIFY2(content.contains("INSERT INTO"), qPrintable("дамп не содержит данных"));
+
+    // createBackup: pg_dump (если доступен в PATH) либо fallback — в любом случае файл создаётся
+    BackupManager::BackupResult result = BackupManager::createBackup(
+        m_testDb, tempDir + "/backup_full.sql", m_testDb.password());
+    QVERIFY2(result.ok, qPrintable(result.error));
+    QVERIFY2(result.size > 0, qPrintable("бэкап пустой"));
+    QVERIFY2(result.method == "pg_dump" || result.method == "fallback",
+             qPrintable("неизвестный метод бэкапа: " + result.method));
+
+    // Журнал операций: запись должна появиться в ops.log
+    OpsLog::instance().setLogDirectory(tempDir);
+    QString msg = "Тестовая запись журнала операций " +
+                  QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
+    OpsLog::instance().info(msg);
+    QString logPath = OpsLog::instance().logFilePath();
+    QVERIFY2(QFile::exists(logPath), qPrintable("ops.log не создан: " + logPath));
+    QFile lf(logPath);
+    QVERIFY(lf.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString logContent = QString::fromUtf8(lf.readAll());
+    lf.close();
+    QVERIFY2(logContent.contains(msg), qPrintable("ops.log не содержит запись"));
+
+    QDir(tempDir).removeRecursively();
 }
 
 QTEST_GUILESS_MAIN(TestDbIntegration)
