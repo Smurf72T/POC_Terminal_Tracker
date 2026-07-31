@@ -79,6 +79,9 @@ _CPack_Packages/
 # AI tool artifacts
 .gigacode/
 
+# Agent workspace (temporary files from other agents)
+agent-workspace/
+
 # Logs
 *.log
 

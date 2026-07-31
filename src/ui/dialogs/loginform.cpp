@@ -77,31 +77,37 @@ void LoginForm::on_btnLogin_clicked()
             return;
         }
 
-        if (lockedUntil.isValid()) {
-            // Блокировка истекла — открываем новое окно из 5 попыток
-            QSqlQuery reset(DatabaseManager::instance().getDatabase());
-            reset.prepare("UPDATE tbl_users SET failed_login_attempts = 0, locked_until = NULL "
-                          "WHERE username = :uname");
-            reset.bindValue(":uname", username);
-            if (!reset.exec()) {
-                qWarning() << "Не удалось сбросить блокировку:" << reset.lastError().text();
-            }
-        }
-
         QString storedHash = query.value(4).toString();
         if (!checkPassword(password, storedHash)) {
+            // Атомарный сброс истёкшей блокировки + инкремент счётчика в одном UPDATE.
+            // WHERE-условие исключает активные блокировки: параллельные попытки
+            // после истечения больше не получают каждый своё «новое окно» из 5 попыток.
             QSqlQuery upd(DatabaseManager::instance().getDatabase());
-            upd.prepare("UPDATE tbl_users SET failed_login_attempts = failed_login_attempts + 1, "
-                        "locked_until = CASE WHEN failed_login_attempts + 1 >= 5 "
-                        "THEN NOW() + INTERVAL '30 seconds' ELSE locked_until END "
-                        "WHERE username = :uname RETURNING failed_login_attempts");
+            upd.prepare("UPDATE tbl_users SET "
+                        "failed_login_attempts = CASE WHEN locked_until IS NOT NULL "
+                        "    THEN 1 ELSE failed_login_attempts + 1 END, "
+                        "locked_until = CASE WHEN "
+                        "    (CASE WHEN locked_until IS NOT NULL "
+                        "         THEN 1 ELSE failed_login_attempts + 1 END) >= 5 "
+                        "    THEN NOW() + INTERVAL '30 seconds' ELSE NULL END "
+                        "WHERE username = :uname "
+                        "  AND (locked_until IS NULL OR locked_until <= NOW()) "
+                        "RETURNING failed_login_attempts");
             upd.bindValue(":uname", username);
 
-            int attempts = 5;
-            if (upd.exec() && upd.next()) {
-                attempts = upd.value(0).toInt();
+            if (!upd.exec()) {
+                qWarning() << "Не удалось обновить счётчик попыток:" << upd.lastError().text();
+                ui->labelError->setText("Неверный пароль!");
+                return;
             }
 
+            if (!upd.next()) {
+                // Строка не обновлена — блокировка активна (активировалась параллельной попыткой)
+                ui->labelError->setText("Слишком много попыток. Повторите через 30 с.");
+                return;
+            }
+
+            int attempts = upd.value(0).toInt();
             if (attempts >= 5) {
                 ui->labelError->setText("Слишком много попыток. Повторите через 30 с.");
             } else {

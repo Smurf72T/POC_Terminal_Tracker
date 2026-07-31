@@ -19,11 +19,11 @@ public:
     bool initialize(const QString& configPath = "config/config.json");
     bool isConnected() const;
     void close();
+    void listenForDataChanges();
 
     // Миграции БД
     bool runMigrations(const QString &migrationsDir = "sql/migrations/");
     QStringList pendingMigrations();
-
     QSqlDatabase& getDatabase();
     QJsonObject configObject() const;
     QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true);
@@ -54,10 +54,12 @@ private:
     bool loadConfig(const QString& configPath);
     void showError(const QString& message);
     bool ensureMigrationsTable();
+    bool applyPendingMigrations();
 
     QSqlDatabase m_database;
     QJsonObject m_config;
     bool m_initialized = false;
+    bool m_listening = false;
     QString m_currentUser = "admin";
     QString m_currentUserRole = "admin";
 };

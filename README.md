@@ -24,6 +24,7 @@
 - **Переключалка темы:** Тёмная/светлая тема (кнопка в статусбаре, `modern.qss` ↔ `light.qss`), выбор сохраняется в QSettings
 - **Эксплуатация (v1.3.0):** автоматические бэкапы по расписанию (интервал + retention), журнал операций `ops.log`, автоматическая проверка целостности БД (терминалы/SIM), статус бэкапа в статусбаре — подробности в [docs/OPS.md](docs/OPS.md)
 - **Доставка (v1.4.0):** портативный ZIP-дистрибутив (`cmake --build build --target deploy` + `cpack`) с Qt runtime и PostgreSQL DLL; автообновление по манифесту-URL (проверка при старте и «Сервис → Проверка обновлений») — подробности в [docs/OPS.md](docs/OPS.md)
+- **Многопользовательский режим (v1.5.0):** защита от гонок — миграции под `pg_advisory_lock`, выдача SIM под блокировкой `FOR UPDATE NOWAIT`, атомарный rate limiting, межэкземплярное обновление через `NOTIFY`; конкуренто-тесты `test_concurrency` — подробности в [docs/OPS.md](docs/OPS.md)
 
 ## Требования
 
@@ -112,6 +113,8 @@ psql -U postgres -d pocbase -f sql/migrations/002_status_change_docs.sql
 psql -U postgres -d pocbase -f sql/migrations/003_doc_number_sequences.sql
 psql -U postgres -d pocbase -f sql/migrations/004_role_enforcement.sql
 psql -U postgres -d pocbase -f sql/migrations/005_login_security.sql
+psql -U postgres -d pocbase -f sql/migrations/006_terminal_status_check.sql
+psql -U postgres -d pocbase -f sql/migrations/007_data_change_notify.sql
 ```
 
 ## Логирование
@@ -136,7 +139,7 @@ QT_LOGGING_RULES="app.sql=true;app.migration=true"
 ```
 src/
   main.cpp                    — Точка входа, показ формы входа
-  database/databasemanager.*  — Подключение к БД, миграции, аудит, .env
+  database/databasemanager.*  — Подключение к БД, миграции (advisory lock), аудит, NOTIFY, .env
   ui/
     mainwindow.*              — Главное окно, дашборд
     dialogs/
@@ -173,7 +176,7 @@ src/
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/
-  migrations/               — Миграции БД 001/002/003 (применяются автоматически)
+  migrations/               — Миграции БД 000–007 (применяются автоматически)
   add_indexes.sql           — Индексы и ограничения
 libs/
   QXlsx/                      — Git submodule (QtExcel/QXlsx)
@@ -183,6 +186,8 @@ tests/
   test_password_utils.cpp     — Unit-тесты PBKDF2, обратная совместимость
   test_validator.cpp          — Unit-тесты IMEI, INN, Luhn, серийных номеров
   test_update_utils.cpp       — Unit-тесты сравнения версий
+  test_db_integration.cpp     — Интеграционные тесты БД (миграции, аудит, роли, rate limiting)
+  test_concurrency.cpp        — Конкуренто-тесты (N потоков × отдельные соединения)
   stub_databasemanager.cpp    — Стаб DatabaseManager для тестов
 ```
 

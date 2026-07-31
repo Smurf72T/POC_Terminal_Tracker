@@ -105,8 +105,29 @@ void BatchStatusForm::on_btnApply_clicked()
     }
 
     int updated = 0;
+    int expectedStatus = ui->comboBoxCurrentStatus->currentData().toInt();
     for (const QModelIndex &idx : selected) {
         int terminalId = model->data(model->index(idx.row(), 0)).toInt();
+
+        QSqlQuery lockQuery(db);
+        lockQuery.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+        lockQuery.bindValue(":id", terminalId);
+
+        if (!lockQuery.exec() || !lockQuery.next()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Терминал %1 занят другим пользователем. Повторите попытку.").arg(terminalId));
+            return;
+        }
+
+        if (lockQuery.value(0).toInt() != expectedStatus) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Статус терминала %1 изменился. Перезагрузите список и повторите попытку.")
+                    .arg(terminalId));
+            return;
+        }
+
         QSqlQuery query(db);
         query.prepare("UPDATE tblterminals SET status = :status WHERE terminalid = :id");
         query.bindValue(":status", newStatus);

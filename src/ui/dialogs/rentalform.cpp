@@ -344,6 +344,17 @@ void RentalForm::on_btnPost_clicked()
             }
 
             if (simId > 0) {
+                QSqlQuery simLock(db);
+                simLock.prepare("SELECT status FROM tblsimcards WHERE simcardid = :id AND status = 0 FOR UPDATE NOWAIT");
+                simLock.bindValue(":id", simId);
+
+                if (!simLock.exec() || !simLock.next()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка",
+                        QString("SIM-карта %1 уже занята другим терминалом!").arg(simId));
+                    return;
+                }
+
                 QSqlQuery simQuery(db);
                 simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
                 simQuery.bindValue(":id", simId);

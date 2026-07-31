@@ -130,8 +130,36 @@ bool DatabaseManager::initialize(const QString& configPath)
         return false;
     }
 
+    listenForDataChanges();
+
     m_initialized = true;
     return true;
+}
+
+void DatabaseManager::listenForDataChanges()
+{
+    if (m_listening || !m_database.isOpen())
+        return;
+
+    // Подписка на канал NOTIFY 'poc_data_changed' (триггеры из 007-й миграции).
+    // Доставленные уведомления эмитятся в dataChanged() — дашборды всех
+    // запущенных экземпляров обновляются при изменениях в любом из них.
+    QSqlDriver *driver = m_database.driver();
+    if (!driver->hasFeature(QSqlDriver::DriverFeature::EventNotifications))
+        return;
+
+    if (!driver->subscribeToNotification(QStringLiteral("poc_data_changed"))) {
+        qCWarning(logDB) << "Не удалось подписаться на уведомления БД:"
+                         << m_database.lastError().text();
+        return;
+    }
+
+    connect(driver, &QSqlDriver::notification, this,
+            [this](const QString & /*channel*/,
+                   QSqlDriver::NotificationSource /*source*/,
+                   const QVariant & /*payload*/) { emit dataChanged(); });
+
+    m_listening = true;
 }
 
 bool DatabaseManager::loadConfig(const QString& configPath)
@@ -159,6 +187,10 @@ bool DatabaseManager::isConnected() const
 
 void DatabaseManager::close()
 {
+    if (m_listening) {
+        m_database.driver()->unsubscribeFromNotification(QStringLiteral("poc_data_changed"));
+        m_listening = false;
+    }
     if (m_database.isOpen()) {
         m_database.close();
     }
@@ -365,6 +397,35 @@ QStringList DatabaseManager::pendingMigrations()
 bool DatabaseManager::runMigrations(const QString &migrationsDir)
 {
     Q_UNUSED(migrationsDir);
+
+    // Advisory lock защищает от гонки при одновременном старте нескольких
+    // экземпляров приложения: пока один применяет миграции, остальные ждут,
+    // после чего их список pending будет пуст (версии уже записаны).
+    static const qint64 kMigrationLockKey = 0x504F434D494752; // "POCMIGR"
+    QSqlQuery lockQuery(m_database);
+    lockQuery.prepare("SELECT pg_advisory_lock(:key)");
+    lockQuery.bindValue(":key", kMigrationLockKey);
+    if (!lockQuery.exec()) {
+        qCWarning(logMigration) << "Не удалось взять advisory lock на миграции:"
+                                << lockQuery.lastError().text();
+        return false;
+    }
+
+    bool ok = applyPendingMigrations();
+
+    QSqlQuery unlockQuery(m_database);
+    unlockQuery.prepare("SELECT pg_advisory_unlock(:key)");
+    unlockQuery.bindValue(":key", kMigrationLockKey);
+    if (!unlockQuery.exec()) {
+        qCWarning(logMigration) << "Не удалось снять advisory lock:"
+                                << unlockQuery.lastError().text();
+    }
+
+    return ok;
+}
+
+bool DatabaseManager::applyPendingMigrations()
+{
     QStringList pending = pendingMigrations();
     if (pending.isEmpty()) {
         return true;
