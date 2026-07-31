@@ -1,5 +1,7 @@
 # POC Terminal Tracker
 
+[![CI](https://github.com/Smurf72T/POC_Terminal_Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/Smurf72T/POC_Terminal_Tracker/actions/workflows/ci.yml)
+
 Система учёта POC-терминалов и SIM-карт. Qt 6 (C++17) + PostgreSQL.
 
 ## Функциональность
@@ -25,6 +27,7 @@
 - **Эксплуатация (v1.3.0):** автоматические бэкапы по расписанию (интервал + retention), журнал операций `ops.log`, автоматическая проверка целостности БД (терминалы/SIM), статус бэкапа в статусбаре — подробности в [docs/OPS.md](docs/OPS.md)
 - **Доставка (v1.4.0):** портативный ZIP-дистрибутив (`cmake --build build --target deploy` + `cpack`) с Qt runtime и PostgreSQL DLL; автообновление по манифесту-URL (проверка при старте и «Сервис → Проверка обновлений») — подробности в [docs/OPS.md](docs/OPS.md)
 - **Многопользовательский режим (v1.5.0):** защита от гонок — миграции под `pg_advisory_lock`, выдача SIM под блокировкой `FOR UPDATE NOWAIT`, атомарный rate limiting, межэкземплярное обновление через `NOTIFY`; конкуренто-тесты `test_concurrency` — подробности в [docs/OPS.md](docs/OPS.md)
+- **CI/CD (v1.5.1):** GitHub Actions — сборка (Qt 6.11 MinGW), все тесты против реального PostgreSQL, сборка портативного ZIP; артефакт в Actions → Run → Artifacts
 
 ## Требования
 

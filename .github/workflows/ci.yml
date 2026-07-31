@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test-package:
+    name: Build, test and package
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 6.11.1 (MinGW) + qtcharts
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+          modules: 'qtcharts'
+          tools: 'tools_mingw, tools_cmake, tools_ninja'
+          add-tool-to-path: true
+          cache: true
+
+      - name: Install PostgreSQL 17
+        shell: powershell
+        run: |
+          choco install postgresql17 -y --no-progress --params '/Password:postgres'
+          if ($LASTEXITCODE -ne 0) {
+            Start-Sleep -Seconds 10
+            choco install postgresql17 -y --no-progress --params '/Password:postgres'
+            if ($LASTEXITCODE -ne 0) { throw "choco install postgresql17 failed" }
+          }
+          $pgBin = "C:\Program Files\PostgreSQL\17\bin"
+          if (-not (Test-Path "$pgBin\psql.exe")) { throw "PostgreSQL binaries not found at $pgBin" }
+          for ($i = 0; $i -lt 30; $i++) {
+            & "$pgBin\pg_isready.exe" -h localhost -p 5432 -U postgres
+            if ($LASTEXITCODE -le 1) { break }
+            Start-Sleep -Seconds 2
+          }
+          & "$pgBin\psql.exe" -h localhost -p 5432 -U postgres -c "SELECT version();"
+
+      - name: Configure
+        shell: powershell
+        run: |
+          $qtRoot = if ($env:Qt6_DIR) { $env:Qt6_DIR } elseif ($env:QTDIR) { $env:QTDIR } else { throw "Qt dir env var not set" }
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            "-DCMAKE_PREFIX_PATH=$qtRoot" `
+            "-DPostgreSQL_ROOT=C:\Program Files\PostgreSQL\17" `
+            -DBUILD_TESTS=ON
+
+      - name: Build
+        shell: powershell
+        run: cmake --build build
+
+      - name: Test (incl. DB integration + concurrency)
+        shell: powershell
+        env:
+          POC_DB_HOST: localhost
+          POC_DB_PORT: '5432'
+          POC_DB_USER: postgres
+          POC_DB_PASSWORD: postgres
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Deploy portable distribution + CPack ZIP
+        shell: powershell
+        run: |
+          cmake --build build --target deploy
+          cpack --config build/CPackConfig.cmake
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: POC_Terminal_Tracker-portable
+          path: POC_Terminal_Tracker-*-portable.zip
+          if-no-files-found: error
