@@ -23,6 +23,7 @@
 - **Глобальный поиск:** Ctrl+K, поиск по всем справочникам (ILIKE), открытие найденной формы
 - **Переключалка темы:** Тёмная/светлая тема (кнопка в статусбаре, `modern.qss` ↔ `light.qss`), выбор сохраняется в QSettings
 - **Эксплуатация (v1.3.0):** автоматические бэкапы по расписанию (интервал + retention), журнал операций `ops.log`, автоматическая проверка целостности БД (терминалы/SIM), статус бэкапа в статусбаре — подробности в [docs/OPS.md](docs/OPS.md)
+- **Доставка (v1.4.0):** портативный ZIP-дистрибутив (`cmake --build build --target deploy` + `cpack`) с Qt runtime и PostgreSQL DLL; автообновление по манифесту-URL (проверка при старте и «Сервис → Проверка обновлений») — подробности в [docs/OPS.md](docs/OPS.md)
 
 ## Требования
 
@@ -77,6 +78,24 @@ POC_DB_PASSWORD=postgres
 ```
 
 Подробное руководство по эксплуатации — [docs/OPS.md](docs/OPS.md).
+
+### Обновление и дистрибутив
+
+- **Пакетирование**: `cmake --build build --target deploy` собирает портативную папку
+  с Qt runtime (`windeployqt`), драйвером `qsqlpsql`, DLL PostgreSQL и конфигурацией;
+  затем `cpack --config build/CPackConfig.cmake` упаковывает её в
+  `POC_Terminal_Tracker-<версия>-portable.zip`.
+- **Автообновление** настраивается в `config/config.json` (секция `update`):
+
+```json
+"update": {
+  "url": "https://example.com/poc/update.json",
+  "check_on_startup": true
+}
+```
+
+Манифест: `{"version": "1.4.1", "release_notes": "...", "download_url": "https://..."}`.
+При пустом `url` проверка отключена.
 
 ### Начальная настройка БД
 
@@ -148,6 +167,9 @@ src/
     backupmanager.*           — Бэкап (pg_dump + fallback) и восстановление (psql), без UI
     opslog.*                  — Журнал операций logs/ops.log (ротация 1 МБ)
     opsscheduler.*            — Планировщик автобэкапов и проверки целостности БД
+  update/
+    updatemanager.*           — Автообновление: проверка манифеста, скачивание в загрузки
+    version.h                 — Утилиты сравнения версий (semver major.minor.patch)
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/
@@ -160,6 +182,7 @@ config/
 tests/
   test_password_utils.cpp     — Unit-тесты PBKDF2, обратная совместимость
   test_validator.cpp          — Unit-тесты IMEI, INN, Luhn, серийных номеров
+  test_update_utils.cpp       — Unit-тесты сравнения версий
   stub_databasemanager.cpp    — Стаб DatabaseManager для тестов
 ```
 

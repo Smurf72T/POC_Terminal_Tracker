@@ -16,6 +16,7 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
         Sql
         PrintSupport
         Charts
+        Network
 )
 
 # Ищем PostgreSQL
@@ -59,6 +60,7 @@ set(SOURCES
         src/ops/backupmanager.cpp
         src/ops/opslog.cpp
         src/ops/opsscheduler.cpp
+        src/update/updatemanager.cpp
 )
 
 set(HEADERS
@@ -93,6 +95,8 @@ set(HEADERS
         src/ops/backupmanager.h
         src/ops/opslog.h
         src/ops/opsscheduler.h
+        src/update/updatemanager.h
+        src/update/version.h
 )
 
 set(UI_FILES
@@ -127,6 +131,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Sql
         Qt6::PrintSupport
         Qt6::Charts
+        Qt6::Network
         PostgreSQL::PostgreSQL
         QXlsx::QXlsx
 )
@@ -202,6 +207,11 @@ if(BUILD_TESTS)
     target_link_libraries(test_validator PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_validator COMMAND test_validator)
 
+    add_executable(test_update_utils tests/test_update_utils.cpp)
+    target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_update_utils PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME test_update_utils COMMAND test_update_utils)
+
     add_executable(test_db_integration tests/test_db_integration.cpp
             src/ops/backupmanager.cpp
             src/ops/opslog.cpp
@@ -221,7 +231,7 @@ if(BUILD_TESTS)
     endif()
 
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
-    foreach(_test test_password_utils test_validator test_db_integration)
+    foreach(_test test_password_utils test_validator test_update_utils test_db_integration)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
             if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")
                 add_custom_command(TARGET ${_test} POST_BUILD
@@ -243,4 +253,88 @@ if(BUILD_TESTS)
             endif()
         endforeach()
     endforeach()
+endif()
+
+# ============================================================
+# Доставка: портативный дистрибутив (windeployqt + CPack ZIP)
+# ============================================================
+if(WIN32)
+    find_program(WINDEPLOYQT_EXE windeployqt HINTS "${CMAKE_PREFIX_PATH}/bin" DOC "Qt windeployqt")
+
+    if(WINDEPLOYQT_EXE)
+        set(DEPLOY_DIR "${CMAKE_BINARY_DIR}/deploy")
+        set(DEPLOY_CMDS)
+
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEPLOY_DIR}")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E make_directory "${DEPLOY_DIR}/config")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E make_directory "${DEPLOY_DIR}/sql/migrations")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E make_directory "${DEPLOY_DIR}/docs")
+
+        # Сам exe, затем Qt runtime + плагины через windeployqt
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy
+                "$<TARGET_FILE:${PROJECT_NAME}>" "${DEPLOY_DIR}/POC_Terminal_Tracker.exe")
+        list(APPEND DEPLOY_CMDS COMMAND "${WINDEPLOYQT_EXE}" --no-translations
+                "${DEPLOY_DIR}/POC_Terminal_Tracker.exe")
+
+        # Драйвер QPSQL (windeployqt его не определяет — плагин грузится динамически)
+        if(EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/qsqlpsql.dll")
+            list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/qsqlpsql.dll"
+                    "${DEPLOY_DIR}/sqldrivers/qsqlpsql.dll")
+        endif()
+
+        # PostgreSQL DLL (libpq и зависимости)
+        if(DEFINED PostgreSQL_ROOT AND EXISTS "${PostgreSQL_ROOT}/bin")
+            foreach(_pg_dll libpq.dll libintl-9.dll libssl-3-x64.dll libcrypto-3-x64.dll)
+                if(EXISTS "${PostgreSQL_ROOT}/bin/${_pg_dll}")
+                    list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                            "${PostgreSQL_ROOT}/bin/${_pg_dll}" "${DEPLOY_DIR}/${_pg_dll}")
+                endif()
+            endforeach()
+        endif()
+
+        # MinGW runtime (libgcc/libstdc++/libwinpthread), если не попал в deploy через windeployqt
+        get_filename_component(MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        foreach(_rt_dll libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll)
+            if(EXISTS "${MINGW_BIN_DIR}/${_rt_dll}")
+                list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${MINGW_BIN_DIR}/${_rt_dll}" "${DEPLOY_DIR}/${_rt_dll}")
+            endif()
+        endforeach()
+
+        # Конфиг, миграции, документация
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/config/config.json" "${DEPLOY_DIR}/config/config.json")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_SOURCE_DIR}/sql/migrations" "${DEPLOY_DIR}/sql/migrations")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/docs/OPS.md" "${DEPLOY_DIR}/docs/OPS.md")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/README.md" "${DEPLOY_DIR}/README.md")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/CHANGELOG.md" "${DEPLOY_DIR}/CHANGELOG.md")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/.env.example" "${DEPLOY_DIR}/.env.example")
+
+        add_custom_target(deploy ${DEPLOY_CMDS}
+                DEPENDS ${PROJECT_NAME}
+                COMMENT "Сборка портативного дистрибутива (windeployqt)")
+
+        # ---- CPack: ZIP-архив из папки deploy ----
+        include(InstallRequiredSystemLibraries)
+        file(READ "${CMAKE_SOURCE_DIR}/config/config.json" POC_CONFIG_JSON)
+        string(JSON POC_VERSION GET "${POC_CONFIG_JSON}" "application" "version")
+
+        set(CPACK_PACKAGE_NAME "POC_Terminal_Tracker")
+        set(CPACK_PACKAGE_VERSION "${POC_VERSION}")
+        set(CPACK_PACKAGE_VENDOR "POC")
+        set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Система учёта POC-терминалов и SIM-карт")
+        set(CPACK_PACKAGE_FILE_NAME "POC_Terminal_Tracker-${POC_VERSION}-portable")
+        set(CPACK_PACKAGE_INSTALL_DIRECTORY "POC_Terminal_Tracker")
+        set(CPACK_GENERATOR "ZIP")
+        set(CPACK_INSTALLED_DIRECTORIES "${DEPLOY_DIR}" "/")
+        include(CPack)
+    else()
+        message(WARNING "windeployqt не найден — цель deploy и CPack-пакетирование отключены")
+    endif()
 endif()

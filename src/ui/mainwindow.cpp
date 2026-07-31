@@ -5,6 +5,7 @@
 #include "ops/backupmanager.h"
 #include "ops/opslog.h"
 #include "ops/opsscheduler.h"
+#include "update/updatemanager.h"
 #include "dialogs/manufacturersform.h"
 #include "dialogs/modelsform.h"
 #include "dialogs/clientsform.h"
@@ -151,6 +152,55 @@ MainWindow::MainWindow(QWidget *parent) :
             qCWarning(logApp) << summary;
     });
     m_opsScheduler->start();
+
+    // Автообновление: проверка манифеста при старте, предложение скачать новую версию
+    m_updater = new UpdateManager(opsConfig, this);
+    connect(m_updater, &UpdateManager::updateAvailable, this,
+            [this](const QString &version, const QString &notes, const QString &url) {
+                QString text = QString("Доступна новая версия %1\nТекущая версия: %2")
+                                   .arg(version, m_updater->currentVersion());
+                if (!notes.isEmpty())
+                    text += "\n\nЧто нового:\n" + notes;
+                QMessageBox box(this);
+                box.setWindowTitle("Обновление");
+                box.setText(text);
+                QPushButton *downloadBtn = box.addButton("Скачать", QMessageBox::AcceptRole);
+                QPushButton *laterBtn = box.addButton("Позже", QMessageBox::RejectRole);
+                box.setDefaultButton(laterBtn);
+                box.exec();
+                if (box.clickedButton() == downloadBtn && !url.isEmpty())
+                    m_updater->downloadUpdate(url);
+            });
+    connect(m_updater, &UpdateManager::noUpdateAvailable, this, [this]() {
+        statusBar()->showMessage(QString("Обновлений нет (версия %1)")
+                                     .arg(m_updater->currentVersion()), 8000);
+    });
+    connect(m_updater, &UpdateManager::checkFailed, this, [this](const QString &error) {
+        if (m_updater->isEnabled())
+            statusBar()->showMessage(error, 10000);
+        qCWarning(logApp) << error;
+    });
+    connect(m_updater, &UpdateManager::downloadProgress, this,
+            [this](qint64 received, qint64 total) {
+                if (total > 0)
+                    statusBar()->showMessage(QString("Скачивание обновления: %1 / %2 КБ")
+                                                 .arg(received / 1024)
+                                                 .arg(total / 1024));
+                else
+                    statusBar()->showMessage(QString("Скачивание обновления: %1 КБ")
+                                                 .arg(received / 1024));
+            });
+    connect(m_updater, &UpdateManager::downloadFinished, this, [this](const QString &filePath) {
+        QMessageBox::information(this, "Скачивание завершено",
+            "Обновление скачано:\n" + filePath +
+            "\n\nРаспакуйте архив и замените файлы приложения.");
+        QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(filePath).absolutePath()));
+    });
+    connect(m_updater, &UpdateManager::downloadFailed, this,
+            [this](const QString &error) {
+                QMessageBox::warning(this, "Скачивание обновления", error);
+            });
+    m_updater->start();
 }
 
 MainWindow::~MainWindow()
@@ -225,6 +275,7 @@ void MainWindow::setupUI()
     connect(ui->actionRestore, &QAction::triggered, this, &MainWindow::onActionRestore_triggered);
     connect(ui->actionIntegrityCheck, &QAction::triggered, this, &MainWindow::onActionIntegrityCheck_triggered);
     connect(ui->actionOpsLog, &QAction::triggered, this, &MainWindow::onActionOpsLog_triggered);
+    connect(ui->actionCheckUpdates, &QAction::triggered, this, &MainWindow::onActionCheckUpdates_triggered);
     connect(ui->actionExpiryNotifications, &QAction::triggered, this, &MainWindow::onActionExpiryNotifications_triggered);
     connect(ui->actionAuditLog, &QAction::triggered, this, &MainWindow::onActionAuditLog_triggered);
     connect(ui->actionBatchStatus, &QAction::triggered, this, &MainWindow::onActionBatchStatus_triggered);
@@ -495,9 +546,11 @@ void MainWindow::onRecentDocDoubleClicked(const QModelIndex &index)
 
 void MainWindow::onActionAbout_triggered()
 {
+    QString version = DatabaseManager::instance().configObject()
+                          ["application"].toObject()["version"].toString("1.0.0");
     QMessageBox::about(this, "О программе",
                        "POC Terminal Tracker\n"
-                       "Версия 1.1.0\n\n"
+                       "Версия " + version + "\n\n"
                        "Система учёта POC-терминалов и SIM-карт");
 }
 
@@ -1056,6 +1109,22 @@ void MainWindow::onActionOpsLog_triggered()
         return;
     }
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+void MainWindow::onActionCheckUpdates_triggered()
+{
+    if (!m_updater)
+        return;
+
+    if (!m_updater->isEnabled()) {
+        QMessageBox::information(this, "Проверка обновлений",
+            "Автообновление не настроено.\n"
+            "Укажите update.url в config/config.json.");
+        return;
+    }
+
+    statusBar()->showMessage("Проверка обновлений...", 5000);
+    m_updater->checkForUpdates();
 }
 
 void MainWindow::showExpiryNotifications()

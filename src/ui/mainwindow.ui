@@ -343,6 +343,7 @@
      <addaction name="separator"/>
      <addaction name="actionIntegrityCheck"/>
      <addaction name="actionOpsLog"/>
+     <addaction name="actionCheckUpdates"/>
       <addaction name="actionExpiryNotifications"/>
      <addaction name="actionAuditLog"/>
      <addaction name="separator"/>
@@ -477,6 +478,11 @@
   <action name="actionOpsLog">
     <property name="text">
      <string>Журнал операций</string>
+    </property>
+   </action>
+  <action name="actionCheckUpdates">
+    <property name="text">
+     <string>Проверить обновления</string>
     </property>
    </action>
   <action name="actionExpiryNotifications">

@@ -262,6 +262,21 @@ psql -h localhost -U postgres -d pocbase_restore -f backup_poc_20260731_120000.s
 
 ## 6. Обновление версии
 
+### 6.1 Портативный дистрибутив
+
+Сборка дистрибутива (Qt runtime, драйвер QPSQL, DLL PostgreSQL, конфиг, миграции, документация):
+
+```bash
+cmake --build build --target deploy      # собирает build/deploy/
+cpack --config build/CPackConfig.cmake   # POC_Terminal_Tracker-<версия>-portable.zip
+```
+
+Пользователь распаковывает ZIP в любую папку и запускает `POC_Terminal_Tracker.exe`.
+Конфигурация и БД не хранятся рядом с exe (порт. режим) — настройки подключения
+берутся из `.env` рядом с exe, а пароль — из `POC_DB_PASSWORD`.
+
+### 6.2 Ручное обновление
+
 1. Сделайте бэкап БД (раздел 3).
 2. Остановите приложение.
 3. Замените файлы приложения (exe, DLL, `sql\migrations\`, `config\`).
@@ -277,6 +292,36 @@ psql -h localhost -U postgres -d pocbase_restore -f backup_poc_20260731_120000.s
 ```bash
 psql -U postgres -d pocbase -f sql\migrations\00X_xxx.sql
 ```
+
+### 6.3 Автообновление (в приложении)
+
+Приложение умеет проверять наличие новой версии по HTTP-манифесту и скачивать
+дистрибутив в папку загрузок. Настройка в `config\config.json`:
+
+```json
+"update": {
+  "url": "https://example.com/poc/update.json",
+  "check_on_startup": true
+}
+```
+
+Формат манифеста:
+
+```json
+{
+  "version": "1.4.1",
+  "release_notes": "Что изменилось",
+  "download_url": "https://example.com/poc/POC_Terminal_Tracker-1.4.1-portable.zip"
+}
+```
+
+- При старте (если `check_on_startup=true`) и по «Сервис → Проверка обновлений»
+  приложение загружает манифест и сравнивает версии.
+- Если новая версия найдена — диалог «Скачать/Позже»; при скачивании файл
+  кладётся в папку загрузок системы, прогресс — в статусбар.
+- Приложение само себя не заменяет: после скачивания распакуйте архив поверх
+  текущего каталога (данные при этом сохраняются).
+- При пустом `update.url` проверка отключена (меню сообщит об этом).
 
 ## 7. Диагностика проблем
 

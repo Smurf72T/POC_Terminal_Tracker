@@ -66,6 +66,10 @@ Makefile
 compile_commands.json
 .cmake/
 
+# Packaging artifacts (CPack)
+_CPack_Packages/
+*.zip
+
 # PostgreSQL
 *.sql.bak
 

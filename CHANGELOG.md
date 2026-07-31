@@ -1,8 +1,14 @@
 # Changelog
 
-## [1.3.0] — 2026-07-31
+## [1.4.0] — 2026-07-31
 
-### Operations
+### Delivery
+- **Портативный дистрибутив**: цель `deploy` (windeployqt) + CPack ZIP `POC_Terminal_Tracker-<версия>-portable.zip` — Qt runtime, драйвер `qsqlpsql`, DLL PostgreSQL (libpq/libintl/OpenSSL), MinGW runtime, `config/`, миграции и документация в комплекте; запуск без установки
+- **Автообновление**: `update/updatemanager.*` — проверка манифеста `{"version", "release_notes", "download_url"}` по `update.url` (при старте и «Сервис → Проверка обновлений»), диалог «Скачать/Позже», скачивание в папку загрузок с прогрессом; при пустом `update.url` функция выключена
+- **Утилиты версий**: `update/version.h` — `parseVersion`/`compareVersions`/`isVersionNewer` (semver major.minor.patch, `-beta` игнорируется)
+- **Тесты**: `test_update_utils` — парсинг и сравнение версий
+- **Об About**: версия приложения читается из `config.json` (была захардкожена 1.1.0)
+
 - **Планировщик автобэкапов**: `ops/opsscheduler.*` — автоматические бэкапы по расписанию (`backup.interval_hours`, пока приложение запущено), каталог `backup.directory`, retention `backup.retention_count` (авто-удаление старых `backup_poc_*.sql`), статус в статусбаре главного окна
 - **Журнал операций**: `ops/opslog.*` — `logs/ops.log` с записями о запусках, бэкапах, восстановлениях, проверках целостности и ошибках; ротация при 1 МБ; открытие из меню «Сервис → Журнал операций»
 - **Мониторинг целостности**: автоматическая проверка бизнес-инвариантов терминалов/SIM (`monitoring.integrity_interval_hours`) + ручной запуск «Сервис → Проверка целостности БД»; результаты в `ops.log`

@@ -22,6 +22,8 @@ namespace Ui {
 
 class OpsScheduler;
 
+class UpdateManager;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -55,6 +57,7 @@ private slots:
     void onActionRestore_triggered();
     void onActionIntegrityCheck_triggered();
     void onActionOpsLog_triggered();
+    void onActionCheckUpdates_triggered();
     void onActionExpiryNotifications_triggered();
     void onActionAuditLog_triggered();
     void onActionBatchStatus_triggered();
@@ -73,6 +76,7 @@ private:
     QChartView *chartStatusView = nullptr;
     QChartView *chartRevenueView = nullptr;
     OpsScheduler *m_opsScheduler = nullptr;
+    UpdateManager *m_updater = nullptr;
     QLabel *m_backupStatusLabel = nullptr;
 
     void setupUI();
