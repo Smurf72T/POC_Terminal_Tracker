@@ -22,6 +22,9 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2022_64'
           modules: 'qtcharts'
+          # В релизе aqtinstall (PyPI 3.3.0, 2025-06) нет поддержки Qt 6.11 —
+          # новая структура репозитория Qt. Фикс только на master (PR #1000).
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e'
           cache: true
 
       - name: Install PostgreSQL 17
