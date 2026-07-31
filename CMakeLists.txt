@@ -196,8 +196,23 @@ if(BUILD_TESTS)
     target_link_libraries(test_validator PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_validator COMMAND test_validator)
 
+    add_executable(test_db_integration tests/test_db_integration.cpp)
+    target_include_directories(test_db_integration PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_db_integration PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
+    add_test(NAME test_db_integration COMMAND test_db_integration)
+
+    if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/qsqlpsql.dll")
+        add_custom_command(TARGET test_db_integration POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:test_db_integration>/sqldrivers"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/qsqlpsql.dll"
+                "$<TARGET_FILE_DIR:test_db_integration>/sqldrivers/qsqlpsql.dll"
+                COMMENT "Copying qsqlpsql.dll for test_db_integration"
+        )
+    endif()
+
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
-    foreach(_test test_password_utils test_validator)
+    foreach(_test test_password_utils test_validator test_db_integration)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
             if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")
                 add_custom_command(TARGET ${_test} POST_BUILD
