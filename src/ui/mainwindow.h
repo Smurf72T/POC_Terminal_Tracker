@@ -39,10 +39,12 @@ private slots:
     void onActionReceipt_triggered();
     void onActionRental_triggered();
     void onActionReturn_triggered();
+    void onActionStatusChange_triggered();
     void onActionPayment_triggered();
     void onActionArchiveReceipt_triggered();
     void onActionArchiveRental_triggered();
     void onActionArchiveReturn_triggered();
+    void onActionArchiveStatusChange_triggered();
     void onActionArchivePayment_triggered();
     void onActionTerminalHistory_triggered();
     void onActionFreeDevicesReport_triggered();
@@ -82,7 +84,6 @@ private:
     void performBackup();
     void performFallbackBackup(const QString &filePath, const QString &dbname);
     void performRestore();
-    bool performFallbackRestore(const QString &filePath);
     void showExpiryNotifications();
     void showGlobalSearch();
 };

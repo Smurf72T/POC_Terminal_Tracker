@@ -167,15 +167,27 @@ void BulkImportForm::loadPreview()
 
 bool BulkImportForm::importData()
 {
-    QAbstractItemModel *model = ui->tableViewPreview->model();
-    if (!model || model->rowCount() == 0) {
-        QMessageBox::warning(this, "Внимание", "Нет данных для импорта.");
+    // Импортируем из исходного файла, а не из preview-модели
+    // (preview показывает только первые 50 строк)
+    QXlsx::Document document(selectedFilePath);
+    QXlsx::Worksheet *worksheet = document.currentWorksheet();
+    if (!worksheet) {
+        QMessageBox::critical(this, "Ошибка", "Не удалось прочитать лист документа.");
         return false;
     }
 
+    QXlsx::CellRange range = worksheet->dimension();
+    int maxRows = range.rowCount();
+    if (maxRows < 2) {
+        QMessageBox::warning(this, "Внимание",
+            "Файл слишком короткий (нужна хотя бы строка данных после заголовков).");
+        return false;
+    }
+    int dataRows = maxRows - 1;
+
     QMessageBox::StandardButton reply = QMessageBox::question(this, "Подтверждение",
         QString("Импортировать %1 терминалов?\n\n"
-                "Убедитесь, что все модели указаны корректно.").arg(model->rowCount()),
+                "Убедитесь, что все модели указаны корректно.").arg(dataRows),
         QMessageBox::Yes | QMessageBox::No);
 
     if (reply != QMessageBox::Yes) return false;
@@ -203,12 +215,17 @@ bool BulkImportForm::importData()
         existingSerials.insert(existingQuery.value(0).toString());
     }
 
-    for (int row = 0; row < model->rowCount(); row++) {
-        QString serial = model->data(model->index(row, 0)).toString();
-        QString imei1 = model->data(model->index(row, 1)).toString();
-        QString imei2 = model->data(model->index(row, 2)).toString();
-        QString modelName = model->data(model->index(row, 3)).toString();
-        QString notes = model->data(model->index(row, 4)).toString();
+    for (int row = 2; row <= maxRows; row++) {
+        auto cellValue = [&](int col) -> QString {
+            auto cell = worksheet->cellAt(row, col);
+            return cell ? cell->value().toString() : QString();
+        };
+
+        QString serial = cellValue(1);
+        QString imei1 = cellValue(2);
+        QString imei2 = cellValue(3);
+        QString modelName = cellValue(4);
+        QString notes = cellValue(5);
 
         QStringList rowErrors;
 
@@ -238,7 +255,7 @@ bool BulkImportForm::importData()
 
         if (!rowErrors.isEmpty()) {
             failed++;
-            errors.append(QString("Строка %1: %2").arg(row + 2).arg(rowErrors.join("; ")));
+            errors.append(QString("Строка %1: %2").arg(row).arg(rowErrors.join("; ")));
             continue;
         }
 
@@ -258,17 +275,17 @@ bool BulkImportForm::importData()
             existingSerials.insert(serial);
 
             dbMgr.logAction("ADD", "tblterminals", terminalId,
-                "admin", "{}",
+                dbMgr.getCurrentUser(), "{}",
                 QString("serial=%1, imei1=%2").arg(serial).arg(imei1));
         } else {
             failed++;
-            errors.append(QString("Строка %1: %2").arg(row + 2).arg(query.lastError().text()));
+            errors.append(QString("Строка %1: %2").arg(row).arg(query.lastError().text()));
         }
     }
 
     if (failed > 0) {
         db.rollback();
-        showImportResult(false, model->rowCount(), imported, failed, errors.join("\n"));
+        showImportResult(false, dataRows, imported, failed, errors.join("\n"));
         return false;
     }
 
@@ -277,7 +294,7 @@ bool BulkImportForm::importData()
         return false;
     }
 
-    showImportResult(true, model->rowCount(), imported, failed, QString());
+    showImportResult(true, dataRows, imported, failed, QString());
     dbMgr.notifyDataChanged();
     return true;
 }

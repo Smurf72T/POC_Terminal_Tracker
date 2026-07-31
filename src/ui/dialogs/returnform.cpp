@@ -425,7 +425,7 @@ void ReturnForm::on_btnPrint_clicked()
                    "th { background-color: #f0f0f0; }"
                    "</style></head><body>";
 
-    html += "<h2>АКТ ВОЗВРАТА ТЕРМИНАЛОВ № " + ui->lineEditNumber->text() + "</h2>";
+    html += "<h2>АКТ ВОЗВРАТА ТЕРМИНАЛОВ № " + ui->lineEditNumber->text().toHtmlEscaped() + "</h2>";
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
     html += "<p><b>Арендодатель:</b> ООО «POC Terminal»</p>";
 
@@ -437,8 +437,8 @@ void ReturnForm::on_btnPrint_clicked()
         clientName = clientQuery.value(0).toString();
         clientInn = clientQuery.value(1).toString();
     }
-    html += "<p><b>Арендатор:</b> " + clientName;
-    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn + ")";
+    html += "<p><b>Арендатор:</b> " + clientName.toHtmlEscaped();
+    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
     html += "</p>";
 
     html += "<table><tr><th>№</th><th>Серийный номер</th><th>Модель</th><th>IMEI 1</th></tr>";
@@ -460,9 +460,9 @@ void ReturnForm::on_btnPrint_clicked()
         }
 
         html += "<tr><td>" + QString::number(i + 1) + "</td>"
-                "<td>" + serial + "</td>"
-                "<td>" + modelName + "</td>"
-                "<td>" + imei + "</td></tr>";
+                "<td>" + serial.toHtmlEscaped() + "</td>"
+                "<td>" + modelName.toHtmlEscaped() + "</td>"
+                "<td>" + imei.toHtmlEscaped() + "</td></tr>";
     }
     html += "</table>";
 

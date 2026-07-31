@@ -70,6 +70,16 @@ inline QString hashPassword(const QString &password)
     return hashPassword(password, generateSalt());
 }
 
+inline bool constantTimeEquals(const QByteArray &a, const QByteArray &b)
+{
+    if (a.size() != b.size())
+        return false;
+    unsigned char result = 0;
+    for (int i = 0; i < a.size(); ++i)
+        result |= static_cast<unsigned char>(a.at(i)) ^ static_cast<unsigned char>(b.at(i));
+    return result == 0;
+}
+
 inline bool checkPassword(const QString &password, const QString &storedHash)
 {
     if (storedHash.count(':') == 2) {
@@ -80,18 +90,18 @@ inline bool checkPassword(const QString &password, const QString &storedHash)
         QString salt = parts[1];
         QString expected = parts[2];
         QString actual = hashPassword(password, salt);
-        return actual == storedHash;
+        return constantTimeEquals(actual.section(':', 2, 2).toUtf8(), expected.toUtf8());
     }
     if (storedHash.length() == 80) {
         QString salt = storedHash.left(16);
         QString hash = QString(QCryptographicHash::hash(
             (salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
-        return hash == storedHash.mid(16);
+        return constantTimeEquals(hash.toUtf8(), storedHash.mid(16).toUtf8());
     }
     if (storedHash.length() == 64) {
         QString hash = QString(QCryptographicHash::hash(
             password.toUtf8(), QCryptographicHash::Sha256).toHex());
-        return hash == storedHash;
+        return constantTimeEquals(hash.toUtf8(), storedHash.toUtf8());
     }
     return false;
 }

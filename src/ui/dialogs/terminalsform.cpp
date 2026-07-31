@@ -33,6 +33,7 @@ TerminalsForm::TerminalsForm(QWidget *parent) :
     model->setHeaderData(6, Qt::Horizontal, "SIM-карта");
     model->setHeaderData(7, Qt::Horizontal, "Дата покупки");
     model->setHeaderData(8, Qt::Horizontal, "Примечание");
+    model->setHeaderData(9, Qt::Horizontal, "Был в ремонте");
 
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -70,7 +71,8 @@ void TerminalsForm::loadModel(const QString &filter)
         "t.imei1, t.imei2, "
         "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
         "COALESCE(s.simnumber, 'SIM не назначена') AS simnumber, "
-        "t.purchasedate, t.notes "
+        "t.purchasedate, t.notes, "
+        "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS was_repaired "
         "FROM tblterminals t "
         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
         "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid";

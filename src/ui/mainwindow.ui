@@ -298,20 +298,22 @@
      <property name="title">
       <string>Документы</string>
      </property>
-     <addaction name="actionReceipt"/>
-     <addaction name="actionRental"/>
-     <addaction name="actionReturn"/>
-     <addaction name="actionPayment"/>
-    </widget>
-    <widget class="QMenu" name="menuArchives">
-     <property name="title">
-      <string>Архивы документов</string>
-     </property>
-     <addaction name="actionArchiveReceipt"/>
-     <addaction name="actionArchiveRental"/>
-     <addaction name="actionArchiveReturn"/>
-     <addaction name="actionArchivePayment"/>
-    </widget>
+      <addaction name="actionReceipt"/>
+      <addaction name="actionRental"/>
+      <addaction name="actionReturn"/>
+      <addaction name="actionStatusChange"/>
+      <addaction name="actionPayment"/>
+     </widget>
+     <widget class="QMenu" name="menuArchives">
+      <property name="title">
+       <string>Архивы документов</string>
+      </property>
+      <addaction name="actionArchiveReceipt"/>
+      <addaction name="actionArchiveRental"/>
+      <addaction name="actionArchiveReturn"/>
+      <addaction name="actionArchiveStatusChange"/>
+      <addaction name="actionArchivePayment"/>
+     </widget>
    <widget class="QMenu" name="menuFile">
     <property name="title">
      <string>Файл</string>
@@ -401,6 +403,11 @@
     <string>Возврат из аренды</string>
    </property>
   </action>
+  <action name="actionStatusChange">
+   <property name="text">
+    <string>Изменение статуса терминалов</string>
+   </property>
+  </action>
   <action name="actionPayment">
    <property name="text">
     <string>Отметка оплаты</string>
@@ -419,6 +426,11 @@
    <action name="actionArchiveReturn">
     <property name="text">
      <string>Возврат</string>
+    </property>
+   </action>
+   <action name="actionArchiveStatusChange">
+    <property name="text">
+     <string>Изменение статусов</string>
     </property>
    </action>
    <action name="actionArchivePayment">

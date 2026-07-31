@@ -10,6 +10,7 @@
 #include "dialogs/receiptform.h"
 #include "dialogs/rentalform.h"
 #include "dialogs/returnform.h"
+#include "dialogs/statuschangeform.h"
 #include "dialogs/paymentform.h"
 #include "dialogs/archivedocumentsform.h"
 #include "dialogs/terminalhistoryform.h"
@@ -44,6 +45,7 @@
 #include <QComboBox>
 #include <QCompleter>
 #include <QApplication>
+#include <QSettings>
 #include <QFile>
 #include <QShortcut>
 #include <QDialog>
@@ -60,6 +62,7 @@ MainWindow::MainWindow(QWidget *parent) :
     refreshTimer(new QTimer(this))
 {
     ui->setupUi(this);
+    m_darkTheme = QSettings("POC", "TerminalTracker").value("darkTheme", true).toBool();
     setupUI();
     updateStatusBar();
 
@@ -123,7 +126,7 @@ void MainWindow::setupUI()
     setWindowTitle("POC Terminal Tracker");
     resize(1200, 800);
 
-    auto *themeBtn = new QPushButton("☀️ Светлая тема", this);
+    auto *themeBtn = new QPushButton(m_darkTheme ? "☀️ Светлая тема" : "🌙 Тёмная тема", this);
     themeBtn->setFixedHeight(24);
     themeBtn->setStyleSheet(
         "QPushButton { background: transparent; color: #E0E0E0; border: 1px solid #555; "
@@ -133,6 +136,7 @@ void MainWindow::setupUI()
     statusBar()->addPermanentWidget(themeBtn);
     connect(themeBtn, &QPushButton::clicked, this, [this, themeBtn]() {
         m_darkTheme = !m_darkTheme;
+        QSettings("POC", "TerminalTracker").setValue("darkTheme", m_darkTheme);
         QFile file(m_darkTheme ? ":/styles/modern.qss" : ":/styles/light.qss");
         if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             QString style = QString::fromUtf8(file.readAll());
@@ -167,10 +171,12 @@ void MainWindow::setupUI()
     connect(ui->actionReceipt, &QAction::triggered, this, &MainWindow::onActionReceipt_triggered);
     connect(ui->actionRental, &QAction::triggered, this, &MainWindow::onActionRental_triggered);
     connect(ui->actionReturn, &QAction::triggered, this, &MainWindow::onActionReturn_triggered);
+    connect(ui->actionStatusChange, &QAction::triggered, this, &MainWindow::onActionStatusChange_triggered);
     connect(ui->actionPayment, &QAction::triggered, this, &MainWindow::onActionPayment_triggered);
     connect(ui->actionArchiveReceipt, &QAction::triggered, this, &MainWindow::onActionArchiveReceipt_triggered);
     connect(ui->actionArchiveRental, &QAction::triggered, this, &MainWindow::onActionArchiveRental_triggered);
     connect(ui->actionArchiveReturn, &QAction::triggered, this, &MainWindow::onActionArchiveReturn_triggered);
+    connect(ui->actionArchiveStatusChange, &QAction::triggered, this, &MainWindow::onActionArchiveStatusChange_triggered);
     connect(ui->actionArchivePayment, &QAction::triggered, this, &MainWindow::onActionArchivePayment_triggered);
     connect(ui->actionTerminalHistory, &QAction::triggered, this, &MainWindow::onActionTerminalHistory_triggered);
     connect(ui->actionFreeDevicesReport, &QAction::triggered, this, &MainWindow::onActionFreeDevicesReport_triggered);
@@ -398,6 +404,8 @@ void MainWindow::loadRecentDocuments()
         "SELECT 2, rentaldocid, docnumber, docdate, 'Аренда' FROM tblrentaldocs "
         "UNION ALL "
         "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
+        "UNION ALL "
+        "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
         "ORDER BY \"Дата\" DESC "
         "LIMIT 15";
 
@@ -433,6 +441,10 @@ void MainWindow::onRecentDocDoubleClicked(const QModelIndex &index)
         ReturnForm form(this);
         form.loadForEdit(docId);
         form.exec();
+    } else if (docType == 5) {
+        StatusChangeForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
     }
     loadRecentDocuments();
 }
@@ -441,7 +453,7 @@ void MainWindow::onActionAbout_triggered()
 {
     QMessageBox::about(this, "О программе",
                        "POC Terminal Tracker\n"
-                       "Версия 1.0.0\n\n"
+                       "Версия 1.1.0\n\n"
                        "Система учёта POC-терминалов и SIM-карт");
 }
 
@@ -491,6 +503,11 @@ void MainWindow::onActionReturn_triggered()
     openForm(new ReturnForm(this));
 }
 
+void MainWindow::onActionStatusChange_triggered()
+{
+    openForm(new StatusChangeForm(this));
+}
+
 void MainWindow::onActionPayment_triggered()
 {
     openForm(new PaymentForm(this));
@@ -509,6 +526,11 @@ void MainWindow::onActionArchiveRental_triggered()
 void MainWindow::onActionArchiveReturn_triggered()
 {
     openForm(new ArchiveDocumentsForm(3, this));
+}
+
+void MainWindow::onActionArchiveStatusChange_triggered()
+{
+    openForm(new ArchiveDocumentsForm(5, this));
 }
 
 void MainWindow::onActionArchivePayment_triggered()
@@ -870,16 +892,17 @@ void MainWindow::performBackup()
 
     if (reply != QMessageBox::Yes) return;
 
-    // Загружаем конфигурацию БД
+    // Загружаем конфигурацию БД (host берём из активного подключения)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT current_setting('port'), current_database(), current_user") || !query.next()) {
+    if (!query.exec("SELECT current_setting('host'), current_setting('port'), current_database(), current_user") || !query.next()) {
         qCWarning(logSQL) << "Failed to get database settings:" << query.lastError().text();
         return;
     }
 
-    QString port = query.value(0).toString();
-    QString dbname = query.value(1).toString();
-    QString user = query.value(2).toString();
+    QString host = query.value(0).toString();
+    QString port = query.value(1).toString();
+    QString dbname = query.value(2).toString();
+    QString user = query.value(3).toString();
 
     // Показываем диалог для ввода пароля
     bool passwordOk;
@@ -888,11 +911,15 @@ void MainWindow::performBackup()
     if (!passwordOk) return;
 
     // Формируем команду pg_dump (пароль передаём через PGPASSWORD, без файлов на диске)
+    // --clean/--if-exists добавляют в дамп DROP-инструкции, чтобы дамп можно было
+    // восстановить в уже заполненную базу (psql без этого падает на существующих таблицах).
     QStringList args;
     args << "--format=plain"
          << "--encoding=UTF8"
          << "--no-password"
-         << "--host=localhost"
+         << "--clean"
+         << "--if-exists"
+         << QString("--host=%1").arg(host)
          << QString("--port=%1").arg(port)
          << QString("--username=%1").arg(user)
          << QString("--file=%1").arg(filePath)
@@ -930,6 +957,47 @@ void MainWindow::performBackup()
     }
 }
 
+namespace {
+QString escapeSqlLiteral(const QString &value)
+{
+    QString escaped = value;
+    escaped.replace("\\", "\\\\");
+    escaped.replace("'", "''");
+    return "'" + escaped + "'";
+}
+
+QString formatSqlValue(const QVariant &val)
+{
+    if (val.isNull())
+        return "NULL";
+
+    switch (static_cast<QMetaType::Type>(val.typeId())) {
+    case QMetaType::QDateTime:
+        return escapeSqlLiteral(val.toDateTime().toString(Qt::ISODateWithMs));
+    case QMetaType::QDate:
+        return escapeSqlLiteral(val.toDate().toString(Qt::ISODate));
+    case QMetaType::QTime:
+        return escapeSqlLiteral(val.toTime().toString("HH:mm:ss"));
+    case QMetaType::Bool:
+        return val.toBool() ? "TRUE" : "FALSE";
+    case QMetaType::QByteArray:
+        return "'\\x" + QString::fromLatin1(val.toByteArray().toHex()) + "'";
+    case QMetaType::Double:
+        return QString::number(val.toDouble(), 'g', 17);
+    case QMetaType::QString:
+    case QMetaType::Char:
+    case QMetaType::QChar:
+    case QMetaType::QStringList:
+    case QMetaType::QJsonObject:
+    case QMetaType::QJsonArray:
+    case QMetaType::QJsonValue:
+        return escapeSqlLiteral(val.toString());
+    default:
+        return val.toString();
+    }
+}
+} // namespace
+
 void MainWindow::performFallbackBackup(const QString &filePath, const QString &dbname)
 {
     QFile file(filePath);
@@ -942,22 +1010,47 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
 
     out << "-- Резервная копия БД " << dbname << "\n";
-    out << "-- Создана: " << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n\n";
+    out << "-- Создана: " << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n";
+    out << "-- Восстановление: psql -U <user> -d <dbname> -f <file>\n\n";
 
     QSqlQuery tableQuery(db);
     if (!tableQuery.exec("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")) {
         qCWarning(logSQL) << "Failed to list tables:" << tableQuery.lastError().text();
         return;
     }
+    QStringList tables;
+    while (tableQuery.next())
+        tables.append(tableQuery.value(0).toString());
 
-    while (tableQuery.next()) {
-        QString table = tableQuery.value(0).toString();
+    out << "-- 1. Удаление старых таблиц\n";
+    for (const QString &table : tables)
+        out << "DROP TABLE IF EXISTS \"" << table << "\" CASCADE;\n";
+    out << "\n";
 
-        out << "-- Таблица: " << table << "\n";
-        out << "CREATE TABLE IF NOT EXISTS \"" << table << "\" (\n";
+    out << "-- 2. Последовательности (после DROP, т.к. owned-последовательности удаляются вместе с таблицей)\n";
+    QSqlQuery seqQuery(db);
+    if (seqQuery.exec("SELECT schemaname, sequencename FROM pg_sequences "
+                      "WHERE schemaname = 'public' ORDER BY sequencename")) {
+        while (seqQuery.next()) {
+            QString seq = seqQuery.value(1).toString();
+            QSqlQuery stateQuery(db);
+            if (stateQuery.exec("SELECT last_value, is_called FROM \"" + seq + "\"") && stateQuery.next()) {
+                qint64 lastValue = stateQuery.value(0).toLongLong();
+                bool isCalled = stateQuery.value(1).toBool();
+                out << "CREATE SEQUENCE IF NOT EXISTS \"" << seq << "\" START 1;\n";
+                out << "SELECT setval('" << seq << "', " << lastValue << ", "
+                    << (isCalled ? "TRUE" : "FALSE") << ");\n";
+            }
+        }
+    } else {
+        qCWarning(logSQL) << "Failed to list sequences:" << seqQuery.lastError().text();
+    }
+    out << "\n";
 
+    out << "-- 3. Создание таблиц (FK добавляются в конце)\n";
+    for (const QString &table : tables) {
         QSqlQuery colQuery(db);
-        colQuery.prepare("SELECT column_name, data_type, is_nullable "
+        colQuery.prepare("SELECT column_name, data_type, is_nullable, column_default "
                          "FROM information_schema.columns "
                          "WHERE table_schema = 'public' AND table_name = :tbl "
                          "ORDER BY ordinal_position");
@@ -968,18 +1061,38 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
         }
 
         QStringList columnDefs;
-        QStringList columnNames;
         while (colQuery.next()) {
             QString name = colQuery.value(0).toString();
             QString type = colQuery.value(1).toString();
             QString nullable = colQuery.value(2).toString();
-            columnNames.append("\"" + name + "\"");
-
+            QString defaultValue = colQuery.value(3).toString();
             if (type.toUpper().startsWith("INT")) type = "INTEGER";
-            columnDefs.append("    \"" + name + "\" " + type +
-                              (nullable == "YES" ? " NULL" : " NOT NULL"));
+            QString def = "    \"" + name + "\" " + type +
+                          (nullable == "YES" ? " NULL" : " NOT NULL");
+            if (!defaultValue.isEmpty())
+                def += " DEFAULT " + defaultValue;
+            columnDefs.append(def);
         }
-        out << columnDefs.join(",\n") << "\n);\n\n";
+        out << "CREATE TABLE \"" << table << "\" (\n"
+            << columnDefs.join(",\n") << "\n);\n\n";
+    }
+
+    out << "-- 4. Данные\n";
+    for (const QString &table : tables) {
+        QSqlQuery colQuery(db);
+        colQuery.prepare("SELECT column_name FROM information_schema.columns "
+                         "WHERE table_schema = 'public' AND table_name = :tbl "
+                         "ORDER BY ordinal_position");
+        colQuery.bindValue(":tbl", table);
+        QStringList columnNames;
+        if (colQuery.exec()) {
+            while (colQuery.next())
+                columnNames.append("\"" + colQuery.value(0).toString() + "\"");
+        }
+        if (columnNames.isEmpty()) {
+            qCWarning(logSQL) << "No columns for table" << table;
+            continue;
+        }
 
         QSqlQuery dataQuery(db);
         dataQuery.prepare(QString("SELECT * FROM \"%1\"").arg(table));
@@ -990,31 +1103,62 @@ void MainWindow::performFallbackBackup(const QString &filePath, const QString &d
 
         while (dataQuery.next()) {
             out << "INSERT INTO \"" << table << "\" (" << columnNames.join(", ") << ") VALUES (";
-            for (int i = 0; i < dataQuery.record().count(); i++) {
+            for (int i = 0; i < dataQuery.record().count(); ++i) {
                 if (i > 0) out << ", ";
-                QVariant val = dataQuery.value(i);
-                if (val.isNull()) {
-                    out << "NULL";
-                } else {
-                    QMetaType::Type t = static_cast<QMetaType::Type>(val.typeId());
-                    if (t == QMetaType::QString || t == QMetaType::QByteArray) {
-                        QString escaped = val.toString();
-                        escaped.replace("\\", "\\\\");
-                        escaped.replace("'", "''");
-                        out << "'" << escaped << "'";
-                    } else if (t == QMetaType::QDateTime || t == QMetaType::QDate) {
-                        out << "'" << val.toString() << "'";
-                    } else if (t == QMetaType::QByteArray) {
-                        out << "'\\x" << val.toByteArray().toHex() << "'";
-                    } else {
-                        out << val.toString();
-                    }
-                }
+                out << formatSqlValue(dataQuery.value(i));
             }
             out << ");\n";
         }
         out << "\n";
     }
+
+    out << "-- 5. Функции\n";
+    QSqlQuery funcQuery(db);
+    if (funcQuery.exec("SELECT pg_get_functiondef(p.oid) FROM pg_proc p "
+                       "JOIN pg_namespace n ON n.oid = p.pronamespace "
+                       "WHERE n.nspname = 'public' ORDER BY p.oid")) {
+        while (funcQuery.next())
+            out << funcQuery.value(0).toString() << "\n";
+    }
+    out << "\n";
+
+    out << "-- 6. Триггеры\n";
+    QSqlQuery triggerQuery(db);
+    if (triggerQuery.exec("SELECT pg_get_triggerdef(t.oid) FROM pg_trigger t "
+                          "JOIN pg_class c ON c.oid = t.tgrelid "
+                          "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                          "WHERE NOT t.tgisinternal AND n.nspname = 'public'")) {
+        while (triggerQuery.next())
+            out << triggerQuery.value(0).toString() << ";\n";
+    }
+    out << "\n";
+
+    out << "-- 7. Индексы (индексы ограничений создаются вместе с ограничениями)\n";
+    QSqlQuery indexQuery(db);
+    if (indexQuery.exec("SELECT pg_get_indexdef(i.indexrelid) FROM pg_index i "
+                        "JOIN pg_class c ON c.oid = i.indexrelid "
+                        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                        "LEFT JOIN pg_constraint con ON con.conindid = i.indexrelid "
+                        "WHERE n.nspname = 'public' AND con.oid IS NULL "
+                        "ORDER BY c.relname")) {
+        while (indexQuery.next())
+            out << indexQuery.value(0).toString() << ";\n";
+    }
+    out << "\n";
+
+    out << "-- 8. Ограничения (FK в конце)\n";
+    QSqlQuery conQuery(db);
+    if (conQuery.exec("SELECT c.conrelid::regclass::text, c.conname, pg_get_constraintdef(c.oid) "
+                      "FROM pg_constraint c WHERE c.connamespace = 'public'::regnamespace "
+                      "AND c.contype IN ('p','u','c','f') "
+                      "ORDER BY (c.contype = 'f'), c.conname")) {
+        while (conQuery.next()) {
+            out << "ALTER TABLE " << conQuery.value(0).toString()
+                << " ADD CONSTRAINT " << conQuery.value(1).toString() << " "
+                << conQuery.value(2).toString() << ";\n";
+        }
+    }
+    out << "\n";
 
     file.close();
     QMessageBox::information(this, "Успех",
@@ -1052,14 +1196,15 @@ void MainWindow::performRestore()
 
     // Пытаемся через psql
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT current_setting('port'), current_database(), current_user") || !query.next()) {
+    if (!query.exec("SELECT current_setting('host'), current_setting('port'), current_database(), current_user") || !query.next()) {
         qCWarning(logSQL) << "Failed to get database settings:" << query.lastError().text();
         return;
     }
 
-    QString port = query.value(0).toString();
-    QString dbname = query.value(1).toString();
-    QString user = query.value(2).toString();
+    QString host = query.value(0).toString();
+    QString port = query.value(1).toString();
+    QString dbname = query.value(2).toString();
+    QString user = query.value(3).toString();
 
     bool passwordOk;
     QString password = QInputDialog::getText(this, "Пароль PostgreSQL",
@@ -1067,11 +1212,12 @@ void MainWindow::performRestore()
     if (!passwordOk) return;
 
     QStringList args;
-    args << "--host=localhost"
+    args << QString("--host=%1").arg(host)
          << QString("--port=%1").arg(port)
          << QString("--username=%1").arg(user)
          << QString("--dbname=%1").arg(dbname)
-         << QString("--file=%1").arg(filePath);
+         << QString("--file=%1").arg(filePath)
+         << "--single-transaction";
 
     QProcess process;
     auto env = process.environment();
@@ -1090,14 +1236,12 @@ void MainWindow::performRestore()
     QString error = process.readAllStandardError();
     int exitCode = process.exitCode();
 
+    // psql возвращает ненулевой код только при реальных ошибках (NOTICE/WARNING не считаются)
     if (exitCode != 0) {
-        // psql выдаёт NOTICE/WARNING даже при успехе — не пугаем пользователя
-        if (error.contains("ERROR", Qt::CaseInsensitive)) {
-            QMessageBox::critical(this, "Ошибка восстановления",
-                "psql завершился с ошибками (код " + QString::number(exitCode) + "):\n"
-                + error.left(2000));
-            return;
-        }
+        QMessageBox::critical(this, "Ошибка восстановления",
+            "psql завершился с ошибками (код " + QString::number(exitCode) + "):\n"
+            + error.left(2000));
+        return;
     }
 
     // Обновляем данные на дашборде

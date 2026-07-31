@@ -364,13 +364,13 @@ void ReceiptForm::on_btnPrint_clicked()
                    "th { background-color: #f0f0f0; }"
                    "</style></head><body>";
 
-    html += "<h2>ПРИХОДНАЯ НАКЛАДНАЯ № " + ui->lineEditNumber->text() + "</h2>";
+    html += "<h2>ПРИХОДНАЯ НАКЛАДНАЯ № " + ui->lineEditNumber->text().toHtmlEscaped() + "</h2>";
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
     html += "<p><b>Поставщик:</b> ООО «POC Terminal»</p>";
 
     QString comment = ui->textEditComment->toPlainText().trimmed();
     if (!comment.isEmpty())
-        html += "<p><b>Комментарий:</b> " + comment + "</p>";
+        html += "<p><b>Комментарий:</b> " + comment.toHtmlEscaped() + "</p>";
 
     html += "<table><tr><th>№</th><th>Серийный номер</th><th>Модель</th><th>IMEI 1</th><th>IMEI 2</th></tr>";
 
@@ -386,10 +386,10 @@ void ReceiptForm::on_btnPrint_clicked()
         QString imei2 = rowsModel->data(rowsModel->index(i, 3)).toString();
 
         html += "<tr><td>" + QString::number(i + 1) + "</td>"
-                "<td>" + serial + "</td>"
-                "<td>" + modelName + "</td>"
-                "<td>" + imei1 + "</td>"
-                "<td>" + imei2 + "</td></tr>";
+                "<td>" + serial.toHtmlEscaped() + "</td>"
+                "<td>" + modelName.toHtmlEscaped() + "</td>"
+                "<td>" + imei1.toHtmlEscaped() + "</td>"
+                "<td>" + imei2.toHtmlEscaped() + "</td></tr>";
     }
     html += "</table>";
 

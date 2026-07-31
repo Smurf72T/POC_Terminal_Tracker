@@ -447,12 +447,12 @@ void RentalForm::on_btnPrintAct_clicked()
                    ".signature div { width: 45%; }"
                    "</style></head><body>";
 
-    html += "<h2>АКТ ПРИЁМА-ПЕРЕДАЧИ ТЕРМИНАЛОВ № " + ui->lineEditNumber->text() + "</h2>";
+    html += "<h2>АКТ ПРИЁМА-ПЕРЕДАЧИ ТЕРМИНАЛОВ № " + ui->lineEditNumber->text().toHtmlEscaped() + "</h2>";
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
     html += "<p><b>Арендодатель:</b> ООО «POC Terminal»</p>";
-    html += "<p><b>Арендатор:</b> " + clientName;
-    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn + ")";
-    if (!clientAddress.isEmpty()) html += ", адрес: " + clientAddress;
+    html += "<p><b>Арендатор:</b> " + clientName.toHtmlEscaped();
+    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
+    if (!clientAddress.isEmpty()) html += ", адрес: " + clientAddress.toHtmlEscaped();
     html += "</p>";
     html += "<p>Настоящий акт составлен о том, что Арендодатель передал, а Арендатор принял следующие POC-терминалы:</p>";
 
@@ -488,9 +488,9 @@ void RentalForm::on_btnPrintAct_clicked()
         }
 
         html += "<tr><td>" + QString::number(num++) + "</td>"
-                "<td>" + serial + "</td>"
-                "<td>" + imei + "</td>"
-                "<td>" + simNumber + "</td></tr>";
+                "<td>" + serial.toHtmlEscaped() + "</td>"
+                "<td>" + imei.toHtmlEscaped() + "</td>"
+                "<td>" + simNumber.toHtmlEscaped() + "</td></tr>";
     }
     html += "</table>";
 

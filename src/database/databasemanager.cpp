@@ -239,6 +239,18 @@ void DatabaseManager::setCurrentUser(const QString& username)
     m_currentUser = username;
 }
 
+void DatabaseManager::setAuditUsername(const QString& username)
+{
+    // set_config(..., false) — параметр живёт до конца сессии.
+    // Триггеры аудита (tblterminals/tblclients) читают current_setting('app.username').
+    QSqlQuery query(m_database);
+    query.prepare("SELECT set_config('app.username', :uname, false)");
+    query.bindValue(":uname", username);
+    if (!query.exec()) {
+        qCWarning(logAudit) << "Не удалось установить app.username:" << query.lastError().text();
+    }
+}
+
 QString DatabaseManager::getCurrentUser() const
 {
     return m_currentUser;
@@ -348,19 +360,20 @@ bool DatabaseManager::runMigrations(const QString &migrationsDir)
             return false;
         }
 
-        if (m_database.driver()->hasFeature(QSqlDriver::Transactions)) {
-            if (!m_database.commit()) {
-                qCWarning(logMigration) << "Не удалось закоммитить:" << m_database.lastError().text();
-                m_database.rollback();
-                return false;
-            }
-        }
-
+        // Версию записываем в той же транзакции: при сбое записи миграция
+        // откатится целиком, и при следующем запуске она применится заново.
         QSqlQuery rec(m_database);
         rec.prepare("INSERT INTO schema_migrations (version) VALUES (:v)");
         rec.bindValue(":v", version);
         if (!rec.exec()) {
             qCWarning(logMigration) << "Не удалось записать версию:" << rec.lastError().text();
+            m_database.rollback();
+            return false;
+        }
+
+        if (!m_database.commit()) {
+            qCWarning(logMigration) << "Не удалось закоммитить:" << m_database.lastError().text();
+            m_database.rollback();
             return false;
         }
 

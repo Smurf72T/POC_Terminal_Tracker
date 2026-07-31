@@ -378,11 +378,11 @@ void PaymentForm::on_btnPrint_clicked()
     html += "<h2>КВИТАНЦИЯ ОБ ОПЛАТЕ</h2>";
     html += "<p><b>Платёж №</b> " + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + "</p>";
     html += "<p><b>Дата:</b> " + ui->dateEdit->date().toString("dd.MM.yyyy") + "</p>";
-    html += "<p><b>Плательщик:</b> " + clientName;
-    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn + ")";
+    html += "<p><b>Плательщик:</b> " + clientName.toHtmlEscaped();
+    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
     html += "</p>";
     html += "<p><b>Получатель:</b> ООО «POC Terminal»</p>";
-    html += "<p><b>Период оплаты:</b> " + monthNames.value(month) + " " + QString::number(year) + "</p>";
+    html += "<p><b>Период оплаты:</b> " + monthNames.value(month).toHtmlEscaped() + " " + QString::number(year) + "</p>";
     html += "<hr>";
     html += "<p style='font-size: 16px;'><b>Сумма:</b> " + QString::number(amount, 'f', 2) + " руб.</p>";
     html += "<p style='font-size: 13px; color: #555;'>Сумма прописью: ...</p>";
@@ -390,7 +390,7 @@ void PaymentForm::on_btnPrint_clicked()
 
     QString comment = ui->textEditComment->toPlainText().trimmed();
     if (!comment.isEmpty())
-        html += "<p><b>Комментарий:</b> " + comment + "</p>";
+        html += "<p><b>Комментарий:</b> " + comment.toHtmlEscaped() + "</p>";
 
     html += "<div style='margin-top: 50px; display: flex; justify-content: space-between;'>"
             "<div><p>Кассир: ________________</p></div>"

@@ -34,6 +34,7 @@ public:
 
     void notifyDataChanged();
     void setCurrentUser(const QString& username);
+    void setAuditUsername(const QString& username);
     QString getCurrentUser() const;
     void setCurrentUserRole(const QString& role);
     QString getCurrentUserRole() const;

@@ -41,6 +41,7 @@ set(SOURCES
         src/ui/dialogs/receiptform.cpp
         src/ui/dialogs/rentalform.cpp
         src/ui/dialogs/returnform.cpp
+        src/ui/dialogs/statuschangeform.cpp
         src/ui/dialogs/archivedocumentsform.cpp
         src/ui/dialogs/paymentform.cpp
         src/ui/dialogs/terminalhistoryform.cpp
@@ -70,6 +71,7 @@ set(HEADERS
         src/ui/delegates/comboboxmodel.h
         src/ui/dialogs/rentalform.h
         src/ui/dialogs/returnform.h
+        src/ui/dialogs/statuschangeform.h
         src/ui/dialogs/archivedocumentsform.h
         src/ui/dialogs/paymentform.h
         src/ui/dialogs/terminalhistoryform.h
@@ -95,6 +97,7 @@ set(UI_FILES
         src/ui/dialogs/receiptform.ui
         src/ui/dialogs/rentalform.ui
         src/ui/dialogs/returnform.ui
+        src/ui/dialogs/statuschangeform.ui
         src/ui/dialogs/archivedocumentsform.ui
         src/ui/dialogs/paymentform.ui
         src/ui/dialogs/terminalhistoryform.ui
@@ -190,4 +193,28 @@ if(BUILD_TESTS)
     target_include_directories(test_validator PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/database)
     target_link_libraries(test_validator PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_validator COMMAND test_validator)
+
+    # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
+    foreach(_test test_password_utils test_validator)
+        foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
+            if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")
+                add_custom_command(TARGET ${_test} POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${QT_DLL_DIR}/${_qt_dll}"
+                        "$<TARGET_FILE_DIR:${_test}>/${_qt_dll}"
+                        COMMENT "Copying ${_qt_dll}"
+                )
+            endif()
+        endforeach()
+        foreach(_pg_dll libpq.dll libintl-9.dll libssl-3-x64.dll libcrypto-3-x64.dll)
+            if(DEFINED PG_DLL_DIR AND EXISTS "${PG_DLL_DIR}/${_pg_dll}")
+                add_custom_command(TARGET ${_test} POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${PG_DLL_DIR}/${_pg_dll}"
+                        "$<TARGET_FILE_DIR:${_test}>/${_pg_dll}"
+                        COMMENT "Copying ${_pg_dll}"
+                )
+            endif()
+        endforeach()
+    endforeach()
 endif()

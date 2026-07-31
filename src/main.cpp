@@ -5,6 +5,7 @@
 #include <QIcon>
 #include <QFile>
 #include <QMessageBox>
+#include <QSettings>
 #include <QWidget>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -52,6 +53,17 @@ int main(int argc, char *argv[])
 
     DatabaseManager::instance().setCurrentUser(loginDialog.getUsername());
     DatabaseManager::instance().setCurrentUserRole(loginDialog.getRole());
+    DatabaseManager::instance().setAuditUsername(loginDialog.getUsername());
+
+    // Применяем сохранённую тему (по умолчанию тёмная)
+    QSettings settings("POC", "TerminalTracker");
+    if (!settings.value("darkTheme", true).toBool()) {
+        QFile lightFile(":/styles/light.qss");
+        if (lightFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            a.setStyleSheet(QString::fromUtf8(lightFile.readAll()));
+            lightFile.close();
+        }
+    }
 
     MainWindow w;
     w.setWindowTitle(QString("POC Terminal Tracker — %1").arg(loginDialog.getUsername()));

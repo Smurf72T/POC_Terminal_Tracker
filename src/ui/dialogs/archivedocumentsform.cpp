@@ -5,6 +5,7 @@
 #include "ui/dialogs/rentalform.h"
 #include "ui/dialogs/returnform.h"
 #include "ui/dialogs/paymentform.h"
+#include "ui/dialogs/statuschangeform.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -28,8 +29,8 @@ ArchiveDocumentsForm::ArchiveDocumentsForm(int docType, QWidget *parent) :
     ui->dateEditFrom->setDate(QDate(today.year(), today.month(), 1));
     ui->dateEditTo->setDate(today);
 
-    // Загружаем клиентов (если это не Поступление)
-    if (m_docType != 1) {
+    // Загружаем клиентов (если это не Поступление и не Изменение статусов)
+    if (m_docType != 1 && m_docType != 5) {
         loadClients();
     }
 
@@ -54,6 +55,10 @@ void ArchiveDocumentsForm::setupUI()
         setWindowTitle("Архив: Возврат из аренды");
     } else if (m_docType == 4) {
         setWindowTitle("Архив: Оплата");
+    } else if (m_docType == 5) {
+        setWindowTitle("Архив: Изменение статусов");
+        ui->labelClient->setVisible(false);
+        ui->comboBoxClient->setVisible(false);
     }
 
     ui->tableView->setModel(model);
@@ -142,6 +147,21 @@ void ArchiveDocumentsForm::applyFilter()
             "WHERE p.paymentdate BETWEEN :dateFrom AND :dateTo "
             "AND (:clientId = 0 OR p.clientid = :clientId) "
             "ORDER BY p.paymentdate DESC");
+    } else if (m_docType == 5) { // Изменение статусов
+        queryStr = QString(
+            "SELECT sc.statuschangedocid, "
+            "sc.docnumber AS \"Номер\", "
+            "sc.docdate AS \"Дата\", "
+            "CASE sc.actiontype WHEN 'repair' THEN 'В ремонт' WHEN 'repair_return' THEN 'Возврат из ремонта' "
+            "WHEN 'writeoff' THEN 'Списан' WHEN 'lost' THEN 'Утерян' ELSE sc.actiontype END AS \"Операция\", "
+            "COALESCE(det.cnt, 0)::text || ' терминал(ов)' AS \"Терминалов\", "
+            "sc.comment AS \"Комментарий\" "
+            "FROM tblstatuschangedocs sc "
+            "LEFT JOIN (SELECT statuschangedocid, COUNT(*) AS cnt "
+            "          FROM tblstatuschangedetails GROUP BY statuschangedocid) det "
+            "ON sc.statuschangedocid = det.statuschangedocid "
+            "WHERE sc.docdate BETWEEN :dateFrom AND :dateTo "
+            "ORDER BY sc.docdate DESC");
     }
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
@@ -180,6 +200,7 @@ void ArchiveDocumentsForm::on_tableView_doubleClicked(const QModelIndex &index)
         case 2: openRentalForEdit(docId); break;
         case 3: openReturnForEdit(docId); break;
         case 4: openPaymentForEdit(docId); break;
+        case 5: openStatusChangeForEdit(docId); break;
     }
 }
 
@@ -224,6 +245,15 @@ void ArchiveDocumentsForm::openPaymentForEdit(int docId)
     }
 }
 
+void ArchiveDocumentsForm::openStatusChangeForEdit(int docId)
+{
+    StatusChangeForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
 void ArchiveDocumentsForm::setupCheckBoxColumn()
 {
     // Для архива аренды (docType == 2) колонка "Возврат" (индекс 5)
@@ -244,7 +274,8 @@ void ArchiveDocumentsForm::on_btnExportExcel_clicked()
     if (m_docType == 1) title = "Архив: Поступление терминалов";
     else if (m_docType == 2) title = "Архив: Передача в аренду";
     else if (m_docType == 3) title = "Архив: Возврат из аренды";
-    else title = "Архив: Оплата";
+    else if (m_docType == 4) title = "Архив: Оплата";
+    else title = "Архив: Изменение статусов";
 
     ReportExporter::exportModelToExcel(model, title, filePath, this);
 }
@@ -271,7 +302,8 @@ void ArchiveDocumentsForm::on_btnExportPdf_clicked()
     if (m_docType == 1) html += "<h1>Архив: Поступление терминалов</h1>";
     else if (m_docType == 2) html += "<h1>Архив: Передача в аренду</h1>";
     else if (m_docType == 3) html += "<h1>Архив: Возврат из аренды</h1>";
-    else html += "<h1>Архив: Оплата</h1>";
+    else if (m_docType == 4) html += "<h1>Архив: Оплата</h1>";
+    else html += "<h1>Архив: Изменение статусов</h1>";
 
     html += "<p>Период: с " + ui->dateEditFrom->date().toString("dd.MM.yyyy") +
             " по " + ui->dateEditTo->date().toString("dd.MM.yyyy") + "</p>";
@@ -279,7 +311,7 @@ void ArchiveDocumentsForm::on_btnExportPdf_clicked()
 
     html += "<table><tr>";
     for (int col = 0; col < model->columnCount(); ++col) {
-        html += "<th>" + model->headerData(col, Qt::Horizontal).toString() + "</th>";
+        html += "<th>" + model->headerData(col, Qt::Horizontal).toString().toHtmlEscaped() + "</th>";
     }
     html += "</tr>";
 
@@ -287,7 +319,7 @@ void ArchiveDocumentsForm::on_btnExportPdf_clicked()
         html += "<tr>";
         for (int col = 0; col < model->columnCount(); ++col) {
             QString value = model->data(model->index(row, col)).toString();
-            html += "<td>" + value + "</td>";
+            html += "<td>" + value.toHtmlEscaped() + "</td>";
         }
         html += "</tr>";
     }

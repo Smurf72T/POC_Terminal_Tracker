@@ -21,7 +21,7 @@
 - **Управление пользователями:** Смена ролей, деактивация, сброс пароля (Сервис → Управление пользователями)
 - **Печать документов:** Квитанция поступления, акт возврата, квитанция об оплате (HTML → QPrinter)
 - **Глобальный поиск:** Ctrl+K, поиск по всем справочникам (ILIKE), открытие найденной формы
-- **Переключалка темы:** Тёмная/светлая тема (кнопка в статусбаре, `modern.qss` ↔ `light.qss`)
+- **Переключалка темы:** Тёмная/светлая тема (кнопка в статусбаре, `modern.qss` ↔ `light.qss`), выбор сохраняется в QSettings
 
 ## Требования
 
@@ -114,15 +114,15 @@ src/
       usermanagementform.*    — Управление пользователями
       reportsform.*           — Отчёты по периодам
   utils/
-    password_utils.h          — PBKDF2-HMAC-SHA256 (100k итераций), обратная совместимость
+    password_utils.h          — PBKDF2-HMAC-SHA256 (100k итераций), constant-time проверка, обратная совместимость
     validator.*               — Валидация ИНН, IMEI (Luhn), данных
     reportexporter.*          — Экспорт в Excel (QXlsx) и PDF
     logging.h                 — QLoggingCategory: app.database, app.audit, app.migration, app.sql, app.general
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/
-  migrations/001_initial.sql  — Миграции БД (применяются автоматически)
-  add_indexes.sql             — Индексы и ограничения
+  migrations/               — Миграции БД 001/002/003 (применяются автоматически)
+  add_indexes.sql           — Индексы и ограничения
 libs/
   QXlsx/                      — Git submodule (QtExcel/QXlsx)
 config/
