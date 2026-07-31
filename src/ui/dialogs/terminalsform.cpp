@@ -80,7 +80,11 @@ void TerminalsForm::loadModel(const QString &filter)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
 
     if (!filter.isEmpty()) {
-        QString likeFilter = "%" + filter + "%";
+        QString escaped = filter;
+        escaped.replace("\\", "\\\\");
+        escaped.replace("%", "\\%");
+        escaped.replace("_", "\\_");
+        QString likeFilter = "%" + escaped + "%";
         queryStr += " WHERE (t.serialnumber LIKE :f1 "
                     "OR t.imei1 LIKE :f2 "
                     "OR t.imei2 LIKE :f3 "

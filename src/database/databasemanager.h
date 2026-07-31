@@ -29,7 +29,7 @@ public:
     bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc);
     QString generateDocNumber(const QString& docType); // receipt, rental, return, payment
     void logAction(const QString& action, const QString& tableName, int recordId,
-                   const QString& username = "admin", const QString& oldValues = "{}",
+                   const QString& username = QString(), const QString& oldValues = "{}",
                    const QString& newValues = "{}");
 
     void notifyDataChanged();

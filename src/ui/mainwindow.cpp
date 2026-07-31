@@ -892,17 +892,13 @@ void MainWindow::performBackup()
 
     if (reply != QMessageBox::Yes) return;
 
-    // Загружаем конфигурацию БД (host берём из активного подключения)
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT current_setting('host'), current_setting('port'), current_database(), current_user") || !query.next()) {
-        qCWarning(logSQL) << "Failed to get database settings:" << query.lastError().text();
-        return;
-    }
-
-    QString host = query.value(0).toString();
-    QString port = query.value(1).toString();
-    QString dbname = query.value(2).toString();
-    QString user = query.value(3).toString();
+    // Host/port/db/user берём из активного подключения.
+    // current_setting('host') не существует в PostgreSQL (host — параметр libpq, а не серверный GUC).
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    QString host = db.hostName();
+    QString port = QString::number(db.port());
+    QString dbname = db.databaseName();
+    QString user = db.userName();
 
     // Показываем диалог для ввода пароля
     bool passwordOk;
@@ -932,29 +928,30 @@ void MainWindow::performBackup()
     process.start("pg_dump", args);
 
     if (!process.waitForFinished(60000)) {
-        QMessageBox::warning(this, "Ошибка резервного копирования",
-            "Не удалось выполнить pg_dump.\n"
-            "Убедитесь, что PostgreSQL клиент установлен и доступен в PATH.\n\n"
-            "Альтернативный метод (SQL-экспорт через Qt SQL):\n"
-            "Резервная копия будет создана через SQL-запросы.");
-
-        // Фоллбэк: экспорт всех данных через SQL
+        process.kill();
+        process.waitForFinished(5000);
+        QMessageBox::warning(this, "Резервное копирование",
+            "pg_dump не завершился за 60 секунд и был остановлен.\n"
+            "Будет создан резервный SQL-дамп через Qt SQL (fallback).");
         performFallbackBackup(filePath, dbname);
-    } else {
-        QString output = process.readAllStandardOutput();
-        QString error = process.readAllStandardError();
-
-        if (!error.isEmpty() && !error.contains("Enter password")) {
-            QMessageBox::warning(this, "Ошибка резервного копирования",
-                "pg_dump вернул ошибки:\n" + error);
-        } else {
-            QMessageBox::information(this, "Успех",
-                QString("Резервная копия создана:\n%1")
-                .arg(filePath) +
-                QString("\nРазмер: %1 KB")
-                .arg(QFileInfo(filePath).size() / 1024));
-        }
+        return;
     }
+
+    QString error = process.readAllStandardError();
+    int exitCode = process.exitCode();
+    if (exitCode != 0) {
+        QMessageBox::warning(this, "Ошибка резервного копирования",
+            "pg_dump завершился с ошибкой (код " + QString::number(exitCode) + "):\n"
+            + error.left(2000));
+        performFallbackBackup(filePath, dbname);
+        return;
+    }
+
+    QMessageBox::information(this, "Успех",
+        QString("Резервная копия создана:\n%1")
+        .arg(filePath) +
+        QString("\nРазмер: %1 KB")
+        .arg(QFileInfo(filePath).size() / 1024));
 }
 
 namespace {
@@ -1194,17 +1191,12 @@ void MainWindow::performRestore()
 
     if (reply != QMessageBox::Yes) return;
 
-    // Пытаемся через psql
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT current_setting('host'), current_setting('port'), current_database(), current_user") || !query.next()) {
-        qCWarning(logSQL) << "Failed to get database settings:" << query.lastError().text();
-        return;
-    }
-
-    QString host = query.value(0).toString();
-    QString port = query.value(1).toString();
-    QString dbname = query.value(2).toString();
-    QString user = query.value(3).toString();
+    // Host/port/db/user берём из активного подключения (см. performBackup)
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    QString host = db.hostName();
+    QString port = QString::number(db.port());
+    QString dbname = db.databaseName();
+    QString user = db.userName();
 
     bool passwordOk;
     QString password = QInputDialog::getText(this, "Пароль PostgreSQL",
@@ -1226,8 +1218,12 @@ void MainWindow::performRestore()
     process.start("psql", args);
 
     if (!process.waitForFinished(120000)) {
-        QMessageBox::warning(this, "Ошибка восстановления",
-            "psql не завершился за 120 секунд.\n\n"
+        process.kill();
+        process.waitForFinished(5000);
+        QMessageBox::critical(this, "Ошибка восстановления",
+            "psql не завершился за 120 секунд и был остановлен.\n"
+            "Данные могли остаться в прежнем состоянии (restore выполняется "
+            "в одной транзакции).\n\n"
             "Попробуйте восстановить вручную:\n"
             "psql -U " + user + " -d " + dbname + " -f \"" + filePath + "\"");
         return;

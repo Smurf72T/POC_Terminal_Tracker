@@ -11,6 +11,7 @@
 #include <QMessageBox>
 #include <QSqlDriver>
 #include <QSqlError>
+#include <QStringConverter>
 #include <QTextStream>
 
 static QMap<QString, QString> loadEnvFile(const QString &filePath)
@@ -342,6 +343,7 @@ bool DatabaseManager::runMigrations(const QString &migrationsDir)
             return false;
         }
         QTextStream in(&file);
+        in.setEncoding(QStringConverter::Utf8);
         QString sql = in.readAll();
         file.close();
 

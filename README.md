@@ -63,10 +63,13 @@ POC_DB_PASSWORD=postgres
 2. Запустите приложение — миграции применятся автоматически из `sql/migrations/`
 3. Дефолтный пользователь: `admin` / `admin123`
 
-Если авто-миграции не сработали (нет прав на создание таблиц), выполните вручную:
+Если авто-миграции не сработали (нет прав на создание таблиц), выполните вручную в порядке нумерации:
 
 ```bash
+psql -U postgres -d pocbase -f sql/migrations/000_base_schema.sql
 psql -U postgres -d pocbase -f sql/migrations/001_initial.sql
+psql -U postgres -d pocbase -f sql/migrations/002_status_change_docs.sql
+psql -U postgres -d pocbase -f sql/migrations/003_doc_number_sequences.sql
 ```
 
 ## Логирование
