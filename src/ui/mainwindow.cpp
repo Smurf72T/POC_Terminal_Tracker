@@ -551,7 +551,8 @@ void MainWindow::onActionAbout_triggered()
     QMessageBox::about(this, "О программе",
                        "POC Terminal Tracker\n"
                        "Версия " + version + "\n\n"
-                       "Система учёта POC-терминалов и SIM-карт");
+                       "Система учёта POC-терминалов и SIM-карт\n\n"
+                       "Связь с разработчиком: ipdoc72@yandex.ru");
 }
 
 void MainWindow::onActionExit_triggered()
