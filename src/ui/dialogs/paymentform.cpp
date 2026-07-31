@@ -108,7 +108,11 @@ void PaymentForm::loadForEdit(int paymentId)
     QSqlQuery linkQuery(DatabaseManager::instance().getDatabase());
     linkQuery.prepare("SELECT rentaldocid FROM tblpayment_rental_links WHERE paymentid = :id");
     linkQuery.bindValue(":id", paymentId);
-    linkQuery.exec();
+    if (!linkQuery.exec()) {
+        QMessageBox::warning(this, "Ошибка БД",
+            "Не удалось загрузить привязанные документы аренды:\n" + linkQuery.lastError().text());
+        return;
+    }
 
     QSet<int> linkedRentalIds;
     while (linkQuery.next()) {

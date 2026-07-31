@@ -97,8 +97,9 @@ void UserManagementForm::loadUsers()
         "display_name AS \"Отображаемое имя\", "
         "role AS \"Роль\", "
         "CASE WHEN is_active THEN 1 ELSE 0 END AS \"Активен\", "
-        "created_at::date AS \"Создан\" "
-        "FROM tbl_users ORDER BY username",
+        "created_at::date AS \"Создан\", "
+        "CASE WHEN is_active THEN 'Активен' ELSE 'Ожидает активации' END AS \"Статус\" "
+        "FROM tbl_users ORDER BY is_active ASC, username",
         DatabaseManager::instance().getDatabase());
 
     tableView->hideColumn(0);
@@ -107,6 +108,7 @@ void UserManagementForm::loadUsers()
     tableView->setColumnWidth(3, 80);
     tableView->setColumnWidth(4, 80);
     tableView->setColumnWidth(5, 100);
+    tableView->setColumnWidth(6, 160);
 }
 
 void UserManagementForm::onRoleChanged(int row, int userId, const QString &newRole)

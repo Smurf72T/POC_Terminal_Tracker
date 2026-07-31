@@ -9,9 +9,7 @@
 #include <QDateTime>
 #include <QRegularExpression>
 #include <QApplication>
-
-QMap<QString, int> LoginForm::s_globalFailedAttempts;
-QMap<QString, qint64> LoginForm::s_globalLockUntil;
+#include <QDebug>
 
 LoginForm::LoginForm(QWidget *parent) :
     QDialog(parent),
@@ -64,37 +62,63 @@ void LoginForm::on_btnLogin_clicked()
         return;
     }
 
-    // Rate limiting: блокировка после 5 неудачных попыток
-    qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (s_globalLockUntil.contains(username) && now < s_globalLockUntil[username]) {
-        int secondsLeft = static_cast<int>((s_globalLockUntil[username] - now) / 1000) + 1;
-        ui->labelError->setText(QString("Слишком много попыток. Повторите через %1 с.").arg(secondsLeft));
-        return;
-    }
-
+    // Rate limiting на уровне БД (переживает перезапуск приложения)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT user_id, username, display_name, role, password_hash FROM tbl_users "
+    query.prepare("SELECT user_id, username, display_name, role, password_hash, "
+                  "failed_login_attempts, locked_until FROM tbl_users "
                   "WHERE username = :uname AND is_active = TRUE");
     query.bindValue(":uname", username);
 
     if (query.exec() && query.next()) {
+        QDateTime lockedUntil = query.value(6).toDateTime();
+        if (lockedUntil.isValid() && lockedUntil > QDateTime::currentDateTime()) {
+            int secondsLeft = static_cast<int>(QDateTime::currentDateTime().secsTo(lockedUntil)) + 1;
+            ui->labelError->setText(QString("Слишком много попыток. Повторите через %1 с.").arg(secondsLeft));
+            return;
+        }
+
+        if (lockedUntil.isValid()) {
+            // Блокировка истекла — открываем новое окно из 5 попыток
+            QSqlQuery reset(DatabaseManager::instance().getDatabase());
+            reset.prepare("UPDATE tbl_users SET failed_login_attempts = 0, locked_until = NULL "
+                          "WHERE username = :uname");
+            reset.bindValue(":uname", username);
+            if (!reset.exec()) {
+                qWarning() << "Не удалось сбросить блокировку:" << reset.lastError().text();
+            }
+        }
+
         QString storedHash = query.value(4).toString();
         if (!checkPassword(password, storedHash)) {
-            s_globalFailedAttempts[username]++;
-            if (s_globalFailedAttempts[username] >= 5) {
-                s_globalLockUntil[username] = QDateTime::currentMSecsSinceEpoch() + 30000;
-                s_globalFailedAttempts[username] = 0;
+            QSqlQuery upd(DatabaseManager::instance().getDatabase());
+            upd.prepare("UPDATE tbl_users SET failed_login_attempts = failed_login_attempts + 1, "
+                        "locked_until = CASE WHEN failed_login_attempts + 1 >= 5 "
+                        "THEN NOW() + INTERVAL '30 seconds' ELSE locked_until END "
+                        "WHERE username = :uname RETURNING failed_login_attempts");
+            upd.bindValue(":uname", username);
+
+            int attempts = 5;
+            if (upd.exec() && upd.next()) {
+                attempts = upd.value(0).toInt();
+            }
+
+            if (attempts >= 5) {
                 ui->labelError->setText("Слишком много попыток. Повторите через 30 с.");
             } else {
                 ui->labelError->setText(QString("Неверный пароль! Осталось попыток: %1")
-                    .arg(5 - s_globalFailedAttempts[username]));
+                    .arg(5 - attempts));
             }
             return;
         }
 
-        // Сброс счётчика при успешном входе
-        s_globalFailedAttempts.remove(username);
-        s_globalLockUntil.remove(username);
+        // Успешный вход: сбрасываем счётчик и блокировку
+        QSqlQuery clear(DatabaseManager::instance().getDatabase());
+        clear.prepare("UPDATE tbl_users SET failed_login_attempts = 0, locked_until = NULL "
+                      "WHERE username = :uname");
+        clear.bindValue(":uname", username);
+        if (!clear.exec()) {
+            qWarning() << "Не удалось сбросить счётчик попыток:" << clear.lastError().text();
+        }
 
         m_userId = query.value(0).toInt();
         m_username = query.value(1).toString();
@@ -136,15 +160,7 @@ void LoginForm::on_btnLogin_clicked()
 
         accept();
     } else {
-        s_globalFailedAttempts[username]++;
-        if (s_globalFailedAttempts[username] >= 5) {
-            s_globalLockUntil[username] = QDateTime::currentMSecsSinceEpoch() + 30000;
-            s_globalFailedAttempts[username] = 0;
-            ui->labelError->setText("Слишком много попыток. Повторите через 30 с.");
-        } else {
-            ui->labelError->setText(QString("Неверный пароль! Осталось попыток: %1")
-                .arg(5 - s_globalFailedAttempts[username]));
-        }
+        ui->labelError->setText("Неверный пароль или пользователь не активен.");
     }
 }
 
@@ -188,18 +204,20 @@ void LoginForm::on_btnRegister_clicked()
 
     QString storedHash = hashPassword(password);
 
+    // Саморегистрация создаёт неактивную учётную запись:
+    // доступ появляется только после активации администратором
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("INSERT INTO tbl_users (username, display_name, password_hash, role, is_active) "
-                  "VALUES (:uname, :dname, :hash, 'user', TRUE)");
+                  "VALUES (:uname, :dname, :hash, 'user', FALSE)");
     query.bindValue(":uname", username.trimmed());
     query.bindValue(":dname", displayName.trimmed());
     query.bindValue(":hash", storedHash);
 
     if (query.exec()) {
-        QMessageBox::information(this, "Успех", "Пользователь '" + username.trimmed() + "' зарегистрирован!\nТеперь войдите в систему.");
+        QMessageBox::information(this, "Успех",
+            "Заявка на регистрацию '" + username.trimmed() + "' отправлена.\n"
+            "Учётная запись будет активирована администратором.");
         loadUsers();
-        int idx = ui->comboBoxUser->findData(username.trimmed());
-        if (idx >= 0) ui->comboBoxUser->setCurrentIndex(idx);
         ui->lineEditPass->setFocus();
     } else {
         QMessageBox::warning(this, "Ошибка", "Не удалось создать пользователя.\nВозможно, такой логин уже существует.");

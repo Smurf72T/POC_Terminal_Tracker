@@ -25,6 +25,8 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
 
+    QStringList loadErrors;
+
     receiptModel = new QSqlQueryModel(this);
     QSqlQuery receiptQuery(db);
     receiptQuery.prepare(
@@ -37,7 +39,7 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
         "ORDER BY rd.docdate DESC"
     );
     receiptQuery.bindValue(":tid", terminalId);
-    receiptQuery.exec();
+    if (!receiptQuery.exec()) loadErrors << "Приходы: " + receiptQuery.lastError().text();
     receiptModel->setQuery(std::move(receiptQuery));
 
     rentalModel = new QSqlQueryModel(this);
@@ -54,7 +56,7 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
         "ORDER BY rdo.docdate DESC"
     );
     rentalQuery.bindValue(":tid", terminalId);
-    rentalQuery.exec();
+    if (!rentalQuery.exec()) loadErrors << "Аренда: " + rentalQuery.lastError().text();
     rentalModel->setQuery(std::move(rentalQuery));
 
     returnModel = new QSqlQueryModel(this);
@@ -69,7 +71,7 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
         "ORDER BY ret.docdate DESC"
     );
     returnQuery.bindValue(":tid", terminalId);
-    returnQuery.exec();
+    if (!returnQuery.exec()) loadErrors << "Возвраты: " + returnQuery.lastError().text();
     returnModel->setQuery(std::move(returnQuery));
 
     paymentModel = new QSqlQueryModel(this);
@@ -87,7 +89,7 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
         "ORDER BY p.paymentdate DESC"
     );
     paymentQuery.bindValue(":tid", terminalId);
-    paymentQuery.exec();
+    if (!paymentQuery.exec()) loadErrors << "Оплаты: " + paymentQuery.lastError().text();
     paymentModel->setQuery(std::move(paymentQuery));
 
     receiptModel->setHeaderData(0, Qt::Horizontal, "ID");
@@ -145,6 +147,11 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
     if (totalDocs == 0) {
         ui->lblTerminalInfo->setText(ui->lblTerminalInfo->text() + "\nИстория документов отсутствует");
         ui->lblTerminalInfo->setStyleSheet("color: gray;");
+    }
+
+    if (!loadErrors.isEmpty()) {
+        QMessageBox::warning(this, "Ошибка загрузки истории",
+            "Не удалось загрузить часть данных:\n" + loadErrors.join("\n"));
     }
 }
 

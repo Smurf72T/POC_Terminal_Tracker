@@ -2,8 +2,6 @@
 #define LOGINFORM_H
 
 #include <QDialog>
-#include <QElapsedTimer>
-#include <QMap>
 
 namespace Ui {
     class LoginForm;
@@ -34,10 +32,6 @@ private:
     QString m_username;
     int m_userId = 0;
     QString m_role;
-    int m_failedAttempts = 0;
-    QElapsedTimer m_lastAttemptTimer;
-    static QMap<QString, int> s_globalFailedAttempts;
-    static QMap<QString, qint64> s_globalLockUntil;
 };
 
 #endif // LOGINFORM_H

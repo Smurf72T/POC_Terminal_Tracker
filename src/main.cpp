@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
     DatabaseManager::instance().setCurrentUser(loginDialog.getUsername());
     DatabaseManager::instance().setCurrentUserRole(loginDialog.getRole());
     DatabaseManager::instance().setAuditUsername(loginDialog.getUsername());
+    DatabaseManager::instance().setSessionRole(loginDialog.getRole());
 
     // Применяем сохранённую тему (по умолчанию тёмная)
     QSettings settings("POC", "TerminalTracker");

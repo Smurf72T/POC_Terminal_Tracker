@@ -2,6 +2,7 @@
 #include "ui_simcardsform.h"
 #include "delegates/readonlydelegate.h"
 #include "database/databasemanager.h"
+#include "database/submiterrortablemodel.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -45,9 +46,13 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     resize(700, 500);
 
     // Используем таблицу tblsimcards напрямую
-    model = new QSqlTableModel(this, DatabaseManager::instance().getDatabase());
+    model = new SubmitErrorTableModel(this, DatabaseManager::instance().getDatabase());
     model->setTable("tblsimcards");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
+    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this, [this](const QString &error) {
+        QMessageBox::warning(this, "Ошибка сохранения",
+            "Не удалось сохранить изменение:\n" + error);
+    });
 
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка БД",

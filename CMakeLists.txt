@@ -31,6 +31,7 @@ add_subdirectory(libs/QXlsx/QXlsx)
 set(SOURCES
         src/main.cpp
         src/database/databasemanager.cpp
+        src/database/submiterrortablemodel.cpp
         src/ui/mainwindow.cpp
         src/ui/dialogs/manufacturersform.cpp
         src/ui/dialogs/modelsform.cpp
@@ -59,6 +60,7 @@ set(SOURCES
 
 set(HEADERS
         src/database/databasemanager.h
+        src/database/submiterrortablemodel.h
         src/ui/mainwindow.h
         src/ui/dialogs/manufacturersform.h
         src/ui/dialogs/modelsform.h

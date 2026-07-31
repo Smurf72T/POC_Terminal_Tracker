@@ -1,6 +1,7 @@
 #include "modelsform.h"
 #include "ui_modelsform.h"
 #include "database/databasemanager.h"
+#include "database/submiterrortablemodel.h"
 #include <QMessageBox>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -22,9 +23,13 @@ ModelsForm::ModelsForm(QWidget *parent) :
     resize(600, 400);
 
     // Инициализация реляционной модели
-    model = new QSqlRelationalTableModel(this, DatabaseManager::instance().getDatabase());
+    model = new SubmitErrorRelationalTableModel(this, DatabaseManager::instance().getDatabase());
     model->setTable("tblmodels");
     model->setEditStrategy(QSqlRelationalTableModel::OnFieldChange);
+    connect(static_cast<SubmitErrorRelationalTableModel*>(model), &SubmitErrorRelationalTableModel::submitFailed, this, [this](const QString &error) {
+        QMessageBox::warning(this, "Ошибка сохранения",
+            "Не удалось сохранить изменение:\n" + error);
+    });
 
     // ВАЖНО: Настраиваем связь (Внешний ключ)
     // Колонка 1 (manufacturerid) ссылается на tblmanufacturers.manufacturerid,
@@ -97,7 +102,11 @@ void ModelsForm::on_btnAdd_clicked()
 {
     // Сначала проверяем, есть ли вообще производители
     QSqlQuery checkQuery(DatabaseManager::instance().getDatabase());
-    checkQuery.exec("SELECT manufacturerid FROM tblmanufacturers ORDER BY manufacturerid LIMIT 1");
+    if (!checkQuery.exec("SELECT manufacturerid FROM tblmanufacturers ORDER BY manufacturerid LIMIT 1")) {
+        QMessageBox::warning(this, "Ошибка БД",
+            "Не удалось проверить наличие производителей: " + checkQuery.lastError().text());
+        return;
+    }
 
     if (!checkQuery.next()) {
         QMessageBox::warning(this, "Внимание", "Сначала добавьте хотя бы одного производителя в справочнике!");

@@ -5,7 +5,8 @@
     "database": "pocbase",
     "username": "postgres",
     "password": "",
-    "sslmode": "prefer"
+    "sslmode": "prefer",
+    "sslrootcert": ""
   },
   "application": {
     "name": "POC Terminal Tracker",

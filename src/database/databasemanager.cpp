@@ -76,32 +76,51 @@ bool DatabaseManager::initialize(const QString& configPath)
     m_database.setUserName(env.value("POC_DB_USER", dbConfig["username"].toString()));
     m_database.setPassword(env.value("POC_DB_PASSWORD", dbConfig["password"].toString()));
 
-    // SSL mode: require | prefer | disable
+    // SSL mode: disable | prefer | require | verify-ca | verify-full
     QString sslMode = env.value("POC_DB_SSLMODE", dbConfig["sslmode"].toString("prefer")).toLower().trimmed();
+    QString sslRootCert = env.value("POC_DB_SSLROOTCERT", dbConfig["sslrootcert"].toString()).trimmed();
 
-    if (sslMode == "require") {
-        m_database.setConnectOptions("requiressl=1");
+    if (sslMode == "verify-full" || sslMode == "verify-ca") {
+        // Проверка сертификата сервера (снимает риск MITM при sslmode=prefer)
+        QString opts = QString("sslmode=%1").arg(sslMode);
+        if (!sslRootCert.isEmpty()) {
+            opts += ";sslrootcert=" + sslRootCert;
+        }
+        m_database.setConnectOptions(opts);
+        if (!m_database.open()) {
+            showError(QString("Ошибка подключения к БД: серверный сертификат не прошёл проверку (sslmode=%1).\n"
+                              "Укажите корректный путь к корневому сертификату (sslrootcert).\n%2")
+                          .arg(sslMode, m_database.lastError().text()));
+            return false;
+        }
+    } else if (sslMode == "require") {
+        m_database.setConnectOptions("sslmode=require");
         if (!m_database.open()) {
             showError("Ошибка подключения к БД: сервер не поддерживает SSL (sslmode=require).\n"
                       + m_database.lastError().text());
             return false;
         }
     } else if (sslMode == "disable") {
-        m_database.setConnectOptions("requiressl=0");
+        m_database.setConnectOptions("sslmode=disable");
         if (!m_database.open()) {
             showError("Ошибка подключения к базе данных:\n" + m_database.lastError().text());
             return false;
         }
     } else {
-        // prefer — пробуем SSL, при неудаче предупреждаем и подключаемся без SSL
-        m_database.setConnectOptions("requiressl=1");
+        // prefer — пробуем SSL, при неудаче предупреждаем и подключаемся без SSL.
+        // ВАЖНО: проверка сертификата при prefer не выполняется — для защиты
+        // соединения используйте sslmode=verify-full с sslrootcert.
+        m_database.setConnectOptions("sslmode=require");
         if (!m_database.open()) {
             qCWarning(logDB) << "SSL не поддерживается сервером, подключаемся без SSL";
-            m_database.setConnectOptions("requiressl=0");
+            m_database.setConnectOptions("sslmode=disable");
             if (!m_database.open()) {
                 showError("Ошибка подключения к базе данных:\n" + m_database.lastError().text());
                 return false;
             }
+        } else {
+            qCWarning(logDB) << "Подключено по SSL без проверки сертификата (sslmode=prefer). "
+                             << "Для проверки сертификата используйте sslmode=verify-full";
         }
     }
 
@@ -249,6 +268,18 @@ void DatabaseManager::setAuditUsername(const QString& username)
     query.bindValue(":uname", username);
     if (!query.exec()) {
         qCWarning(logAudit) << "Не удалось установить app.username:" << query.lastError().text();
+    }
+}
+
+void DatabaseManager::setSessionRole(const QString& role)
+{
+    // set_config(..., false) — параметр живёт до конца сессии.
+    // Триггеры авторизации (tbl_users, tbl_audit_log) читают current_setting('app.role').
+    QSqlQuery query(m_database);
+    query.prepare("SELECT set_config('app.role', :role, false)");
+    query.bindValue(":role", role);
+    if (!query.exec()) {
+        qCWarning(logAudit) << "Не удалось установить app.role:" << query.lastError().text();
     }
 }
 

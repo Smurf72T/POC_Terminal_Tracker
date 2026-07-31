@@ -1,6 +1,7 @@
 #include "manufacturersform.h"
 #include "ui_manufacturersform.h"
 #include "database/databasemanager.h"
+#include "database/submiterrortablemodel.h"
 #include <QDebug>
 #include <QMessageBox>
 #include <QSqlError>
@@ -28,9 +29,13 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
     }
 
     // Инициализация модели данных
-    model = new QSqlTableModel(this, db);
+    model = new SubmitErrorTableModel(this, db);
     model->setTable("tblmanufacturers");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
+    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this, [this](const QString &error) {
+        QMessageBox::warning(this, "Ошибка сохранения",
+            "Не удалось сохранить изменение:\n" + error);
+    });
     
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка загрузки данных",

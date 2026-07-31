@@ -1,6 +1,7 @@
 #include "clientsform.h"
 #include "ui_clientsform.h"
 #include "database/databasemanager.h"
+#include "database/submiterrortablemodel.h"
 #include "utils/validator.h"
 #include <QMessageBox>
 #include <QSqlError>
@@ -20,9 +21,13 @@ ClientsForm::ClientsForm(QWidget *parent) :
     setWindowTitle("Справочник клиентов");
     resize(800, 500);
 
-    model = new QSqlTableModel(this, DatabaseManager::instance().getDatabase());
+    model = new SubmitErrorTableModel(this, DatabaseManager::instance().getDatabase());
     model->setTable("tblclients");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
+    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this, [this](const QString &error) {
+        QMessageBox::warning(this, "Ошибка сохранения",
+            "Не удалось сохранить изменение:\n" + error);
+    });
 
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка БД",
