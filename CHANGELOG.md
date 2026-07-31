@@ -3,7 +3,7 @@
 ## [1.5.1] — 2026-07-31
 
 ### CI/CD
-- **GitHub Actions конвейер** (`.github/workflows/ci.yml`): на push в `master` / pull request — сборка Qt 6.11.1 (MinGW) + `qtcharts`, установка PostgreSQL 17, конфигурация/сборка Ninja, прогон всех тестов (`ctest`, включая `test_db_integration` и `test_concurrency` против реального PostgreSQL), сборка портативного дистрибутива (`deploy` + CPack ZIP) и загрузка артефакта; запуск вручную через `workflow_dispatch`
+- **GitHub Actions конвейер** (`.github/workflows/ci.yml`): на push в `master` / pull request — сборка Qt 6.11.1 (MSVC) + `qtcharts`, установка PostgreSQL 17, конфигурация/сборка CMake (VS generator, Release), прогон всех тестов (`ctest`, включая `test_db_integration` и `test_concurrency` против реального PostgreSQL), сборка портативного дистрибутива (`deploy` + CPack ZIP) и загрузка артефакта; запуск вручную через `workflow_dispatch`
 
 ## [1.5.0] — 2026-07-31
 
