@@ -103,7 +103,7 @@ jobs:
           if [ -z "$QT_ROOT_DIR" ]; then QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"; fi
           export QT_PLUGIN_PATH="$QT_ROOT_DIR/plugins"
           ctest --test-dir build -C Release \
-            -R "test_password_utils|test_validator|test_update_utils|test_connectionpool" \
+            -R "test_password_utils|test_validator|test_update_utils|test_connectionpool|test_circuitbreaker" \
             --output-on-failure
 
       - name: Generate coverage report (gcovr)

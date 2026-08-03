@@ -9,6 +9,7 @@
 #include <QDialog>
 #include <QGroupBox>
 #include <QMessageBox>
+#include <QMap>
 #include <QtCharts/QChartView>
 #include <QtCharts/QPieSeries>
 #include <QtCharts/QBarSeries>
@@ -87,6 +88,8 @@ private:
     QThread *m_backupThread = nullptr;
     BackupWorker *m_backupWorker = nullptr;
     bool m_backupBusy = false;
+
+    QMap<QString, QString> m_chartsSignature;
 
     void setupUI();
     void setupCharts();

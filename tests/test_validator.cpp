@@ -1,6 +1,8 @@
 #include <QTest>
 #include <QString>
+#include <QRandomGenerator>
 #include "utils/validator.h"
+#include "utils/password_utils.h"
 
 class TestValidator : public QObject
 {
@@ -112,6 +114,62 @@ private slots:
         QVERIFY(serialRe.isValid());
         QVERIFY(serialRe.match("ABC-123").hasMatch());
         QVERIFY(!serialRe.match("").hasMatch());
+    }
+
+    void fuzz_random_validator_inputs()
+    {
+        // Рандомизированный (детерминированный seed) прогон по всем чистым функциям
+        // валидатора: случайные строки не должны приводить к краху/зависанию,
+        // регулярные выражения остаются валидными.
+        QRandomGenerator rng(0xC0FFEEu);
+        const int rounds = 20000;
+        for (int i = 0; i < rounds; ++i) {
+            QString s;
+            const int len = int(rng.bounded(64));
+            for (int j = 0; j < len; ++j) {
+                switch (rng.bounded(4)) {
+                case 0: s += QChar('0' + rng.bounded(10)); break;
+                case 1: s += QChar('A' + rng.bounded(26)); break;
+                case 2: s += QChar(0x0410 + rng.bounded(32)); break; // кириллица
+                default: s += QChar(0x20 + rng.bounded(0x5F)); break; // печатный ASCII
+                }
+            }
+            (void)Validator::validateIMEI(s);
+            (void)Validator::validateINN(s);
+            (void)Validator::validateSerialNotEmpty(s);
+            (void)Validator::checkLuhn(s);
+            (void)Validator::validateINNChecksum(s);
+            (void)Validator::createIMEIValidator().match(s);
+            (void)Validator::createINNValidator().match(s);
+            (void)Validator::createSerialValidator().match(s);
+        }
+    }
+
+    void fuzz_password_hashing()
+    {
+        // PBKDF2 (100k итераций) — дорогой, поэтому раундов немного.
+        QRandomGenerator rng(0xBEEFu);
+        const int rounds = 15;
+        for (int i = 0; i < rounds; ++i) {
+            QString s;
+            const int len = int(rng.bounded(1, 32));
+            for (int j = 0; j < len; ++j) {
+                switch (rng.bounded(3)) {
+                case 0: s += QChar('0' + rng.bounded(10)); break;
+                case 1: s += QChar('A' + rng.bounded(26)); break;
+                default: s += QChar(0x20 + rng.bounded(0x5F)); break;
+                }
+            }
+            QString hash = hashPassword(s);
+            QVERIFY2(hash.count(':') == 2, qPrintable("PBKDF2-хеш должен быть в формате iter:salt:hash"));
+            QVERIFY(checkPassword(s, hash));
+            QVERIFY(!checkPassword(s + "x", hash));
+        }
+        // Мусор в хранимом хеше отклоняется без краха
+        QVERIFY(!checkPassword("password", ""));
+        QVERIFY(!checkPassword("password", "::"));
+        QVERIFY(!checkPassword("password", "garbage"));
+        QVERIFY(!checkPassword("password", QString(64, 'z')));
     }
 };
 

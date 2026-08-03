@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.2] — 2026-08-03
+
+### Аудит (03.08.2026 — четвёртый этап: безопасность и надёжность)
+- **Принудительная смена паролей**: миграция `009_security_hardening.sql` (`must_change_password`); legacy-хеши (не `iter:salt:hash`) и учётная запись `admin` помечаются, `loginform` требует смену пароля с проверкой сложности (`validatePasswordStrength`) — `password_utils.h`
+- **Шифрование бэкапов**: AES-256-CBC (`openssl enc -aes-256-cbc -pbkdf2 -iter 100000`), маркер `POCENC1\n`, обратная совместимость с plain-дампом; roundtrip-тест восстановления в свежую БД (`test_db_integration`)
+
+### Аудит (03.08.2026 — пятый этап: fuzz, отказоустойчивость, перф, docs)
+- **Fuzz-тесты**: `test_validator` — `fuzz_random_validator_inputs()` (seed `0xC0FFEE`, 20k раундов) и `fuzz_password_hashing()` (seed `0xBEEF`)
+- **Health-check**: CLI `--check-db` (коды 0/1/2, без GUI) + `--version`/`--help`; `DatabaseManager::setSuppressDialogs`
+- **Graceful shutdown**: `aboutToQuit` закрывает соединение БД; `showError` логирует из фоновых потоков вместо модального диалога
+- **Retry transient-ошибок**: `executeTransaction()` до 3 попыток при SQLSTATE 08*, 40P01, 40001, 57P01 (backoff 100–300 мс)
+- **Circuit breaker**: новый `src/utils/circuitbreaker.*` (Closed/Open/HalfOpen, cooldown 30 с) в `executeQuery`/`executeTransaction`; unit-тест `test_circuitbreaker`
+- **Точный планировщик**: `OpsScheduler` — single-shot таймер с перепланированием до ближайшего события (не чаще 5 с / не реже 60 с), первая проверка через 10 с
+- **Перф**: `updateCharts()` перестраивает графики только при изменении данных; bulk-импорт кэширует `modelid` (устранён N+1 SELECT)
+- **windeployqt**: при отсутствии — `message(FATAL_ERROR)` с инструкцией (вместо тихого пропуска deploy-цели)
+- **CI**: джоба `bump-version` (auto-bump patch + авто-changelog в `CHANGELOG.md`) при push в master
+- **Docs**: `docs/API.md` (интерфейсы модулей), `docs/adr/ADR-0001.md…0005.md` (обоснование решений), версия QXlsx зафиксирована и описана в `docs/OPS.md` (6.1.4)
+
 ## [1.5.1] — 2026-07-31
 
 ### CI/CD (базовый конвейер)

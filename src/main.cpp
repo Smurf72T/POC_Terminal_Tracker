@@ -1,12 +1,18 @@
 #include "ui/mainwindow.h"
 #include "ui/dialogs/loginform.h"
 #include "database/databasemanager.h"
+#include "utils/logging.h"
 #include <QApplication>
+#include <QCoreApplication>
 #include <QIcon>
 #include <QFile>
+#include <QFileInfo>
+#include <QJsonDocument>
 #include <QMessageBox>
 #include <QSettings>
+#include <QSqlQuery>
 #include <QWidget>
+#include <cstdio>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
@@ -23,6 +29,56 @@ static void applyStyle(QApplication& app)
     }
 }
 
+static QString readAppVersion(const QString &configPath)
+{
+    QFile file(configPath);
+    if (!file.open(QIODevice::ReadOnly))
+        return QString();
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (doc.isNull())
+        return QString();
+    return doc.object()["application"].toObject()["version"].toString();
+}
+
+static int runHealthCheck()
+{
+    // Без GUI-диалогов: вывод результата в stdout, код возврата 0/1/2.
+    DatabaseManager::setSuppressDialogs(true);
+
+    if (!DatabaseManager::instance().initialize()) {
+        std::printf("DB_ERROR: не удалось подключиться к базе данных или применить миграции\n");
+        DatabaseManager::instance().close();
+        return 1;
+    }
+
+    QSqlQuery q(DatabaseManager::instance().getDatabase());
+    if (!q.exec("SELECT 1") || !q.next()) {
+        std::printf("DB_ERROR: %s\n", q.lastError().text().toUtf8().constData());
+        DatabaseManager::instance().close();
+        return 1;
+    }
+
+    QStringList pending = DatabaseManager::instance().pendingMigrations();
+    if (!pending.isEmpty()) {
+        std::printf("DB_WARN: не применены миграции: %s\n", pending.join(", ").toUtf8().constData());
+        DatabaseManager::instance().close();
+        return 2;
+    }
+
+    std::printf("DB_OK\n");
+    DatabaseManager::instance().close();
+    return 0;
+}
+
+static void printUsage(const char *appName)
+{
+    std::printf("POC Terminal Tracker\n");
+    std::printf("Использование: %s [опции]\n", appName);
+    std::printf("  --check-db   проверка подключения к БД и применённых миграций (без GUI)\n");
+    std::printf("  --version    вывод версии приложения\n");
+    std::printf("  -h, --help   этот экран\n");
+}
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
@@ -32,6 +88,23 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_WIN
     SetConsoleOutputCP(CP_UTF8);
 #endif
+
+    const QStringList args = QCoreApplication::arguments();
+    const QString appName = args.isEmpty() ? "POC Terminal Tracker" : QFileInfo(args[0]).fileName();
+
+    if (args.contains("--check-db"))
+        return runHealthCheck();
+
+    if (args.contains("-h") || args.contains("--help")) {
+        printUsage(appName.toUtf8().constData());
+        return 0;
+    }
+
+    if (args.contains("--version")) {
+        QString version = readAppVersion("config/config.json");
+        std::printf("%s\n", (version.isEmpty() ? QString("unknown") : version).toUtf8().constData());
+        return 0;
+    }
 
     if (!DatabaseManager::instance().initialize()) {
         QWidget splash;
@@ -48,6 +121,7 @@ int main(int argc, char *argv[])
 
     LoginForm loginDialog;
     if (loginDialog.exec() != QDialog::Accepted) {
+        DatabaseManager::instance().close();
         return 0;
     }
 
@@ -69,6 +143,12 @@ int main(int argc, char *argv[])
     MainWindow w;
     w.setWindowTitle(QString("POC Terminal Tracker — %1").arg(loginDialog.getUsername()));
     w.show();
+
+    // Graceful shutdown: закрываем соединение с БД после завершения цикла событий
+    QObject::connect(&a, &QCoreApplication::aboutToQuit, []() {
+        qCInfo(logApp) << "Приложение завершает работу, закрываем соединение с БД";
+        DatabaseManager::instance().close();
+    });
 
     return a.exec();
 }

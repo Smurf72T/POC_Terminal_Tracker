@@ -11,6 +11,7 @@
 #include <QStandardItemModel>
 #include <QApplication>
 #include <QHeaderView>
+#include <QHash>
 
 #include <xlsxdocument.h>
 #include <xlsxworksheet.h>
@@ -206,6 +207,7 @@ bool BulkImportForm::importData()
     QStringList errors;
     QSqlQuery query(db);
     QSqlQuery modelQuery(db);
+    QHash<QString, int> modelIdCache;
 
     // Собираем существующие серийные номера
     QSqlQuery existingQuery(db);
@@ -244,12 +246,17 @@ bool BulkImportForm::importData()
 
         int modelId = 0;
         if (!modelName.isEmpty()) {
-            modelQuery.prepare("SELECT modelid FROM tblmodels WHERE modelname = :name");
-            modelQuery.bindValue(":name", modelName);
-            if (!modelQuery.exec() || !modelQuery.next()) {
-                rowErrors.append(QString("Модель «%1» не найдена").arg(modelName));
+            if (modelIdCache.contains(modelName)) {
+                modelId = modelIdCache.value(modelName);
             } else {
-                modelId = modelQuery.value(0).toInt();
+                modelQuery.prepare("SELECT modelid FROM tblmodels WHERE modelname = :name");
+                modelQuery.bindValue(":name", modelName);
+                if (!modelQuery.exec() || !modelQuery.next()) {
+                    rowErrors.append(QString("Модель «%1» не найдена").arg(modelName));
+                } else {
+                    modelId = modelQuery.value(0).toInt();
+                    modelIdCache.insert(modelName, modelId);
+                }
             }
         }
 

@@ -48,6 +48,7 @@ private:
     void ensureBackupWorker();
     void enforceRetention();
     void readConfig(const QJsonObject &config);
+    void rescheduleTimer();
 
     QTimer *m_timer = nullptr;
     QThread *m_backupThread = nullptr;

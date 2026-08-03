@@ -99,6 +99,12 @@ DO $$ BEGIN DROP TRIGGER IF EXISTS trg_audit_clients ON tblclients; EXCEPTION WH
 CREATE TRIGGER trg_audit_clients AFTER INSERT OR UPDATE OR DELETE ON tblclients FOR EACH ROW EXECUTE FUNCTION audit_clients_trigger();
 
 -- Генератор номеров документов
+-- ВНИМАНИЕ: функция generate_doc_number() ниже использует глобальную
+-- последовательность seq_doc_numbers и формат «ТИП-YYYY-000001».
+-- Начиная с 002_status_change_docs.sql она ПЕРЕОПРЕДЕЛЯЕТСЯ на формат
+-- «ПП-00001» с отдельными последовательностями на тип документа;
+-- в 008_cleanup_legacy.sql устаревшая seq_doc_numbers удаляется.
+-- Это определение оставлено для обратной совместимости схемы (000–001).
 CREATE SEQUENCE IF NOT EXISTS seq_doc_numbers START 1;
 
 CREATE OR REPLACE FUNCTION generate_doc_number(doc_type TEXT) RETURNS TEXT AS $$

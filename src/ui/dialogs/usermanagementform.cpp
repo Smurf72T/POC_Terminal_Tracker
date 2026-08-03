@@ -153,24 +153,17 @@ void UserManagementForm::onResetPassword(int userId, const QString &username)
         QLineEdit::Password, QString(), &ok);
     if (!ok || newPass.isEmpty()) return;
 
-    if (newPass.length() < 8) {
-        QMessageBox::warning(this, "Ошибка", "Пароль должен быть минимум 8 символов.");
-        return;
-    }
-    bool hasUpper = false, hasDigit = false;
-    for (const QChar &c : newPass) {
-        if (c.isUpper()) hasUpper = true;
-        if (c.isDigit()) hasDigit = true;
-    }
-    if (!hasUpper || !hasDigit) {
-        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать заглавную букву и цифру.");
+    PasswordStrengthResult strength = validatePasswordStrength(newPass);
+    if (!strength.ok) {
+        QMessageBox::warning(this, "Ошибка", strength.error);
         return;
     }
 
     QString saltedHash = hashPassword(newPass);
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("UPDATE tbl_users SET password_hash = :hash WHERE user_id = :id");
+    query.prepare("UPDATE tbl_users SET password_hash = :hash, must_change_password = FALSE "
+                  "WHERE user_id = :id");
     query.bindValue(":hash", saltedHash);
     query.bindValue(":id", userId);
     if (query.exec()) {

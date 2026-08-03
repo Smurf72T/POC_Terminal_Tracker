@@ -11,6 +11,7 @@ public:
         bool ok = false;
         QString filePath;
         QString method;   // "pg_dump" | "fallback"
+        bool encrypted = false; // файл зашифрован AES-256-CBC (openssl)
         QString error;
         qint64 size = 0;
     };

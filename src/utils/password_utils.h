@@ -106,4 +106,35 @@ inline bool checkPassword(const QString &password, const QString &storedHash)
     return false;
 }
 
+// Результат проверки сложности пароля.
+// Единая точка валидации для входа, смены/сброса пароля и регистрации.
+struct PasswordStrengthResult
+{
+    bool ok = false;
+    QString error;
+};
+
+inline PasswordStrengthResult validatePasswordStrength(const QString &password)
+{
+    if (password.length() < 8)
+        return {false, "Пароль должен быть минимум 8 символов."};
+    bool hasUpper = false;
+    bool hasDigit = false;
+    for (const QChar &c : password) {
+        if (c.isUpper()) hasUpper = true;
+        else if (c.isDigit()) hasDigit = true;
+    }
+    if (!hasUpper)
+        return {false, "Пароль должен содержать хотя бы одну заглавную букву."};
+    if (!hasDigit)
+        return {false, "Пароль должен содержать хотя бы одну цифру."};
+    return {true, QString()};
+}
+
+// True, если хеш имеет legacy-формат (SHA-256, 64/80 символов) вместо PBKDF2 «iter:salt:hash».
+inline bool isLegacyPasswordHash(const QString &storedHash)
+{
+    return storedHash.count(':') != 2;
+}
+
 #endif

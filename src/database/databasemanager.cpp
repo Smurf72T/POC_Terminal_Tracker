@@ -13,6 +13,25 @@
 #include <QSqlError>
 #include <QStringConverter>
 #include <QTextStream>
+#include <QThread>
+
+namespace {
+
+constexpr int kMaxTxnRetries = 3;
+
+bool isTransientError(const QSqlError &err)
+{
+    const QString sqlState = err.nativeErrorCode().trimmed().toUpper();
+    if (sqlState.isEmpty())
+        return false;
+    if (sqlState.startsWith("08"))  // класс ошибок соединения
+        return true;
+    return sqlState == "40P01"   // deadlock_detected
+        || sqlState == "40001"   // serialization_failure
+        || sqlState == "57P01";  // admin_shutdown
+}
+
+} // namespace
 
 static QMap<QString, QString> loadEnvFile(const QString &filePath)
 {
@@ -37,6 +56,18 @@ DatabaseManager& DatabaseManager::instance()
 {
     static DatabaseManager instance;
     return instance;
+}
+
+bool DatabaseManager::s_suppressDialogs = false;
+
+void DatabaseManager::setSuppressDialogs(bool suppress)
+{
+    s_suppressDialogs = suppress;
+}
+
+bool DatabaseManager::suppressDialogs()
+{
+    return s_suppressDialogs;
 }
 
 IDatabaseManager &databaseManager()
@@ -214,8 +245,19 @@ QJsonObject DatabaseManager::configObject() const
 
 QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMessage)
 {
+    if (!m_circuitBreaker.isAllowed()) {
+        QSqlQuery sqlQuery(m_database);
+        sqlQuery.exec("SELECT \xEF\xBF\xBD_breaker_open");  // заведомо некорректный SQL — ошибка в lastError()
+        if (showErrorMessage)
+            showError(sqlQuery.lastError().text());
+        return sqlQuery;
+    }
+
     QSqlQuery sqlQuery(m_database);
-    if (!sqlQuery.exec(query)) {
+    if (sqlQuery.exec(query)) {
+        m_circuitBreaker.onSuccess();
+    } else {
+        m_circuitBreaker.onFailure();
         if (showErrorMessage) {
             showError("Ошибка выполнения запроса: " + sqlQuery.lastError().text() +
                      "\nЗапрос: " + query);
@@ -226,31 +268,56 @@ QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMess
 
 bool DatabaseManager::executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc)
 {
-    if (!m_database.isOpen()) {
-        showError("База данных не подключена");
+    if (!m_circuitBreaker.isAllowed()) {
+        showError("Соединение временно недоступно (circuit breaker разомкнут)");
         return false;
     }
 
-    if (!m_database.transaction()) {
-        showError("Не удалось начать транзакцию: " + m_database.lastError().text());
-        return false;
-    }
+    for (int attempt = 1; attempt <= kMaxTxnRetries; ++attempt) {
+        if (!m_database.isOpen()) {
+            if (!m_database.open()) {
+                showError("База данных не подключена");
+                m_circuitBreaker.onFailure();
+                return false;
+            }
+            m_circuitBreaker.onSuccess();
+        }
 
-    bool success = transactionFunc(m_database);
-
-    if (success) {
-        if (!m_database.commit()) {
-            showError("Не удалось зафиксировать транзакцию: " + m_database.lastError().text());
-            m_database.rollback();
+        if (!m_database.transaction()) {
+            showError("Не удалось начать транзакцию: " + m_database.lastError().text());
+            m_circuitBreaker.onFailure();
             return false;
         }
-    } else {
-        if (!m_database.rollback()) {
-            showError("Не удалось откатить транзакцию: " + m_database.lastError().text());
+
+        bool success = transactionFunc(m_database);
+
+        if (!success) {
+            if (!m_database.rollback()) {
+                showError("Не удалось откатить транзакцию: " + m_database.lastError().text());
+            }
+            return false;
         }
+
+        if (m_database.commit()) {
+            m_circuitBreaker.onSuccess();
+            return true;
+        }
+
+        QSqlError commitError = m_database.lastError();
+        m_database.rollback();
+
+        if (!isTransientError(commitError) || attempt == kMaxTxnRetries) {
+            showError("Не удалось зафиксировать транзакцию: " + commitError.text());
+            m_circuitBreaker.onFailure();
+            return false;
+        }
+
+        qCWarning(logDB) << "Транзакция отменена transient-ошибкой (попытка"
+                         << attempt << "из" << kMaxTxnRetries << "):" << commitError.text();
+        QThread::msleep(100 * attempt);
     }
 
-    return success;
+    return false;
 }
 
 void DatabaseManager::notifyDataChanged()
@@ -260,6 +327,16 @@ void DatabaseManager::notifyDataChanged()
 
 void DatabaseManager::showError(const QString& message)
 {
+    if (s_suppressDialogs) {
+        qCritical() << message;
+        return;
+    }
+    // В рабочем потоке (бэкап, миграции) модальный диалог заблокировал бы и поток,
+    // и цикл событий UI — логируем вместо показа.
+    if (QThread::currentThread() != QCoreApplication::instance()->thread()) {
+        qCCritical(logDB) << message;
+        return;
+    }
     QWidget *parent = QApplication::activeWindow();
     QMessageBox::critical(parent, "Ошибка базы данных", message);
 }

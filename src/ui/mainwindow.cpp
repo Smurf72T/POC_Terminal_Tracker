@@ -349,31 +349,35 @@ void MainWindow::updateCharts()
 {
     QSqlQuery query(DatabaseManager::instance().getDatabase());
 
-    // Pie chart — статусы терминалов
+    // Pie chart — статусы терминалов. Перерисовываем только при изменении данных
+    // (график собирается заново каждые 60 с по таймеру).
     auto *pieChart = qobject_cast<QChart*>(chartStatusView->chart());
     if (pieChart) {
-        pieChart->removeAllSeries();
-        auto *pieSeries = new QPieSeries();
+        QString signature;
+        QPieSeries *pieSeries = nullptr;
         if (query.exec("SELECT CASE status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END, COUNT(*) FROM tblterminals GROUP BY status ORDER BY status")) {
-            while (query.next())
-                pieSeries->append(query.value(0).toString(), query.value(1).toInt());
+            while (query.next()) {
+                signature += query.value(0).toString() + "=" + query.value(1).toString() + ";";
+            }
         }
-        pieChart->addSeries(pieSeries);
+        if (signature != m_chartsSignature.value("pie")) {
+            m_chartsSignature["pie"] = signature;
+            pieChart->removeAllSeries();
+            pieSeries = new QPieSeries();
+            if (query.exec("SELECT CASE status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END, COUNT(*) FROM tblterminals GROUP BY status ORDER BY status")) {
+                while (query.next())
+                    pieSeries->append(query.value(0).toString(), query.value(1).toInt());
+            }
+            pieChart->addSeries(pieSeries);
+        }
     }
 
     // Bar chart — выручка за последние 6 месяцев
     auto *barChart = qobject_cast<QChart*>(chartRevenueView->chart());
     if (barChart) {
-        barChart->removeAllSeries();
-        // Удаляем старые оси, чтобы не накапливались при каждом обновлении
-        const auto oldAxes = barChart->axes();
-        for (auto *axis : oldAxes)
-            barChart->removeAxis(axis);
-
-        auto *barSet = new QBarSet("Оплаты");
-        barSet->setColor("#1976D2");
+        QString signature;
         QStringList categories;
-
+        QList<double> totals;
         if (query.exec(
             "SELECT to_char(periodyear || '-' || LPAD(periodmonth::text, 2, '0'), 'YYYY-MM') AS month, "
             "COALESCE(SUM(amount), 0) AS total "
@@ -382,23 +386,37 @@ void MainWindow::updateCharts()
             "GROUP BY periodyear, periodmonth ORDER BY periodyear, periodmonth")) {
             while (query.next()) {
                 categories << query.value(0).toString();
-                *barSet << query.value(1).toDouble();
+                totals << query.value(1).toDouble();
+                signature += query.value(0).toString() + "=" + query.value(1).toString() + ";";
             }
         }
+        if (signature != m_chartsSignature.value("bar")) {
+            m_chartsSignature["bar"] = signature;
+            barChart->removeAllSeries();
+            // Удаляем старые оси, чтобы не накапливались при каждом обновлении
+            const auto oldAxes = barChart->axes();
+            for (auto *axis : oldAxes)
+                barChart->removeAxis(axis);
 
-        auto *barSeries = new QBarSeries();
-        barSeries->append(barSet);
-        barChart->addSeries(barSeries);
+            auto *barSet = new QBarSet("Оплаты");
+            barSet->setColor("#1976D2");
+            for (double total : totals)
+                *barSet << total;
 
-        auto *axisX = new QBarCategoryAxis();
-        axisX->append(categories);
-        barChart->addAxis(axisX, Qt::AlignBottom);
-        barSeries->attachAxis(axisX);
+            auto *barSeries = new QBarSeries();
+            barSeries->append(barSet);
+            barChart->addSeries(barSeries);
 
-        auto *axisY = new QValueAxis();
-        axisY->setTitleText("Сумма, руб.");
-        barChart->addAxis(axisY, Qt::AlignLeft);
-        barSeries->attachAxis(axisY);
+            auto *axisX = new QBarCategoryAxis();
+            axisX->append(categories);
+            barChart->addAxis(axisX, Qt::AlignBottom);
+            barSeries->attachAxis(axisX);
+
+            auto *axisY = new QValueAxis();
+            axisY->setTitleText("Сумма, руб.");
+            barChart->addAxis(axisY, Qt::AlignLeft);
+            barSeries->attachAxis(axisY);
+        }
     }
 }
 

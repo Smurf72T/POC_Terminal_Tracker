@@ -7,7 +7,6 @@
 #include <QSqlError>
 #include <QInputDialog>
 #include <QDateTime>
-#include <QRegularExpression>
 #include <QApplication>
 #include <QDebug>
 
@@ -65,7 +64,7 @@ void LoginForm::on_btnLogin_clicked()
     // Rate limiting на уровне БД (переживает перезапуск приложения)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("SELECT user_id, username, display_name, role, password_hash, "
-                  "failed_login_attempts, locked_until FROM tbl_users "
+                  "failed_login_attempts, locked_until, must_change_password FROM tbl_users "
                   "WHERE username = :uname AND is_active = TRUE");
     query.bindValue(":uname", username);
 
@@ -130,12 +129,15 @@ void LoginForm::on_btnLogin_clicked()
         m_username = query.value(1).toString();
         m_role = query.value(3).toString();
 
-        // Принудительная смена пароля для пользователей со старым хешем.
+        // Принудительная смена пароля:
+        //  - legacy-хеши (SHA-256, 64/80 символов) — чтобы в БД остались только PBKDF2;
+        //  - флаг must_change_password (дефолтный admin из миграции 001 и т.п.).
         // Апгрейд хеша выполняем ТОЛЬКО после успешной смены пароля:
         // если пользователь отменит диалог, старый хеш останется в БД,
         // и при следующем входе смена пароля будет запрошена снова.
-        bool wasOldHash = (storedHash.count(':') != 2);
-        if (wasOldHash) {
+        bool mustChange = isLegacyPasswordHash(storedHash)
+                || query.value(7).toBool();
+        if (mustChange) {
             bool ok;
             QString newPass = QInputDialog::getText(this, "Смена пароля",
                 "Необходимо сменить пароль по умолчанию.\n"
@@ -145,15 +147,16 @@ void LoginForm::on_btnLogin_clicked()
                 reject();
                 return;
             }
-            if (newPass.length() < 8 || !newPass.contains(QRegularExpression("[A-ZА-Я]")) || !newPass.contains(QRegularExpression("[0-9]"))) {
-                QMessageBox::warning(this, "Ошибка",
-                    "Пароль должен быть минимум 8 символов, содержать заглавную букву и цифру.");
+            PasswordStrengthResult strength = validatePasswordStrength(newPass);
+            if (!strength.ok) {
+                QMessageBox::warning(this, "Ошибка", strength.error);
                 reject();
                 return;
             }
             QString newHash = hashPassword(newPass);
             QSqlQuery updatePwd(DatabaseManager::instance().getDatabase());
-            updatePwd.prepare("UPDATE tbl_users SET password_hash = :hash WHERE user_id = :id");
+            updatePwd.prepare("UPDATE tbl_users SET password_hash = :hash, "
+                              "must_change_password = FALSE WHERE user_id = :id");
             updatePwd.bindValue(":hash", newHash);
             updatePwd.bindValue(":id", m_userId);
             if (!updatePwd.exec()) {
@@ -195,16 +198,9 @@ void LoginForm::on_btnRegister_clicked()
         return;
     }
 
-    if (password.length() < 8) {
-        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать минимум 8 символов!");
-        return;
-    }
-    if (!password.contains(QRegularExpression("[A-ZА-Я]"))) {
-        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать хотя бы одну заглавную букву!");
-        return;
-    }
-    if (!password.contains(QRegularExpression("[0-9]"))) {
-        QMessageBox::warning(this, "Ошибка", "Пароль должен содержать хотя бы одну цифру!");
+    PasswordStrengthResult strength = validatePasswordStrength(password);
+    if (!strength.ok) {
+        QMessageBox::warning(this, "Ошибка", strength.error);
         return;
     }
 

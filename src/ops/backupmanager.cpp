@@ -10,6 +10,9 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QTemporaryFile>
 #include <QTextStream>
 #include <QVariant>
 
@@ -18,6 +21,158 @@ namespace {
 constexpr int kPgDumpTimeoutMs = 60000;
 constexpr int kPsqlTimeoutMs = 120000;
 constexpr int kKillWaitMs = 5000;
+
+// Маркер зашифрованного бэкапа (первая строка файла).
+// Формат: "POCENC1\n" + шифротекст openssl enc -aes-256-cbc -pbkdf2.
+const char kEncMarker[] = "POCENC1\n";
+
+QString findOpenssl()
+{
+    QString found = QStandardPaths::findExecutable("openssl");
+    if (!found.isEmpty())
+        return found;
+    // Резервные пути (Git for Windows / OpenSSL) — в CI openssl не всегда в PATH.
+    const QStringList fallbackPaths = {
+#ifdef Q_OS_WIN
+        "C:/Program Files/Git/usr/bin/openssl.exe",
+        "C:/Program Files/OpenSSL-Win64/bin/openssl.exe",
+        "C:/OpenSSL-Win64/bin/openssl.exe",
+#endif
+        "/usr/bin/openssl",
+        "/usr/local/bin/openssl",
+    };
+    for (const QString &p : fallbackPaths) {
+        if (QFileInfo::exists(p))
+            return p;
+    }
+    return QString();
+}
+
+bool runOpenssl(const QStringList &args, QString *error)
+{
+    static const QString kOpenssl = findOpenssl();
+    if (kOpenssl.isEmpty()) {
+        if (error)
+            *error = "openssl не найден — невозможно выполнить шифрование/расшифровку бэкапа";
+        return false;
+    }
+    QProcess process;
+    process.start(kOpenssl, args);
+    if (!process.waitForFinished(kPgDumpTimeoutMs)) {
+        process.kill();
+        process.waitForFinished(kKillWaitMs);
+        if (error)
+            *error = "openssl не завершился за 60 секунд и был остановлен";
+        return false;
+    }
+    QString stderrText = process.readAllStandardError();
+    if (process.exitCode() != 0) {
+        if (error)
+            *error = QString("openssl завершился с ошибкой (код %1):\n%2")
+                         .arg(process.exitCode())
+                         .arg(stderrText.left(1000));
+        return false;
+    }
+    return true;
+}
+
+bool isEncryptedBackup(const QString &path)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly))
+        return false;
+    return f.read(qstrlen(kEncMarker)) == QByteArray(kEncMarker);
+}
+
+// Шифрует plain-файл в файл с маркером POCENC1 + шифротекстом AES-256-CBC.
+bool encryptBackupFile(const QString &plainPath, const QString &outPath,
+                       const QString &passphrase, QString *error)
+{
+    QTemporaryFile cipherFile("enc-XXXXXX.bin");
+    if (!cipherFile.open()) {
+        if (error)
+            *error = "Не удалось создать временный файл для шифрования";
+        return false;
+    }
+    QString cipherPath = cipherFile.fileName();
+    cipherFile.close();
+
+    if (!runOpenssl({"enc", "-aes-256-cbc", "-pbkdf2", "-iter", "100000",
+                     "-salt", "-pass", "pass:" + passphrase,
+                     "-in", plainPath, "-out", cipherPath}, error))
+        return false;
+
+    QFile in(cipherPath);
+    if (!in.open(QIODevice::ReadOnly)) {
+        if (error)
+            *error = "Не удалось прочитать временный шифротекст";
+        return false;
+    }
+    QFile out(outPath);
+    if (out.exists() && !out.remove()) {
+        if (error)
+            *error = "Не удалось перезаписать файл: " + outPath;
+        return false;
+    }
+    if (!out.open(QIODevice::WriteOnly)) {
+        if (error)
+            *error = "Не удалось создать файл: " + outPath;
+        return false;
+    }
+    out.write(kEncMarker, qstrlen(kEncMarker));
+    QByteArray buf;
+    while (!in.atEnd()) {
+        buf = in.read(1024 * 1024);
+        out.write(buf);
+    }
+    out.close();
+    in.close();
+    return true;
+}
+
+// Подготавливает SQL-файл для psql: расшифровывает бэкап (если он с маркером)
+// или копирует как есть (обратная совместимость с незашифрованными дампами).
+bool decryptBackupFile(const QString &inPath, const QString &outPath,
+                       const QString &passphrase, QString *error)
+{
+    if (!isEncryptedBackup(inPath)) {
+        QFile::remove(outPath);
+        return QFile::copy(inPath, outPath);
+    }
+    if (passphrase.isEmpty()) {
+        if (error)
+            *error = "Файл бэкапа зашифрован, но пароль не предоставлен для расшифровки";
+        return false;
+    }
+
+    QTemporaryFile bodyFile("dec-XXXXXX.bin");
+    if (!bodyFile.open()) {
+        if (error)
+            *error = "Не удалось создать временный файл для расшифровки";
+        return false;
+    }
+    {
+        QFile src(inPath);
+        if (!src.open(QIODevice::ReadOnly)) {
+            if (error)
+                *error = "Не удалось открыть файл бэкапа: " + inPath;
+            return false;
+        }
+        src.read(qstrlen(kEncMarker));
+        QByteArray buf;
+        while (!src.atEnd()) {
+            buf = src.read(1024 * 1024);
+            bodyFile.write(buf);
+        }
+        src.close();
+    }
+    bodyFile.close();
+
+    QFile::remove(outPath);
+    return runOpenssl({"enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "100000",
+                       "-pass", "pass:" + passphrase,
+                       "-in", bodyFile.fileName(), "-out", outPath}, error);
+}
 
 QString escapeSqlLiteral(const QString &value)
 {
@@ -70,6 +225,15 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
     QString dbname = db.databaseName();
     QString user = db.userName();
 
+    // Дамп пишется во временный plain-файл, затем финализируется:
+    // при непустом пароле — шифрование AES-256-CBC (openssl), иначе — копирование как есть.
+    QTemporaryDir tmpDir;
+    if (!tmpDir.isValid()) {
+        result.error = "Не удалось создать временную директорию для бэкапа";
+        return result;
+    }
+    QString plainPath = tmpDir.filePath("backup.sql");
+
     // --clean/--if-exists добавляют в дамп DROP-инструкции, чтобы дамп можно было
     // восстановить в уже заполненную базу (psql без этого падает на существующих таблицах).
     QStringList args;
@@ -81,7 +245,7 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
          << QString("--host=%1").arg(host)
          << QString("--port=%1").arg(port)
          << QString("--username=%1").arg(user)
-         << QString("--file=%1").arg(filePath)
+         << QString("--file=%1").arg(plainPath)
          << dbname;
 
     QProcess process;
@@ -94,30 +258,40 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
         process.kill();
         process.waitForFinished(kKillWaitMs);
         result.error = "pg_dump не завершился за 60 секунд, выполнен fallback-дамп";
-        if (createFallbackBackup(db, filePath, dbname, &result.error)) {
-            result.ok = true;
+        if (createFallbackBackup(db, plainPath, dbname, &result.error))
             result.method = "fallback";
-            result.size = QFileInfo(filePath).size();
+        else
+            return result;
+    } else {
+        QString error = process.readAllStandardError();
+        int exitCode = process.exitCode();
+        if (exitCode != 0) {
+            result.error = QString("pg_dump завершился с ошибкой (код %1):\n%2")
+                               .arg(exitCode)
+                               .arg(error.left(2000));
+            if (createFallbackBackup(db, plainPath, dbname, &result.error))
+                result.method = "fallback";
+            else
+                return result;
+        } else {
+            result.method = "pg_dump";
         }
-        return result;
     }
 
-    QString error = process.readAllStandardError();
-    int exitCode = process.exitCode();
-    if (exitCode != 0) {
-        result.error = QString("pg_dump завершился с ошибкой (код %1):\n%2")
-                           .arg(exitCode)
-                           .arg(error.left(2000));
-        if (createFallbackBackup(db, filePath, dbname, &result.error)) {
-            result.ok = true;
-            result.method = "fallback";
-            result.size = QFileInfo(filePath).size();
-        }
+    QString finalizeError;
+    bool finalized = password.isEmpty()
+        ? (QFile::remove(filePath), QFile::copy(plainPath, filePath))
+        : encryptBackupFile(plainPath, filePath, password, &finalizeError);
+    if (!finalized) {
+        result.ok = false;
+        result.error = finalizeError.isEmpty()
+            ? "Не удалось скопировать файл бэкапа: " + filePath
+            : finalizeError;
         return result;
     }
 
     result.ok = true;
-    result.method = "pg_dump";
+    result.encrypted = !password.isEmpty();
     result.size = QFileInfo(filePath).size();
     return result;
 }
@@ -297,12 +471,23 @@ bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &fileP
     QString dbname = db.databaseName();
     QString user = db.userName();
 
+    // Бэкап может быть зашифрован (маркер POCENC1) — расшифровываем во временный файл.
+    QTemporaryDir tmpDir;
+    if (!tmpDir.isValid()) {
+        if (error)
+            *error = "Не удалось создать временную директорию для восстановления";
+        return false;
+    }
+    QString sqlPath = tmpDir.filePath("restore.sql");
+    if (!decryptBackupFile(filePath, sqlPath, password, error))
+        return false;
+
     QStringList args;
     args << QString("--host=%1").arg(host)
          << QString("--port=%1").arg(port)
          << QString("--username=%1").arg(user)
          << QString("--dbname=%1").arg(dbname)
-         << QString("--file=%1").arg(filePath)
+         << QString("--file=%1").arg(sqlPath)
          << "--single-transaction";
 
     QProcess process;
@@ -319,8 +504,10 @@ bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &fileP
                              "Данные могли остаться в прежнем состоянии (restore выполняется "
                              "в одной транзакции).\n\n"
                              "Попробуйте восстановить вручную:\n"
-                             "psql -U %1 -d %2 -f \"%3\"")
-                         .arg(user, dbname, filePath);
+                             "openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass pass:<пароль> "
+                             "-in \"%1\" -out restore.sql\n"
+                             "psql -U %2 -d %3 -f restore.sql")
+                         .arg(filePath, user, dbname);
         }
         return false;
     }

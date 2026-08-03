@@ -58,6 +58,7 @@ set(SOURCES
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
         src/utils/logging.cpp
+        src/utils/circuitbreaker.cpp
         src/ops/backupmanager.cpp
         src/ops/backupworker.cpp
         src/ops/opslog.cpp
@@ -97,6 +98,8 @@ set(HEADERS
         src/utils/reportexporter.h
         src/utils/validator.h
         src/utils/logging.h
+        src/utils/circuitbreaker.h
+        src/utils/password_utils.h
         src/ops/backupmanager.h
         src/ops/backupworker.h
         src/ops/opslog.h
@@ -247,6 +250,11 @@ if(BUILD_TESTS)
     target_link_libraries(test_connectionpool PRIVATE Qt6::Test Qt6::Core Qt6::Sql Threads::Threads)
     add_test(NAME test_connectionpool COMMAND test_connectionpool)
 
+    add_executable(test_circuitbreaker tests/test_circuitbreaker.cpp src/utils/circuitbreaker.cpp)
+    target_include_directories(test_circuitbreaker PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_circuitbreaker PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME test_circuitbreaker COMMAND test_circuitbreaker)
+
     if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers")
         foreach(_sql_driver_pair "test_db_integration;qsqlpsql.dll" "test_concurrency;qsqlpsql.dll" "test_connectionpool;qsqlite.dll")
             list(GET _sql_driver_pair 0 _test)
@@ -265,7 +273,7 @@ if(BUILD_TESTS)
 
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
     foreach(_test test_password_utils test_validator test_update_utils test_db_integration test_concurrency
-            test_ui_components test_connectionpool)
+            test_ui_components test_connectionpool test_circuitbreaker)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
             if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")
                 add_custom_command(TARGET ${_test} POST_BUILD
@@ -345,6 +353,10 @@ if(WIN32)
         list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_SOURCE_DIR}/docs/OPS.md" "${DEPLOY_DIR}/docs/OPS.md")
         list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/docs/API.md" "${DEPLOY_DIR}/docs/API.md")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_SOURCE_DIR}/docs/adr" "${DEPLOY_DIR}/docs/adr")
+        list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_SOURCE_DIR}/README.md" "${DEPLOY_DIR}/README.md")
         list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_SOURCE_DIR}/CHANGELOG.md" "${DEPLOY_DIR}/CHANGELOG.md")
@@ -384,7 +396,9 @@ if(WIN32)
         set(CPACK_NSIS_MENU_LINKS "docs/OPS.md" "Руководство по эксплуатации")
         include(CPack)
     else()
-        message(WARNING "windeployqt не найден — цель deploy и CPack-пакетирование отключены")
+        message(FATAL_ERROR "windeployqt не найден — сборка портативного дистрибутива невозможна.\n"
+                "Задайте -DCMAKE_PREFIX_PATH=<каталог Qt, например E:/Qt/6.11.1/mingw_64>\n"
+                "или установите windeployqt в PATH.")
     endif()
 
     # ============================================================

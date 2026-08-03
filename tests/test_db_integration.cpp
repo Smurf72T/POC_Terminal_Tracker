@@ -340,7 +340,7 @@ void TestDbIntegration::test_schema_objects()
                                QString("seq_statuschange_doc_number")})
         QVERIFY2(found.contains(seq), qPrintable("Нет последовательности: " + seq));
 
-    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 9);
+    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 10);
 }
 
 void TestDbIntegration::test_number_generation()
@@ -699,12 +699,81 @@ void TestDbIntegration::test_backup_and_opslog()
     QVERIFY2(content.contains("INSERT INTO"), qPrintable("дамп не содержит данных"));
 
     // createBackup: pg_dump (если доступен в PATH) либо fallback — в любом случае файл создаётся
+    QString backupFull = tempDir + "/backup_full.sql";
     BackupManager::BackupResult result = BackupManager::createBackup(
-        m_testDb, tempDir + "/backup_full.sql", m_testDb.password());
+        m_testDb, backupFull, m_testDb.password());
     QVERIFY2(result.ok, qPrintable(result.error));
     QVERIFY2(result.size > 0, qPrintable("бэкап пустой"));
     QVERIFY2(result.method == "pg_dump" || result.method == "fallback",
              qPrintable("неизвестный метод бэкапа: " + result.method));
+
+    // Шифрование: бэкап, созданный с паролем, начинается с маркера POCENC1
+    QVERIFY2(result.encrypted, qPrintable("бэкап с паролем должен быть зашифрован"));
+    QFile enc(backupFull);
+    QVERIFY2(enc.open(QIODevice::ReadOnly), qPrintable("не удалось открыть зашифрованный бэкап"));
+    QCOMPARE(QString::fromUtf8(enc.read(8)), QString("POCENC1\n"));
+    enc.close();
+
+    // Roundtrip: восстановление зашифрованного бэкапа в СВЕЖУЮ пустую БД.
+    // (Восстановление поверх рабочей БД не поддерживается: pg_dump --clean
+    //  не удаляет таблицы с внешнеключевыми зависимостями.)
+    const QString restoreDbName = "pocbase_test_restore";
+    QSqlQuery termR(m_adminDb);
+    termR.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                       "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(restoreDbName));
+    QSqlQuery dropR(m_adminDb);
+    QVERIFY2(dropR.exec(QString("DROP DATABASE IF EXISTS %1").arg(restoreDbName)),
+             qPrintable(dropR.lastError().text()));
+    QSqlQuery createR(m_adminDb);
+    QVERIFY2(createR.exec(QString("CREATE DATABASE %1 ENCODING 'UTF8'").arg(restoreDbName)),
+             qPrintable(createR.lastError().text()));
+
+    {
+        QSqlDatabase restoreDb = QSqlDatabase::addDatabase("QPSQL", "restoreConnection");
+        QString rErr;
+        QVERIFY2(openConnection(restoreDb, restoreDbName, m_env, m_dbConfig, &rErr), qPrintable(rErr));
+        QString restoreErr;
+        QVERIFY2(BackupManager::restoreDatabase(restoreDb, backupFull, m_testDb.password(), &restoreErr),
+                 qPrintable(restoreErr));
+        restoreDb.close();
+        QSqlDatabase::removeDatabase("restoreConnection");
+    }
+
+    // В восстановленной БД должны быть схема (миграции) и данные
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase("QPSQL", "restoreCheckConnection");
+        QString cErr;
+        QVERIFY2(openConnection(check, restoreDbName, m_env, m_dbConfig, &cErr), qPrintable(cErr));
+        QSqlQuery q(check);
+        QVERIFY2(q.exec("SELECT count(*) FROM tbl_users"), qPrintable(q.lastError().text()));
+        QVERIFY(q.next());
+        QVERIFY2(q.value(0).toInt() > 0, qPrintable("в восстановленной БД нет пользователей"));
+        QSqlQuery mq(check);
+        QVERIFY(mq.exec("SELECT count(*) FROM schema_migrations"));
+        QVERIFY(mq.next());
+        QCOMPARE(mq.value(0).toInt(), 10);
+        check.close();
+        QSqlDatabase::removeDatabase("restoreCheckConnection");
+    }
+
+    QSqlQuery termR2(m_adminDb);
+    termR2.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                        "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(restoreDbName));
+    QSqlQuery dropR2(m_adminDb);
+    dropR2.exec(QString("DROP DATABASE IF EXISTS %1").arg(restoreDbName));
+
+    // Бэкап без пароля — plaintext SQL (обратная совместимость)
+    QString backupPlain = tempDir + "/backup_plain.sql";
+    BackupManager::BackupResult plainResult = BackupManager::createBackup(
+        m_testDb, backupPlain, QString());
+    QVERIFY2(plainResult.ok, qPrintable(plainResult.error));
+    QVERIFY2(!plainResult.encrypted, qPrintable("бэкап без пароля не должен быть зашифрован"));
+    QFile pf(backupPlain);
+    QVERIFY(pf.open(QIODevice::ReadOnly | QIODevice::Text));
+    QString plainContent = QString::fromUtf8(pf.readAll());
+    pf.close();
+    QVERIFY2(plainContent.contains("CREATE TABLE"),
+             qPrintable("plain-бэкап не содержит CREATE TABLE"));
 
     // Журнал операций: запись должна появиться в ops.log
     OpsLog::instance().setLogDirectory(tempDir);

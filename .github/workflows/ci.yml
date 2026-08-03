@@ -142,3 +142,48 @@ jobs:
           name: POC_Terminal_Tracker-checksums
           path: POC_Terminal_Tracker-*.sha256
           if-no-files-found: error
+
+  bump-version:
+    name: Bump version and update changelog
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: build-test-package
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Bump patch version and append CHANGELOG
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER=$(jq -r '.application.version' config/config.json)
+          MAJOR=${VER%%.*}; REST=${VER#*.}; MINOR=${REST%%.*}; PATCH=${REST#*.}
+          NEW="$MAJOR.$MINOR.$((PATCH+1))"
+          jq ".application.version = \"$NEW\"" config/config.json > config/config.json.tmp
+          mv config/config.json.tmp config/config.json
+
+          # Коммиты с прошлого автоматического bump (в противном случае — последние 30)
+          LAST=$(git log -1 --format=%H --grep="^docs: bump version to" || true)
+          if [ -n "$LAST" ]; then
+            COMMITS=$(git log --format='- %s' "$LAST..HEAD" | grep -v "^docs: bump version to" || true)
+          else
+            COMMITS=$(git log --format='- %s' -30 || true)
+          fi
+          DATE=$(date +%Y-%m-%d)
+          printf '%s\n\n### Изменения (автогенерировано)\n%b\n' \
+            "## [$NEW] — $DATE" "$COMMITS" > CHANGELOG.md.new
+          cat CHANGELOG.md >> CHANGELOG.md.new
+          mv CHANGELOG.md.new CHANGELOG.md
+
+      - name: Commit and push bump
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add config/config.json CHANGELOG.md
+          git commit -m "docs: bump version to $(jq -r '.application.version' config/config.json)"
+          git push

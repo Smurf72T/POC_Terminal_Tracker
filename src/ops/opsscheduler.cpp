@@ -19,7 +19,9 @@
 #include <QTimer>
 #include <QVariant>
 
-static const int kSchedulerTickMs = 60000;
+static const int kSchedulerMinTickMs = 5000;
+static const int kSchedulerMaxTickMs = 60000;
+static const int kSchedulerInitialTickMs = 10000;
 
 namespace {
 
@@ -65,7 +67,7 @@ OpsScheduler::OpsScheduler(const QJsonObject &config, QObject *parent)
     readConfig(config);
     m_lastBackupAt = QDateTime::currentDateTime();
     m_timer = new QTimer(this);
-    m_timer->setInterval(kSchedulerTickMs);
+    m_timer->setSingleShot(true);
     connect(m_timer, &QTimer::timeout, this, &OpsScheduler::checkSchedule);
 }
 
@@ -83,7 +85,7 @@ OpsScheduler::~OpsScheduler()
 
 void OpsScheduler::start()
 {
-    m_timer->start();
+    m_timer->start(kSchedulerInitialTickMs);
     qCInfo(logApp) << "OpsScheduler: бэкапы" << (m_backupEnabled ? "включены" : "выключены")
                    << ", интервал" << (m_backupIntervalSec / 3600) << "ч, retention" << m_retentionCount;
     qCInfo(logApp) << "OpsScheduler: проверка целостности" << (m_integrityEnabled ? "включена" : "выключена")
@@ -164,6 +166,32 @@ void OpsScheduler::checkSchedule()
         m_lastIntegrityAt = now;
         runIntegrityCheck();
     }
+
+    rescheduleTimer();
+}
+
+void OpsScheduler::rescheduleTimer()
+{
+    // Точное расписание: перепланируем таймер на момент ближайшего события,
+    // не чаще 5 с и не реже 60 с (последнее — для реакции на ручные сбросы).
+    QDateTime now = QDateTime::currentDateTime();
+    qint64 nextInMs = kSchedulerMaxTickMs;
+
+    if (m_backupEnabled && !m_backupInProgress) {
+        qint64 backupInMs = m_lastBackupAt.addSecs(m_backupIntervalSec).toMSecsSinceEpoch()
+                          - now.toMSecsSinceEpoch();
+        nextInMs = qMin(nextInMs, qMax<qint64>(kSchedulerMinTickMs, backupInMs));
+    }
+
+    if (m_integrityEnabled) {
+        qint64 integrityInMs = m_lastIntegrityAt.isNull()
+            ? kSchedulerMinTickMs
+            : m_lastIntegrityAt.addSecs(m_integrityIntervalSec).toMSecsSinceEpoch()
+              - now.toMSecsSinceEpoch();
+        nextInMs = qMin(nextInMs, qMax<qint64>(kSchedulerMinTickMs, integrityInMs));
+    }
+
+    m_timer->start(qMin<qint64>(nextInMs, kSchedulerMaxTickMs));
 }
 
 void OpsScheduler::ensureBackupWorker()
@@ -236,6 +264,8 @@ void OpsScheduler::onBackupWorkerFinished(const BackupManager::BackupResult &res
         OpsLog::instance().error(message);
         emit backupFinished(false, result.filePath, message);
     }
+
+    rescheduleTimer();
 }
 
 void OpsScheduler::enforceRetention()

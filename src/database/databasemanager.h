@@ -10,6 +10,7 @@
 #include <QStringList>
 
 #include "idatabasemanager.h"
+#include "utils/circuitbreaker.h"
 
 class DatabaseManager : public QObject, public IDatabaseManager
 {
@@ -17,6 +18,9 @@ class DatabaseManager : public QObject, public IDatabaseManager
 
 public:
     static DatabaseManager& instance();
+
+    static void setSuppressDialogs(bool suppress);
+    static bool suppressDialogs();
 
     bool initialize(const QString& configPath = "config/config.json") override;
     bool isConnected() const override;
@@ -64,6 +68,9 @@ private:
     bool m_listening = false;
     QString m_currentUser = "system";
     QString m_currentUserRole = "user";
+
+    static bool s_suppressDialogs;
+    CircuitBreaker m_circuitBreaker;
 };
 
 #endif // DATABASEMANAGER_H
