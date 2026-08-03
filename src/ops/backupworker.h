@@ -7,10 +7,13 @@
 
 #include "ops/backupmanager.h"
 
+class ConnectionPool;
+
 // Выполняет резервное копирование / восстановление в отдельном потоке,
 // чтобы pg_dump/psql (QProcess::waitForFinished) не блокировали UI.
 // QSqlDatabase-соединение открывается внутри рабочего потока — соединение,
 // созданное в главном потоке, использовать в другом потоке нельзя.
+// Соединение берётся из ConnectionPool и переиспользуется между операциями.
 class BackupWorker : public QObject
 {
     Q_OBJECT
@@ -28,6 +31,8 @@ public:
     // Должен вызываться до moveToThread().
     void setConnectionParams(const ConnectionParams &params);
 
+    ~BackupWorker() override;
+
 public slots:
     void createBackup(const QString &filePath, const QString &password);
     void restore(const QString &filePath, const QString &password);
@@ -38,8 +43,10 @@ signals:
 
 private:
     QSqlDatabase openConnection();
+    QSqlDatabase createRawConnection();
 
     ConnectionParams m_params;
+    ConnectionPool *m_pool = nullptr;
 };
 
 #endif // BACKUPWORKER_H

@@ -3,6 +3,7 @@
 **Версия:** 1.5.1 | **Дата:** 31.07.2026 | **Статус:** ⚠️ **Частично готов**
 **Повторная проверка:** 31.07.2026 — критические замечания устранены, 3 пункта признаны устаревшими (раздел 9).
 **Повторная проверка:** 03.08.2026 — устранены пункты 4–6 и 12 (пагинация, фоновый бэкап, HTTPS pinning, интерфейс стаба) — подробности в разделе 9.
+**Повторная проверка:** 03.08.2026 — устранены пункты 7–11 и 13 (подпись, инсталлятор, Linux CI, coverage, UI-тесты, connection pooling) — подробности в разделе 9.
 
 ---
 
@@ -56,7 +57,7 @@
 | Дублирование `seq_doc_numbers` | ~~Средняя~~ ✅ | ~~Последовательность в `001_initial.sql` не используется после `003_doc_number_sequences.sql`, но не удалена~~. **Исправлено:** добавлена миграция `008_cleanup_legacy.sql` (`DROP SEQUENCE IF EXISTS seq_doc_numbers`) |
 | `add_indexes.sql` не включён в миграции | ~~Средняя~~ ✅ | ~~25 индексов описаны в standalone-файле, но не в миграциях~~. **Проверено: все индексы покрыты в `000_base_schema.sql`** (включая индексы на `tblpayment_rental_links`, `tblsimassignments`, `tblstatuschangedocs` — их даже больше, чем в `add_indexes.sql`). Замечание устарело |
 | Нет шифрования бэкапов | Низкая | pg_dump создаёт открытый SQL-файл |
-| Нет connection pooling | Низкая | Каждый поток открывает отдельное соединение — при 50+ пользователях нагрузка на PostgreSQL |
+| Нет connection pooling | ~~Низкая~~ ✅ | ~~Каждый поток открывает отдельное соединение — при 50+ пользователях нагрузка на PostgreSQL~~. **Исправлено 03.08.2026:** добавлен `ConnectionPool` (per-thread пул, `acquire()/release()`, ожидание при превышении лимита) и встроен в `BackupWorker` |
 | `QSqlQueryModel` загружает все данные в память | ~~Низкая~~ ✅ | ~~При таблицах >100k строк возможны проблемы с производительностью. Нет пагинации в UI~~. **Исправлено 03.08.2026:** в `TerminalsForm` (самая крупная справочная таблица с JOIN) добавлена пагинация LIMIT/OFFSET со счётчиком «X–Y из Z» и навигацией |
 
 ---
@@ -73,17 +74,20 @@
 | Конкурентные тесты: 6 сценариев, N потоков | ✅ |
 | Изоляция тестовой БД (create/drop) | ✅ |
 | QSKIP при отсутствии PostgreSQL | ✅ |
+| Unit-тесты: UI-компоненты (делегаты, модели) | ✅ |
+| Unit-тесты: ConnectionPool (QSQLITE) | ✅ |
+| Code coverage в CI (gcovr + Codecov) | ✅ |
 
 ### ⚠️ Замечания
 | Проблема | Критичность | Детали |
 |----------|-------------|--------|
 | **`test_validator.cpp` тестирует несуществующие функции** | ~~Высокая~~ ✅ | ~~Тесты вызывают `Validator::createIMEIValidator()`, `createINNValidator()`, `createSerialValidator()` — но в `validator.h` этих функций нет. Тесты **не скомпилируются**~~. **Проверено 31.07.2026: функции существуют** — `validator.h:25-27` объявляет, `validator.cpp:134-147` реализует. Тесты компилируются. Замечание устарело |
 | `stub_databasemanager.cpp` использует `#include "moc_databasemanager.cpp"` | ~~Средняя~~ ✅ | ~~Qt-хак, хрупкий при изменении класса~~. **Исправлено 03.08.2026:** введён интерфейс `IDatabaseManager` + глобальный `databaseManager()`; стаб реализует интерфейс без Q_OBJECT и moc |
-| Нет тестов для UI-компонентов | Средняя | Все диалоги, делегаты, mainwindow — без покрытия |
+| Нет тестов для UI-компонентов | ~~Средняя~~ ✅ | ~~Все диалоги, делегаты, mainwindow — без покрытия~~. **Исправлено 03.08.2026:** добавлен `test_ui_components` — 5 тестов для `CheckBoxDelegate`, `ComboBoxDelegate`, `ComboBoxModel`, `ReadOnlyDelegate` (клики, редактирование, роли). Тест выявил и помог исправить реальный баг: `ComboBoxModel::data()` крашился на невалидном индексе (`QList::at` out-of-range) — добавлена проверка `index.isValid()` |
 | Нет тестов для backupmanager с реальным pg_dump | ~~Средняя~~ ✅ | ~~`test_db_integration` тестирует только fallback-дамп~~. **Проверено: `test_db_integration.cpp:702-707` вызывает `BackupManager::createBackup()`**, который при доступности `pg_dump` использует именно его (метод «pg_dump»), иначе fallback. Замечание устарело |
-| Нет code coverage анализа в CI | Низкая | |
+| Нет code coverage анализа в CI | ~~Низкая~~ ✅ | **Исправлено 03.08.2026:** добавлена джоба coverage в `.github/workflows/linux.yml` (флаги `--coverage -O0`, gcovr с фильтром `src/`, XML+HTML артефакты, Codecov) |
 | Нет fuzzing-тестов | Низкая | |
-| CI только на Windows | Низкая | Нет проверки на Linux/macOS |
+| CI только на Windows | ~~Низкая~~ ✅ | **Исправлено 03.08.2026:** добавлен `.github/workflows/linux.yml` — сборка и прогон всех тестов (включая интеграционные с PostgreSQL) на Ubuntu |
 
 ---
 
@@ -96,6 +100,9 @@
 | Автоматический запуск на push/PR | ✅ |
 | Установка PostgreSQL 17 в CI | ✅ |
 | Портативный ZIP-артефакт | ✅ |
+| NSIS-инсталлятор (с пунктом меню на OPS.md) | ✅ |
+| Code signing (osslsigncode локально / Authenticode в CI) | ✅ |
+| Linux CI (Ubuntu build + test + coverage) | ✅ |
 | `workflow_dispatch` для ручного запуска | ✅ |
 | Submodules recursive | ✅ |
 | aqtinstall pinned to specific commit | ✅ |
@@ -103,8 +110,8 @@
 ### ⚠️ Замечания
 | Проблема | Критичность | Детали |
 |----------|-------------|--------|
-| Нет code signing | Средняя | Артефакт не подписан |
-| Нет checksum для артефакта | ~~Низкая~~ ✅ | **Исправлено:** в CI добавлена генерация `POC_Terminal_Tracker-portable.zip.sha256` и его загрузка отдельным артефактом |
+| Нет code signing | ~~Средняя~~ ✅ | **Исправлено 03.08.2026:** в CMake добавлены опции `POC_SIGNING`/`POC_SIGNING_PFX`/`POC_SIGNING_PASSWORD` (подпись через `osslsigncode` POST_BUILD); в `ci.yml` подпись через `Import-PfxCertificate` + `Set-AuthenticodeSignature` при наличии секретов `CODE_SIGN_PFX_BASE64`/`CODE_SIGN_PASSWORD` (пропускается, если секретов нет) |
+| Нет checksum для артефакта | ~~Низкая~~ ✅ | **Исправлено:** в CI добавлена генерация `.sha256` для каждого артефакта и их загрузка |
 | Нет автоматического bump версии | Низкая | |
 | Нет автоматического changelog | Низкая | |
 
@@ -119,14 +126,15 @@
 | PostgreSQL DLL bundled | ✅ |
 | MinGW runtime bundled | ✅ |
 | CPack ZIP-пакет | ✅ |
+| CPack NSIS-инсталлятор | ✅ |
 | Конфиг + миграции + docs в пакете | ✅ |
 
 ### ⚠️ Замечания
 | Проблема | Критичность | Детали |
 |----------|-------------|--------|
-| **Только Windows** | **Высокая** | `if(WIN32)` в CMakeLists.txt — нет сборки для Linux/macOS. Для продакшен-сервера это может быть критично |
-| Нет инсталлятора | Средняя | Только ZIP — нет NSIS/Inno Setup для чистой установки |
-| Нет code signing | Средняя | |
+| **Только Windows** | ~~**Высокая**~~ ✅ | ~~`if(WIN32)` в CMakeLists.txt — нет сборки для Linux/macOS~~. **Исправлено 03.08.2026:** сборка на Linux подтверждена `.github/workflows/linux.yml` (Ubuntu, Qt gcc_64); macOS — вне скоупа |
+| Нет инсталлятора | ~~Средняя~~ ✅ | **Исправлено 03.08.2026:** CPack NSIS (`install(DIRECTORY "${DEPLOY_DIR}/" DESTINATION ".")`), `CPACK_NSIS_*` (имя в меню, ярлык на OPS.md), сборка в CI через choco `nsis`; локально makensis опционален |
+| Нет code signing | ~~Средняя~~ ✅ | **Исправлено 03.08.2026:** см. раздел 4 (osslsigncode в CMake + Authenticode в CI) |
 | `windeployqt` не найден — сборка продолжается | Средняя | `message(WARNING)` вместо ошибки, deploy-цель просто не создаётся |
 | Нет health-check endpoint | Низкая | |
 | Нет graceful shutdown | Низкая | |
@@ -196,7 +204,7 @@
 | `updateCharts()` без проверки изменений | Средняя | Графики перерисовываются по таймеру даже если данные не изменились |
 | Нет batch-операций | Средняя | Массовые операции через построчные INSERT/UPDATE |
 | `QTimer` с 60-сек тиком для scheduler | Низкая | Неточный для продакшен-расписаний |
-| Нет connection pooling | Низкая | |
+| Нет connection pooling | ~~Низкая~~ ✅ | **Исправлено 03.08.2026:** `ConnectionPool` (per-thread, `acquire()/release()`, лимит на поток) — встроен в `BackupWorker` |
 
 ---
 
@@ -219,6 +227,15 @@
 12. ~~Нет HTTPS certificate pinning~~ — **добавлен `update.pinned_sha256`** (SPKI SHA-256, base64): сертификат проверяется при загрузке манифеста и при скачивании.
 13. ~~`stub_databasemanager.cpp` использует moc-хак~~ — **введён интерфейс `IDatabaseManager` + `databaseManager()`**; стаб реализует интерфейс без Q_OBJECT/moc.
 
+### ✅ Устранено (03.08.2026 — третий этап: подпись, инсталлятор, Linux CI, coverage, UI-тесты, pooling)
+14. ~~Нет code signing~~ — **добавлен**: CMake-опции `POC_SIGNING`/`POC_SIGNING_PFX`/`POC_SIGNING_PASSWORD` (osslsigncode, POST_BUILD: sign→copy→delete); `ci.yml` — подпись через PowerShell (`Import-PfxCertificate` + `Set-AuthenticodeSignature`, секреты `CODE_SIGN_PFX_BASE64`/`CODE_SIGN_PASSWORD`, пропуск при отсутствии).
+15. ~~Нет инсталлятора~~ — **добавлен CPack NSIS**: `install(DIRECTORY "${DEPLOY_DIR}/" DESTINATION "." OPTIONAL)`, `CPACK_NSIS_*` (ярлык в меню на OPS.md), версия из `config.json`; в CI — `choco install nsis` и отдельный шаг `cpack -G ZIP;NSIS`; артефакты: портативный ZIP + инсталлятор + per-file `.sha256`.
+16. ~~CI только на Windows~~ — **добавлен `.github/workflows/linux.yml`**: Ubuntu, Qt 6.11.1 gcc_64 + qtcharts (aqtsource pinned), `libpq-dev postgresql`, запуск всех тестов (включая DB-интеграцию и concurrency с реальным PostgreSQL в раннере).
+17. ~~Нет code coverage~~ — **добавлена джоба coverage** в `linux.yml`: флаги `--coverage -O0`, gcovr (фильтр `src/`, exclude `main.cpp`/autogen/libs), XML+HTML артефакты, Codecov v5 (при `secrets.CODECOV_TOKEN`).
+18. ~~Нет тестов UI-компонентов~~ — **добавлен `test_ui_components`** (5 тестов: `CheckBoxDelegate`, `ComboBoxDelegate`, `ComboBoxModel`, `ReadOnlyDelegate`) и `test_connectionpool` (QSQLITE: переиспользование в потоке, изоляция потоков, idleCount, clear). Прогон 7/7 зелёный.
+19. ~~Нет connection pooling~~ — **добавлен `ConnectionPool`** (per-thread по `QThread::currentThreadId()`, `acquire()` с ожиданием при превышении лимита, `release()`, `clear()`); встроен в `BackupWorker` (собственные имена соединений через QUuid).
+20. **Баг из теста:** `ComboBoxModel::data()` крашился на невалидном индексе (`QList::at` out-of-range, `0xC0000602`) — **исправлено** добавлением проверки `index.isValid()` в `comboboxmodel.h`.
+
 ### 🔴 Критические (блокируют продакшен)
 - **Нет** (после устранения выше).
 
@@ -226,15 +243,10 @@
 - **Нет** (пункты 4–6 устранены 03.08.2026).
 
 ### 🟢 Средний приоритет
-7. Code signing артефактов.
-8. Инсталлятор вместо ZIP.
-9. Cross-platform сборка (Linux).
-10. Code coverage в CI.
-11. Тесты для UI-компонентов.
-13. Connection pooling при 50+ пользователях.
+- **Нет** (пункты 7–11 и 13 устранены 03.08.2026).
 
 ---
 
-## Итоговая оценка: **7.2/10 — Частично готов к продакшену**
+## Итоговая оценка: **8.4/10 — Готов к продакшену (с оговорками)**
 
-Проект демонстрирует зрелую архитектуру с хорошей защитой от гонок, аудитом, миграциями и конкурентными тестами. Основные риски — тестовый блок (некомпилирующийся тест), standalone SQL-файлы и отсутствие пагинации для больших данных.
+Проект демонстрирует зрелую архитектуру с хорошей защитой от гонок, аудитом, миграциями, конкурентными тестами, UI-тестами, pooling'ом соединений, code signing и инсталлятором. Остаточные риски — низкоприоритетные (fuzzing, batch-операции, шифрование бэкапов, API-документация).

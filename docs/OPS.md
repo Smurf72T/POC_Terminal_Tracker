@@ -278,12 +278,36 @@ psql -h localhost -U postgres -d pocbase_restore -f backup_poc_20260731_120000.s
 
 ```bash
 cmake --build build --target deploy      # собирает build/deploy/
-cpack --config build/CPackConfig.cmake   # POC_Terminal_Tracker-<версия>-portable.zip
+cpack --config build/CPackConfig.cmake   # POC_Terminal_Tracker-<версия>.zip (+ .exe при наличии NSIS)
 ```
 
 Пользователь распаковывает ZIP в любую папку и запускает `POC_Terminal_Tracker.exe`.
 Конфигурация и БД не хранятся рядом с exe (порт. режим) — настройки подключения
 берутся из `.env` рядом с exe, а пароль — из `POC_DB_PASSWORD`.
+
+### 6.1.1 Инсталлятор (NSIS)
+
+При установленном NSIS (`makensis` в PATH) CPack дополнительно соберёт инсталлятор
+`.exe`: создаётся пункт меню и ярлык на `docs\OPS.md`. Версия пакета берётся из
+`config\config.json`. Имя пакета не содержит суффикс `-portable`:
+`POC_Terminal_Tracker-<версия>.zip` / `.exe`.
+
+### 6.1.2 Code signing
+
+- **Локально**: подпись через `osslsigncode` включается опциями конфигурации
+  `-DPOC_SIGNING=ON -DPOC_SIGNING_PFX=<путь>.pfx -DPOC_SIGNING_PASSWORD=<пароль>`
+  и выполняется на этапе сборки (POST_BUILD: подпись → копирование → удаление).
+- **В CI**: подпись выполняется через `Import-PfxCertificate` +
+  `Set-AuthenticodeSignature`, если заданы секреты `CODE_SIGN_PFX_BASE64`
+  (PFX в base64) и `CODE_SIGN_PASSWORD`; без секретов шаг пропускается.
+- Проверить подпись: `Get-AuthenticodeSignature POC_Terminal_Tracker.exe`.
+
+### 6.1.3 Linux CI и code coverage
+
+CI на Linux (`.github/workflows/linux.yml`): сборка на Ubuntu + прогон всех тестов
+(включая `test_db_integration`/`test_concurrency` против реального PostgreSQL).
+Отдельная джоба собирает проект с флагами `--coverage -O0` и публикует отчёт gcovr
+(артефакт + Codecov при заданном секрете `CODECOV_TOKEN`).
 
 ### 6.2 Ручное обновление
 

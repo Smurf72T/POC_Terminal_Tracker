@@ -1,0 +1,132 @@
+name: CI (Linux)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    name: Build and test (Ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Qt 6.11.1 (gcc_64) + qtcharts
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          target: 'desktop'
+          arch: 'gcc_64'
+          modules: 'qtcharts'
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e'
+          cache: true
+
+      - name: Install PostgreSQL client + server
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev postgresql postgresql-contrib
+
+      - name: Configure
+        env:
+          QT_ROOT_DIR: ${{ env.QT_ROOT_DIR }}
+        run: |
+          if [ -z "$QT_ROOT_DIR" ]; then QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"; fi
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+          cmake -S . -B build -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --config Release -j "$(nproc)"
+
+      - name: Start PostgreSQL
+        run: |
+          sudo pg_ctlcluster $(ls /etc/postgresql | head -n1) main start
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+          pg_isready -h localhost -p 5432
+
+      - name: Test (incl. DB integration + concurrency)
+        env:
+          POC_DB_HOST: localhost
+          POC_DB_PORT: '5432'
+          POC_DB_USER: postgres
+          POC_DB_PASSWORD: postgres
+        run: |
+          if [ -z "$QT_ROOT_DIR" ]; then QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"; fi
+          export QT_PLUGIN_PATH="$QT_ROOT_DIR/plugins"
+          ctest --test-dir build -C Release --output-on-failure
+
+  coverage:
+    name: Code coverage (gcovr)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install Qt 6.11.1 (gcc_64) + qtcharts
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          target: 'desktop'
+          arch: 'gcc_64'
+          modules: 'qtcharts'
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e'
+          cache: true
+
+      - name: Install build deps + gcovr
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpq-dev
+          python3 -m pip install --user gcovr
+
+      - name: Configure (coverage flags)
+        env:
+          QT_ROOT_DIR: ${{ env.QT_ROOT_DIR }}
+        run: |
+          if [ -z "$QT_ROOT_DIR" ]; then QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"; fi
+          cmake -S . -B build -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" -DBUILD_TESTS=ON \
+            -DCMAKE_CXX_FLAGS="--coverage -O0" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build
+        run: cmake --build build --config Release -j "$(nproc)"
+
+      - name: Run unit tests
+        run: |
+          if [ -z "$QT_ROOT_DIR" ]; then QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"; fi
+          export QT_PLUGIN_PATH="$QT_ROOT_DIR/plugins"
+          ctest --test-dir build -C Release \
+            -R "test_password_utils|test_validator|test_update_utils|test_connectionpool" \
+            --output-on-failure
+
+      - name: Generate coverage report (gcovr)
+        run: |
+          gcovr --root . \
+            --filter "src/" \
+            --exclude "src/main.cpp" \
+            --exclude ".*autogen.*" \
+            --exclude "libs/" \
+            --xml-pretty -o coverage.xml \
+            --html --html-details -o coverage.html
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-report
+          path: coverage.*
+          if-no-files-found: error
+
+      - name: Upload to Codecov
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

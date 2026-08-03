@@ -17,7 +17,7 @@ public:
     int columnCount(const QModelIndex &parent = QModelIndex()) const override { return 1; }
 
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
-        if (index.row() >= m_items.size()) return QVariant();
+        if (!index.isValid() || index.row() >= m_items.size()) return QVariant();
         if (role == Qt::DisplayRole) return m_items[index.row()].second;
         if (role == Qt::UserRole) return m_items[index.row()].first;
         return QVariant();

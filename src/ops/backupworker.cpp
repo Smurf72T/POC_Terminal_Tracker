@@ -1,18 +1,34 @@
 #include "backupworker.h"
 
+#include "database/connectionpool.h"
 #include "ops/opslog.h"
 
 #include <QSqlError>
+#include <QUuid>
 
 void BackupWorker::setConnectionParams(const ConnectionParams &params)
 {
     m_params = params;
 }
 
+BackupWorker::~BackupWorker()
+{
+    delete m_pool;
+}
+
 QSqlDatabase BackupWorker::openConnection()
 {
-    static int counter = 0;
-    QString name = QString("backup_worker_%1").arg(++counter);
+    if (!m_pool) {
+        m_pool = new ConnectionPool(
+            [this]() { return createRawConnection(); }, 1);
+    }
+    return m_pool->acquire();
+}
+
+QSqlDatabase BackupWorker::createRawConnection()
+{
+    QString name = QString("backup_worker_%1")
+                       .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", name);
     db.setHostName(m_params.host);
     db.setPort(m_params.port);
@@ -33,39 +49,32 @@ QSqlDatabase BackupWorker::openConnection()
 
 void BackupWorker::createBackup(const QString &filePath, const QString &password)
 {
-    QString connectionName;
-    {
-        QSqlDatabase db = openConnection();
-        connectionName = db.connectionName();
-        if (!db.isOpen()) {
-            BackupManager::BackupResult result;
-            result.filePath = filePath;
-            result.error = "Не удалось открыть соединение с БД в фоновом потоке";
-            emit backupFinished(result);
-        } else {
-            BackupManager::BackupResult result = BackupManager::createBackup(db, filePath, password);
-            emit backupFinished(result);
-            db.close();
-        }
+    QSqlDatabase db = openConnection();
+    BackupManager::BackupResult result;
+    if (db.isOpen()) {
+        result = BackupManager::createBackup(db, filePath, password);
+    } else {
+        result.filePath = filePath;
+        result.error = "Не удалось открыть соединение с БД в фоновом потоке";
     }
-    QSqlDatabase::removeDatabase(connectionName);
+
+    if (m_pool)
+        m_pool->release(db);
+    emit backupFinished(result);
 }
 
 void BackupWorker::restore(const QString &filePath, const QString &password)
 {
-    QString connectionName;
     QString error;
     bool ok = false;
-    {
-        QSqlDatabase db = openConnection();
-        connectionName = db.connectionName();
-        if (db.isOpen()) {
-            ok = BackupManager::restoreDatabase(db, filePath, password, &error);
-            db.close();
-        } else {
-            error = "Не удалось открыть соединение с БД в фоновом потоке";
-        }
+    QSqlDatabase db = openConnection();
+    if (db.isOpen()) {
+        ok = BackupManager::restoreDatabase(db, filePath, password, &error);
+    } else {
+        error = "Не удалось открыть соединение с БД в фоновом потоке";
     }
-    QSqlDatabase::removeDatabase(connectionName);
+
+    if (m_pool)
+        m_pool->release(db);
     emit restoreFinished(ok, filePath, error);
 }

@@ -2,8 +2,8 @@
 
 ## [1.5.1] — 2026-07-31
 
-### CI/CD
-- **GitHub Actions конвейер** (`.github/workflows/ci.yml`): на push в `master` / pull request — сборка Qt 6.11.1 (MSVC) + `qtcharts`, установка PostgreSQL 17, конфигурация/сборка CMake (VS generator, Release), прогон всех тестов (`ctest`, включая `test_db_integration` и `test_concurrency` против реального PostgreSQL), сборка портативного дистрибутива (`deploy` + CPack ZIP) и загрузка артефакта; запуск вручную через `workflow_dispatch`
+### CI/CD (базовый конвейер)
+- **GitHub Actions** (`.github/workflows/ci.yml`): на push в `master` / pull request — сборка Qt 6.11.1 (MSVC) + `qtcharts`, установка PostgreSQL 17 и NSIS, конфигурация/сборка CMake (Release), прогон всех тестов (`ctest`, включая `test_db_integration` и `test_concurrency` против реального PostgreSQL), сборка дистрибутива (`deploy` + CPack ZIP/NSIS) и загрузка артефактов; запуск вручную через `workflow_dispatch`
 
 ### Аудит (31.07.2026)
 - **Проверка sha256 при скачивании обновлений**: `UpdateManager` читает поле `sha256` из манифеста и отклоняет файл при несовпадении контрольной суммы (`src/update/updatemanager.*`); формат манифеста обновлён в `docs/OPS.md`
@@ -11,7 +11,18 @@
 - **Миграция `008_cleanup_legacy.sql`**: удалена неиспользуемая последовательность `seq_doc_numbers` (счётчики миграций в тестах обновлены 8 → 9)
 - **Безопасность по умолчанию**: `DatabaseManager` больше не логирует до входа как `admin` (дефолты `system`/`user`)
 - **`CheckBoxDelegate.h` добавлен в `HEADERS`** в `CMakeLists.txt` (корректная moc-обработка)
-- **CI**: артефакт портативного ZIP сопровождается `POC_Terminal_Tracker-portable.zip.sha256`
+- **CI**: артефакт портативного ZIP сопровождается контрольной суммой `.sha256`
+
+### Аудит (03.08.2026 — второй этап: инфраструктура доставки и качества)
+- **Code signing**: опции CMake `POC_SIGNING`/`POC_SIGNING_PFX`/`POC_SIGNING_PASSWORD` — подпись исполняемого файла через `osslsigncode` (POST_BUILD: sign → copy → delete); в `ci.yml` подпись через `Import-PfxCertificate` + `Set-AuthenticodeSignature` при наличии секретов `CODE_SIGN_PFX_BASE64`/`CODE_SIGN_PASSWORD` (пропускается без них)
+- **NSIS-инсталлятор**: CPack теперь собирает ZIP + NSIS (`install(DIRECTORY "${DEPLOY_DIR}/" DESTINATION "." OPTIONAL)`, версия из `config.json`, `CPACK_NSIS_*` — ярлык в меню на `OPS.md`, имя пакета без суффикса `-portable`); в CI — `choco install nsis` и раздельный шаг `cpack`
+- **Linux CI** (`.github/workflows/linux.yml`): сборка на Ubuntu (Qt 6.11.1 gcc_64 + qtcharts), прогон всех тестов (включая `test_db_integration`/`test_concurrency` против реального PostgreSQL в раннере)
+- **Code coverage**: джоба coverage в `linux.yml` — сборка с `--coverage -O0`, отчёт gcovr (XML+HTML артефакты), загрузка в Codecov при `secrets.CODECOV_TOKEN`
+- **UI-тесты** (`tests/test_ui_components.cpp`): 5 тестов для `CheckBoxDelegate`, `ComboBoxDelegate`, `ComboBoxModel`, `ReadOnlyDelegate`
+- **Тест выявил баг**: `ComboBoxModel::data()` крашился на невалидном индексе (`QList::at` out-of-range, `0xC0000602`) — добавлена проверка `index.isValid()` в `comboboxmodel.h`
+- **Connection pooling**: новый `src/database/connectionpool.*` — per-thread пул соединений (`acquire()/release()/idleCount()/clear()`, ожидание при превышении лимита); встроен в `BackupWorker` (имена соединений через QUuid); тесты `tests/test_connectionpool.cpp` (QSQLITE)
+- **CI-артефакты разделены**: портативный ZIP + NSIS-инсталлятор + per-file `.sha256` (нейминг `POC_Terminal_Tracker-*.zip/.exe`)
+- Локальная проверка: 7/7 тестов зелёные; CPack ZIP собирается (92 записи: config, миграции, docs, плагины)
 
 ### Аудит (03.08.2026)
 - **Пагинация `TerminalsForm`**: таблица грузится страницами (LIMIT/OFFSET, 1000 строк), счётчик «X–Y из Z», кнопки Первая/Назад/Вперёд/Последняя, сброс на первую страницу при поиске — защита от 100k+ строк в памяти

@@ -47,10 +47,18 @@ jobs:
           }
           & "$pgBin\psql.exe" -h localhost -p 5432 -U postgres -c "SELECT version();"
 
+      - name: Install NSIS (for CPack installer)
+        shell: powershell
+        run: |
+          choco install nsis -y --no-progress
+          $nsisExe = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $nsisExe)) { throw "NSIS not found at $nsisExe" }
+
       - name: Configure
         shell: powershell
         run: |
           if (-not $env:QT_ROOT_DIR) { throw "QT_ROOT_DIR is not set" }
+          $env:PATH = "C:\Program Files (x86)\NSIS;" + $env:PATH
           cmake -S . -B build `
             "-DCMAKE_PREFIX_PATH=$env:QT_ROOT_DIR" `
             "-DPostgreSQL_ROOT=C:\Program Files\PostgreSQL\17" `
@@ -69,30 +77,68 @@ jobs:
           POC_DB_PASSWORD: postgres
         run: ctest --test-dir build -C Release --output-on-failure
 
-      - name: Deploy portable distribution + CPack ZIP
+      - name: Deploy portable distribution
+        shell: powershell
+        run: cmake --build build --config Release --target deploy
+
+      - name: Sign (if code-signing certificate provided)
+        shell: powershell
+        env:
+          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          CODE_SIGN_PASSWORD: ${{ secrets.CODE_SIGN_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:CODE_SIGN_PFX_BASE64)) {
+            Write-Host "CODE_SIGN_PFX_BASE64 не задан — подпись пропущена"
+          } else {
+            $pfxPath = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
+            $securePass = ConvertTo-SecureString $env:CODE_SIGN_PASSWORD -AsPlainText -Force
+            Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePass | Out-Null
+            $cert = Get-ChildItem Cert:\CurrentUser\My |
+              Where-Object { $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date) } |
+              Sort-Object NotAfter -Descending | Select-Object -First 1
+            if (-not $cert) { throw "No valid code-signing certificate found in store" }
+            $exe = "build\deploy\POC_Terminal_Tracker.exe"
+            if (-not (Test-Path $exe)) { throw "deploy exe not found: $exe" }
+            Set-AuthenticodeSignature -FilePath $exe -Certificate $cert | Out-Null
+            $sig = Get-AuthenticodeSignature $exe
+            Write-Host "Signature status: $($sig.Status)"
+            if ($sig.Status -ne 'Valid') { throw "Signature verification failed: $($sig.Status)" }
+          }
+
+      - name: Package ZIP + NSIS installer
         shell: powershell
         run: |
-          cmake --build build --config Release --target deploy
           cpack -C Release --config build/CPackConfig.cmake
+          Get-ChildItem POC_Terminal_Tracker-*.zip, POC_Terminal_Tracker-*.exe |
+            ForEach-Object { Write-Host $_.Name }
 
       - name: Upload portable ZIP
         uses: actions/upload-artifact@v5
         with:
           name: POC_Terminal_Tracker-portable
-          path: POC_Terminal_Tracker-*-portable.zip
+          path: POC_Terminal_Tracker-*.zip
           if-no-files-found: error
 
-      - name: Generate SHA256 checksum
-        shell: powershell
-        run: |
-          $zip = Get-ChildItem POC_Terminal_Tracker-*-portable.zip | Select-Object -First 1
-          $hash = Get-FileHash $zip.FullName -Algorithm SHA256
-          "{0}  {1}" -f $hash.Hash, $zip.Name | Out-File -Encoding ascii POC_Terminal_Tracker-portable.zip.sha256
-          Get-Content POC_Terminal_Tracker-portable.zip.sha256
-
-      - name: Upload SHA256 checksum
+      - name: Upload NSIS installer
         uses: actions/upload-artifact@v5
         with:
-          name: POC_Terminal_Tracker-portable-sha256
-          path: POC_Terminal_Tracker-portable.zip.sha256
+          name: POC_Terminal_Tracker-installer
+          path: POC_Terminal_Tracker-*.exe
+          if-no-files-found: error
+
+      - name: Generate SHA256 checksums
+        shell: powershell
+        run: |
+          Get-ChildItem POC_Terminal_Tracker-*.zip, POC_Terminal_Tracker-*.exe | ForEach-Object {
+            $hash = Get-FileHash $_.FullName -Algorithm SHA256
+            "{0}  {1}" -f $hash.Hash, $_.Name | Out-File -Encoding ascii "$($_.Name).sha256"
+          }
+          Get-ChildItem POC_Terminal_Tracker-*.sha256 | ForEach-Object { Write-Host $_.Name }
+
+      - name: Upload SHA256 checksums
+        uses: actions/upload-artifact@v5
+        with:
+          name: POC_Terminal_Tracker-checksums
+          path: POC_Terminal_Tracker-*.sha256
           if-no-files-found: error

@@ -32,6 +32,7 @@ add_subdirectory(libs/QXlsx/QXlsx)
 set(SOURCES
         src/main.cpp
         src/database/databasemanager.cpp
+        src/database/connectionpool.cpp
         src/database/submiterrortablemodel.cpp
         src/ui/mainwindow.cpp
         src/ui/dialogs/manufacturersform.cpp
@@ -67,6 +68,7 @@ set(SOURCES
 set(HEADERS
         src/database/databasemanager.h
         src/database/idatabasemanager.h
+        src/database/connectionpool.h
         src/database/submiterrortablemodel.h
         src/ui/mainwindow.h
         src/ui/dialogs/manufacturersform.h
@@ -231,20 +233,39 @@ if(BUILD_TESTS)
     target_link_libraries(test_concurrency PRIVATE Qt6::Test Qt6::Core Qt6::Sql Threads::Threads)
     add_test(NAME test_concurrency COMMAND test_concurrency)
 
-    if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/qsqlpsql.dll")
-        foreach(_test test_db_integration test_concurrency)
-            add_custom_command(TARGET ${_test} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${_test}>/sqldrivers"
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/qsqlpsql.dll"
-                    "$<TARGET_FILE_DIR:${_test}>/sqldrivers/qsqlpsql.dll"
-                    COMMENT "Copying qsqlpsql.dll for ${_test}"
-            )
+    add_executable(test_ui_components tests/test_ui_components.cpp
+            src/ui/delegates/CheckBoxDelegate.h
+            src/ui/delegates/comboboxdelegate.h
+            src/ui/delegates/comboboxmodel.h
+            src/ui/delegates/readonlydelegate.h)
+    target_include_directories(test_ui_components PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/ui)
+    target_link_libraries(test_ui_components PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets)
+    add_test(NAME test_ui_components COMMAND test_ui_components)
+
+    add_executable(test_connectionpool tests/test_connectionpool.cpp src/database/connectionpool.cpp)
+    target_include_directories(test_connectionpool PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/database)
+    target_link_libraries(test_connectionpool PRIVATE Qt6::Test Qt6::Core Qt6::Sql Threads::Threads)
+    add_test(NAME test_connectionpool COMMAND test_connectionpool)
+
+    if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers")
+        foreach(_sql_driver_pair "test_db_integration;qsqlpsql.dll" "test_concurrency;qsqlpsql.dll" "test_connectionpool;qsqlite.dll")
+            list(GET _sql_driver_pair 0 _test)
+            list(GET _sql_driver_pair 1 _driver)
+            if(EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/${_driver}")
+                add_custom_command(TARGET ${_test} POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${_test}>/sqldrivers"
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/${_driver}"
+                        "$<TARGET_FILE_DIR:${_test}>/sqldrivers/${_driver}"
+                        COMMENT "Copying ${_driver} for ${_test}"
+                )
+            endif()
         endforeach()
     endif()
 
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
-    foreach(_test test_password_utils test_validator test_update_utils test_db_integration test_concurrency)
+    foreach(_test test_password_utils test_validator test_update_utils test_db_integration test_concurrency
+            test_ui_components test_connectionpool)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
             if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")
                 add_custom_command(TARGET ${_test} POST_BUILD
@@ -273,6 +294,7 @@ endif()
 # ============================================================
 if(WIN32)
     find_program(WINDEPLOYQT_EXE windeployqt HINTS "${CMAKE_PREFIX_PATH}/bin" DOC "Qt windeployqt")
+    find_program(MAKENSIS_EXE makensis DOC "NSIS makensis (для CPack NSIS-установщика)")
 
     if(WINDEPLOYQT_EXE)
         set(DEPLOY_DIR "${CMAKE_BINARY_DIR}/deploy")
@@ -333,21 +355,65 @@ if(WIN32)
                 DEPENDS ${PROJECT_NAME}
                 COMMENT "Сборка портативного дистрибутива (windeployqt)")
 
-        # ---- CPack: ZIP-архив из папки deploy ----
+        # ---- CPack: портативный ZIP + установщик NSIS из папки deploy ----
         include(InstallRequiredSystemLibraries)
         file(READ "${CMAKE_SOURCE_DIR}/config/config.json" POC_CONFIG_JSON)
         string(JSON POC_VERSION GET "${POC_CONFIG_JSON}" "application" "version")
+
+        # Содержимое deploy (exe + Qt runtime + DLL + конфиг + docs) становится install-контентом.
+        # OPTIONAL — каталог появляется после сборки цели deploy.
+        install(DIRECTORY "${DEPLOY_DIR}/" DESTINATION "." OPTIONAL)
 
         set(CPACK_PACKAGE_NAME "POC_Terminal_Tracker")
         set(CPACK_PACKAGE_VERSION "${POC_VERSION}")
         set(CPACK_PACKAGE_VENDOR "POC")
         set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Система учёта POC-терминалов и SIM-карт")
-        set(CPACK_PACKAGE_FILE_NAME "POC_Terminal_Tracker-${POC_VERSION}-portable")
+        set(CPACK_PACKAGE_FILE_NAME "POC_Terminal_Tracker-${POC_VERSION}")
         set(CPACK_PACKAGE_INSTALL_DIRECTORY "POC_Terminal_Tracker")
         set(CPACK_GENERATOR "ZIP")
-        set(CPACK_INSTALLED_DIRECTORIES "${DEPLOY_DIR}" "/")
+
+        # Установщик NSIS (собирается только если makensis найден)
+        if(MAKENSIS_EXE)
+            list(APPEND CPACK_GENERATOR "NSIS")
+            set(CPACK_NSIS_EXECUTABLE "${MAKENSIS_EXE}")
+        endif()
+        set(CPACK_NSIS_DISPLAY_NAME "POC Terminal Tracker")
+        set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
+        set(CPACK_NSIS_MODIFY_PATH OFF)
+        set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+        set(CPACK_NSIS_MENU_LINKS "docs/OPS.md" "Руководство по эксплуатации")
         include(CPack)
     else()
         message(WARNING "windeployqt не найден — цель deploy и CPack-пакетирование отключены")
+    endif()
+
+    # ============================================================
+    # Код-подпись exe (опционально, требуется PFX-сертификат)
+    # ============================================================
+    # Использование: cmake -DPOC_SIGNING=ON -DPOC_SIGNING_PFX=C:/certs/sign.pfx
+    #                -DPOC_SIGNING_PASSWORD=...
+    # Требуется установленный osslsigncode (https://github.com/mtrojnar/osslsigncode).
+    # Подпись выполняется после сборки, до копирования в deploy — в пакет попадает
+    # уже подписанный exe. В CI используется PowerShell Set-AuthenticodeSignature
+    # (см. .github/workflows/ci.yml), если задан секрет CODE_SIGN_PFX_BASE64.
+    option(POC_SIGNING "Подписывать POC_Terminal_Tracker.exe после сборки" OFF)
+    set(POC_SIGNING_PFX "" CACHE FILEPATH "Путь к PFX-сертификату для подписи")
+    set(POC_SIGNING_PASSWORD "" CACHE STRING "Пароль от PFX-сертификата")
+
+    if(POC_SIGNING AND POC_SIGNING_PFX)
+        find_program(OSSLSIGNCODE_EXE osslsigncode)
+        if(OSSLSIGNCODE_EXE)
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                    COMMAND "${OSSLSIGNCODE_EXE}" sign -pkcs12 "${POC_SIGNING_PFX}"
+                            -pass "${POC_SIGNING_PASSWORD}"
+                            -in "$<TARGET_FILE:${PROJECT_NAME}>"
+                            -out "$<TARGET_FILE:${PROJECT_NAME}>.signed"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                            "$<TARGET_FILE:${PROJECT_NAME}>.signed" "$<TARGET_FILE:${PROJECT_NAME}>"
+                    COMMAND ${CMAKE_COMMAND} -E remove -f "$<TARGET_FILE:${PROJECT_NAME}>.signed"
+                    COMMENT "Подпись POC_Terminal_Tracker.exe (osslsigncode)")
+        else()
+            message(WARNING "POC_SIGNING=ON, но osslsigncode не найден — подпись не выполняется")
+        endif()
     endif()
 endif()
