@@ -19,6 +19,8 @@ private slots:
     void comboboxModelReturnsDisplayAndUserRoles();
     void readonlyDelegateDoesNotCreateEditor();
     void checkboxDelegateSizeHint();
+    void editableComboboxWritesNewTextAsZeroId();
+    void editableComboboxResolvesTextToExistingItem();
 };
 
 void TestUiComponents::checkboxDelegateTogglesOnClick()
@@ -126,6 +128,50 @@ void TestUiComponents::checkboxDelegateSizeHint()
     const QSize size = delegate.sizeHint(option, model.index(0, 0));
     QVERIFY(size.width() > 0);
     QVERIFY(size.height() > 0);
+}
+
+void TestUiComponents::editableComboboxWritesNewTextAsZeroId()
+{
+    QList<QPair<int, QString>> items = { {1, "Активен"}, {2, "Списан"} };
+    ComboBoxDelegate delegate(items, nullptr, true);
+
+    QStandardItemModel model;
+    model.setColumnCount(1);
+    model.setRowCount(1);
+    const QModelIndex index = model.index(0, 0);
+
+    QComboBox editor;
+    for (const auto &item : items)
+        editor.addItem(item.second, item.first);
+    editor.setEditable(true);
+    editor.setInsertPolicy(QComboBox::NoInsert);
+    editor.setCurrentText("79991234567");
+
+    delegate.setModelData(&editor, &model, index);
+    QCOMPARE(model.data(index, Qt::UserRole).toInt(), 0);
+    QCOMPARE(model.data(index, Qt::DisplayRole).toString(), QString("79991234567"));
+}
+
+void TestUiComponents::editableComboboxResolvesTextToExistingItem()
+{
+    QList<QPair<int, QString>> items = { {1, "Активен"}, {2, "Списан"} };
+    ComboBoxDelegate delegate(items, nullptr, true);
+
+    QStandardItemModel model;
+    model.setColumnCount(1);
+    model.setRowCount(1);
+    const QModelIndex index = model.index(0, 0);
+
+    QComboBox editor;
+    for (const auto &item : items)
+        editor.addItem(item.second, item.first);
+    editor.setEditable(true);
+    editor.setInsertPolicy(QComboBox::NoInsert);
+    editor.setCurrentText("Списан");
+
+    delegate.setModelData(&editor, &model, index);
+    QCOMPARE(model.data(index, Qt::UserRole).toInt(), 2);
+    QCOMPARE(model.data(index, Qt::DisplayRole).toString(), QString("Списан"));
 }
 
 QTEST_MAIN(TestUiComponents)

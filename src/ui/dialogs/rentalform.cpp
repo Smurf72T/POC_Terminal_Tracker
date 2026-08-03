@@ -118,8 +118,9 @@ void RentalForm::loadFreeSIMsToDelegate()
         sims.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
     }
 
-    // Устанавливаем делегат на колонку SIM
-    ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(sims, this));
+    // Устанавливаем делегат на колонку SIM (редактируемый: можно выбрать
+    // существующую SIM-карту или ввести новый номер)
+    ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(sims, this, true));
 }
 
 void RentalForm::generateDocNumber()
@@ -309,7 +310,47 @@ void RentalForm::on_btnPost_clicked()
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
         int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
+        QString simNumber = rowsModel->data(rowsModel->index(i, 1), Qt::DisplayRole).toString().trimmed();
         QString comment = rowsModel->data(rowsModel->index(i, 2), Qt::DisplayRole).toString();
+
+        // Введён новый номер SIM — создаём карточку в справочнике (или берём
+        // существующую с таким же номером)
+        if (simId == 0 && !simNumber.isEmpty()) {
+            if (simNumber.length() > 19) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Номер SIM-карты «%1» слишком длинный (макс. 19 символов).").arg(simNumber));
+                return;
+            }
+
+            QSqlQuery findSim(db);
+            findSim.prepare("SELECT simcardid, status FROM tblsimcards WHERE simnumber = :n");
+            findSim.bindValue(":n", simNumber);
+            if (findSim.exec() && findSim.next()) {
+                simId = findSim.value(0).toInt();
+                if (findSim.value(1).toInt() != 0) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка",
+                        QString("SIM-карта %1 уже занята!").arg(simNumber));
+                    return;
+                }
+            } else {
+                QSqlQuery insertSim(db);
+                insertSim.prepare("INSERT INTO tblsimcards (simnumber, status) VALUES (:n, 0) RETURNING simcardid");
+                insertSim.bindValue(":n", simNumber);
+                if (!insertSim.exec() || !insertSim.next()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка БД",
+                        QString("Не удалось создать SIM-карту %1: %2")
+                            .arg(simNumber).arg(insertSim.lastError().text()));
+                    return;
+                }
+                simId = insertSim.value(0).toInt();
+                DatabaseManager::instance().logAction("INSERT", "tblsimcards", simId,
+                    QString(), QString(), QString("simnumber=%1").arg(simNumber));
+                rowsModel->setData(rowsModel->index(i, 1), simId, Qt::UserRole);
+            }
+        }
 
         if (!m_editMode) {
             QSqlQuery checkQuery(db);
