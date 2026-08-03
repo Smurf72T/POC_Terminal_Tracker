@@ -23,6 +23,9 @@ public:
 
     void start();
 
+    // Допустим только HTTPS; http разрешён лишь для localhost (локальная отладка).
+    static bool isSecureUpdateUrl(const QString &url);
+
 public slots:
     void checkForUpdates();
     void downloadUpdate(const QString &url);

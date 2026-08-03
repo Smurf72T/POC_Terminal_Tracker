@@ -22,6 +22,22 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
 # Ищем PostgreSQL
 find_package(PostgreSQL REQUIRED)
 
+# Проверка внешних утилит для бэкапов: pg_dump/psql нужны для полного дампа,
+# openssl — для шифрования бэкапов (AES-256-CBC). При их отсутствии работает
+# встроенный fallback-дамп и бэкап без шифрования — предупреждаем явно.
+find_program(POC_PG_DUMP pg_dump)
+find_program(POC_PSQL psql)
+find_program(POC_OPENSSL openssl)
+if(NOT POC_PG_DUMP OR NOT POC_PSQL)
+    message(WARNING "pg_dump/psql не найдены в PATH. Резервное копирование будет выполняться встроенным "
+                    "fallback-дампом (структура + данные), что медленнее и менее надёжно, чем pg_dump. "
+                    "Установите PostgreSQL client tools для продакшена.")
+endif()
+if(NOT POC_OPENSSL)
+    message(WARNING "openssl не найден в PATH. Шифрование бэкапов (AES-256-CBC) будет недоступно. "
+                    "Установите OpenSSL для продакшена.")
+endif()
+
 # Подавляем предупреждение Qt о подключении GuiPrivate (нужен QXlsx для Qt >= 6.10)
 set(QT_NO_PRIVATE_MODULE_WARNING ON CACHE BOOL "" FORCE)
 
@@ -223,6 +239,27 @@ if(BUILD_TESTS)
     target_link_libraries(test_update_utils PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_update_utils COMMAND test_update_utils)
 
+    add_executable(test_updatemanager tests/test_updatemanager.cpp
+            src/update/updatemanager.cpp
+            src/ops/opslog.cpp
+            src/utils/logging.cpp)
+    target_include_directories(test_updatemanager PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_updatemanager PRIVATE Qt6::Test Qt6::Core Qt6::Network)
+    add_test(NAME test_updatemanager COMMAND test_updatemanager)
+
+    add_executable(test_opsscheduler tests/test_opsscheduler.cpp
+            src/ops/opsscheduler.cpp
+            src/ops/backupmanager.cpp
+            src/ops/backupworker.cpp
+            src/ops/opslog.cpp
+            src/database/databasemanager.cpp
+            src/database/connectionpool.cpp
+            src/utils/circuitbreaker.cpp
+            src/utils/logging.cpp)
+    target_include_directories(test_opsscheduler PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_opsscheduler PRIVATE Qt6::Test Qt6::Core Qt6::Sql Qt6::Widgets Threads::Threads)
+    add_test(NAME test_opsscheduler COMMAND test_opsscheduler)
+
     add_executable(test_db_integration tests/test_db_integration.cpp
             src/ops/backupmanager.cpp
             src/ops/opslog.cpp
@@ -272,7 +309,8 @@ if(BUILD_TESTS)
     endif()
 
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
-    foreach(_test test_password_utils test_validator test_update_utils test_db_integration test_concurrency
+    foreach(_test test_password_utils test_validator test_update_utils test_updatemanager
+            test_opsscheduler test_db_integration test_concurrency
             test_ui_components test_connectionpool test_circuitbreaker)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
             if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")

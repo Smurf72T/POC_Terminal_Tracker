@@ -1,6 +1,7 @@
 #ifndef BACKUPMANAGER_H
 #define BACKUPMANAGER_H
 
+#include <QMetaType>
 #include <QSqlDatabase>
 #include <QString>
 
@@ -20,5 +21,7 @@ public:
     static bool createFallbackBackup(const QSqlDatabase &db, const QString &filePath, const QString &dbname, QString *error = nullptr);
     static bool restoreDatabase(const QSqlDatabase &db, const QString &filePath, const QString &password, QString *error = nullptr);
 };
+
+Q_DECLARE_METATYPE(BackupManager::BackupResult)
 
 #endif // BACKUPMANAGER_H

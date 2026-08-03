@@ -106,6 +106,18 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    // Частая причина «не подключается к БД»: пустой пароль при отсутствии .env/POC_DB_PASSWORD.
+    {
+        QFile cfgFile("config/config.json");
+        if (cfgFile.open(QIODevice::ReadOnly)) {
+            QJsonDocument cfgDoc = QJsonDocument::fromJson(cfgFile.readAll());
+            const QJsonObject dbCfg = cfgDoc.object()["database"].toObject();
+            if (dbCfg["password"].toString().isEmpty() && qEnvironmentVariableIsEmpty("POC_DB_PASSWORD"))
+                qCWarning(logApp) << "config.json: database.password пуст и POC_DB_PASSWORD не задан — "
+                                  << "подключение к БД, скорее всего, не удастся. Настройте .env или config.json";
+        }
+    }
+
     if (!DatabaseManager::instance().initialize()) {
         QWidget splash;
         splash.setWindowTitle("POC Terminal Tracker");

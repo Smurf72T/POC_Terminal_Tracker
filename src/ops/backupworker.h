@@ -31,6 +31,7 @@ public:
     // Должен вызываться до moveToThread().
     void setConnectionParams(const ConnectionParams &params);
 
+    BackupWorker();
     ~BackupWorker() override;
 
 public slots:

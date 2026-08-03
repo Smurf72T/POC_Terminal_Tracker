@@ -113,7 +113,8 @@ bool DatabaseManager::initialize(const QString& configPath)
     m_database.setPassword(env.value("POC_DB_PASSWORD", dbConfig["password"].toString()));
 
     // SSL mode: disable | prefer | require | verify-ca | verify-full
-    QString sslMode = env.value("POC_DB_SSLMODE", dbConfig["sslmode"].toString("prefer")).toLower().trimmed();
+    // По умолчанию require: без SSL подключение не выполняется (защита от MITM).
+    QString sslMode = env.value("POC_DB_SSLMODE", dbConfig["sslmode"].toString("require")).toLower().trimmed();
     QString sslRootCert = env.value("POC_DB_SSLROOTCERT", dbConfig["sslrootcert"].toString()).trimmed();
 
     if (sslMode == "verify-full" || sslMode == "verify-ca") {

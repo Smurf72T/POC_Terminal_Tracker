@@ -24,6 +24,12 @@ UpdateManager::UpdateManager(const QJsonObject &config, QObject *parent)
 {
     QJsonObject update = config["update"].toObject();
     m_url = update["url"].toString().trimmed();
+    if (!m_url.isEmpty() && !isSecureUpdateUrl(m_url)) {
+        OpsLog::instance().error(
+            "update.url должен использовать HTTPS (указано: " + m_url
+            + "). Автообновление отключено. Для локальной отладки допустим http://localhost");
+        m_url.clear();
+    }
     m_checkOnStartup = update["check_on_startup"].toBool(true);
     m_currentVersion = config["application"].toObject()["version"].toString("1.0.0");
 
@@ -58,6 +64,19 @@ bool UpdateManager::certificateMatchesPin(const QSslCertificate &cert) const
 bool UpdateManager::isEnabled() const
 {
     return !m_url.isEmpty();
+}
+
+bool UpdateManager::isSecureUpdateUrl(const QString &url)
+{
+    const QUrl parsed(url);
+    const QString scheme = parsed.scheme().toLower();
+    if (scheme == "https")
+        return true;
+    if (scheme == "http") {
+        const QString host = parsed.host().toLower();
+        return host == "localhost" || host == "127.0.0.1" || host == "::1";
+    }
+    return false;
 }
 
 bool UpdateManager::startupCheckEnabled() const
@@ -166,6 +185,12 @@ void UpdateManager::downloadUpdate(const QString &url)
 {
     if (url.isEmpty()) {
         emit downloadFailed("URL для скачивания обновления пуст");
+        return;
+    }
+    if (!isSecureUpdateUrl(url)) {
+        QString msg = "URL для скачивания обновления не является HTTPS: " + url;
+        OpsLog::instance().error(msg);
+        emit downloadFailed(msg);
         return;
     }
     if (m_downloadReply) {

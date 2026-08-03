@@ -4,7 +4,16 @@
 #include "ops/opslog.h"
 
 #include <QSqlError>
+#include <QMetaType>
 #include <QUuid>
+
+BackupWorker::BackupWorker()
+{
+    // BackupResult передаётся в сигнале backupFinished между потоками (queued) —
+    // без регистрации метатипа Qt не сможет доставить аргумент, и слот
+    // OpsScheduler::onBackupWorkerFinished никогда не вызовется.
+    qRegisterMetaType<BackupManager::BackupResult>();
+}
 
 void BackupWorker::setConnectionParams(const ConnectionParams &params)
 {
@@ -37,7 +46,7 @@ QSqlDatabase BackupWorker::createRawConnection()
     db.setPassword(m_params.password);
     QString options = m_params.connectOptions.trimmed();
     if (options.isEmpty())
-        options = "sslmode=prefer";
+        options = "sslmode=require";
     db.setConnectOptions(options);
 
     if (!db.open()) {

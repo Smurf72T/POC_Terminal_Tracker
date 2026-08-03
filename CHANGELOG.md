@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.3] — 2026-08-03
+
+### Аудит (03.08.2026 — шестой этап: HTTPS, SSL по умолчанию, тесты планировщика)
+- **HTTPS обязателен для автообновлений**: `UpdateManager::isSecureUpdateUrl()` — `update.url` и `download_url` принимаются только по HTTPS (`http` допустим лишь для `localhost`); несоответствие отключает автообновление с ошибкой в логе; unit-тест `test_updatemanager`
+- **SSL по умолчанию `require`**: `config.json` и фолбэк в `DatabaseManager` — подключение без TLS отклоняется (защита от MITM); для прода рекомендуется `verify-full` + `sslrootcert`; локальная разработка может переопределить режим через `POC_DB_SSLMODE` в `.env`
+- **Предупреждение о пустом пароле БД**: при старте логируется предупреждение, если `database.password` пуст и `POC_DB_PASSWORD` не задан
+- **CMake-проверка утилит**: предупреждения при отсутствии `pg_dump`/`psql` (fallback-дамп) и `openssl` (нет шифрования бэкапов)
+- **Тесты `OpsScheduler`**: `test_opsscheduler` — парсинг конфигурации, отсутствие событий при отключённых фоновых задачах, регистрация метатипа `BackupResult`
+- **Исправлен латентный баг**: `BackupResult` не был зарегистрирован для queued-доставки сигнала `BackupWorker::backupFinished` между потоками — автобэкап «зависал» (`m_backupInProgress`), слот `onBackupWorkerFinished` не вызывался; добавлены `Q_DECLARE_METATYPE` и `qRegisterMetaType` в конструкторе `BackupWorker`
+- **Согласованность SSL**: фолбэк `sslmode` в `BackupWorker::createRawConnection()` изменён `prefer` → `require`
+
 ## [1.5.2] — 2026-08-03
 
 ### Аудит (03.08.2026 — четвёртый этап: безопасность и надёжность)

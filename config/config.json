@@ -5,12 +5,12 @@
     "database": "pocbase",
     "username": "postgres",
     "password": "",
-    "sslmode": "prefer",
+    "sslmode": "require",
     "sslrootcert": ""
   },
   "application": {
     "name": "POC Terminal Tracker",
-    "version": "1.5.2"
+    "version": "1.5.3"
   },
   "log_directory": "",
   "backup": {
