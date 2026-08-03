@@ -35,7 +35,18 @@ jobs:
           sudo apt-get install -y libpq-dev postgresql postgresql-contrib
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake -DBUILD_TESTS=ON
+        run: |
+          set -o pipefail
+          cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake -DBUILD_TESTS=ON 2>&1 | tee configure.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload configure log
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: configure-log
+          path: configure.log
+          if-no-files-found: warn
 
       - name: Build
         run: cmake --build build --config Release -j "$(nproc)"
@@ -84,8 +95,19 @@ jobs:
           python3 -m pip install --user gcovr
 
       - name: Configure (coverage flags)
-        run: cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake -DBUILD_TESTS=ON \
-          -DCMAKE_CXX_FLAGS="--coverage -O0" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+        run: |
+          set -o pipefail
+          cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake -DBUILD_TESTS=ON \
+            -DCMAKE_CXX_FLAGS="--coverage -O0" -DCMAKE_EXE_LINKER_FLAGS="--coverage" 2>&1 | tee configure.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload configure log
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: configure-log
+          path: configure.log
+          if-no-files-found: warn
 
       - name: Build
         run: cmake --build build --config Release -j "$(nproc)"
