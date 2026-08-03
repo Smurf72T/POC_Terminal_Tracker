@@ -31,7 +31,7 @@ jobs:
           for i in $(seq 1 "$attempts"); do
             echo "=== aqt install-qt attempt $i/$attempts ==="
             if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
-                --modules qtcharts --outputdir "$HOME/Qt" -V; then
+                --modules qtcharts --outputdir "$HOME/Qt"; then
               break
             fi
             if [ "$i" -eq "$attempts" ]; then
@@ -100,7 +100,7 @@ jobs:
           for i in $(seq 1 "$attempts"); do
             echo "=== aqt install-qt attempt $i/$attempts ==="
             if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
-                --modules qtcharts --outputdir "$HOME/Qt" -V; then
+                --modules qtcharts --outputdir "$HOME/Qt"; then
               break
             fi
             if [ "$i" -eq "$attempts" ]; then
