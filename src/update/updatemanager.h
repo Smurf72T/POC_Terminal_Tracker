@@ -2,10 +2,12 @@
 #define UPDATEMANAGER_H
 
 #include <QObject>
+#include <QByteArray>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 
 class QNetworkReply;
+class QSslCertificate;
 
 class UpdateManager : public QObject
 {
@@ -37,11 +39,16 @@ signals:
 
 private:
     void handleManifest(QNetworkReply *reply);
+    static QString sha256Hex(const QByteArray &data);
+    bool certificateMatchesPin(const QSslCertificate &cert) const;
+    static QString spkiSha256Base64(const QSslCertificate &cert);
 
     QNetworkAccessManager m_nam;
     QString m_url;
     bool m_checkOnStartup = true;
     QString m_currentVersion = "1.0.0";
+    QString m_pinnedSha256;
+    QString m_expectedSha256;
     QNetworkReply *m_downloadReply = nullptr;
 };
 

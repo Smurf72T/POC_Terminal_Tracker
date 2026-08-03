@@ -9,38 +9,40 @@
 #include <QJsonObject>
 #include <QStringList>
 
-class DatabaseManager : public QObject
+#include "idatabasemanager.h"
+
+class DatabaseManager : public QObject, public IDatabaseManager
 {
     Q_OBJECT
 
 public:
     static DatabaseManager& instance();
 
-    bool initialize(const QString& configPath = "config/config.json");
-    bool isConnected() const;
-    void close();
-    void listenForDataChanges();
+    bool initialize(const QString& configPath = "config/config.json") override;
+    bool isConnected() const override;
+    void close() override;
+    void listenForDataChanges() override;
 
     // Миграции БД
-    bool runMigrations(const QString &migrationsDir = "sql/migrations/");
-    QStringList pendingMigrations();
-    QSqlDatabase& getDatabase();
-    QJsonObject configObject() const;
-    QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true);
-    bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc);
-    QString generateDocNumber(const QString& docType); // receipt, rental, return, payment
+    bool runMigrations(const QString &migrationsDir = "sql/migrations/") override;
+    QStringList pendingMigrations() override;
+    QSqlDatabase& getDatabase() override;
+    QJsonObject configObject() const override;
+    QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true) override;
+    bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc) override;
+    QString generateDocNumber(const QString& docType) override; // receipt, rental, return, payment
     void logAction(const QString& action, const QString& tableName, int recordId,
                    const QString& username = QString(), const QString& oldValues = "{}",
-                   const QString& newValues = "{}");
+                   const QString& newValues = "{}") override;
 
-    void notifyDataChanged();
-    void setCurrentUser(const QString& username);
-    void setAuditUsername(const QString& username);
-    void setSessionRole(const QString& role);
-    QString getCurrentUser() const;
-    void setCurrentUserRole(const QString& role);
-    QString getCurrentUserRole() const;
-    bool isCurrentUserAdmin() const;
+    void notifyDataChanged() override;
+    void setCurrentUser(const QString& username) override;
+    void setAuditUsername(const QString& username) override;
+    void setSessionRole(const QString& role) override;
+    QString getCurrentUser() const override;
+    void setCurrentUserRole(const QString& role) override;
+    QString getCurrentUserRole() const override;
+    bool isCurrentUserAdmin() const override;
 
 signals:
     void dataChanged();
@@ -60,8 +62,8 @@ private:
     QJsonObject m_config;
     bool m_initialized = false;
     bool m_listening = false;
-    QString m_currentUser = "admin";
-    QString m_currentUserRole = "admin";
+    QString m_currentUser = "system";
+    QString m_currentUserRole = "user";
 };
 
 #endif // DATABASEMANAGER_H

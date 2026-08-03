@@ -179,8 +179,11 @@ src/
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/
-  migrations/               — Миграции БД 000–007 (применяются автоматически)
-  add_indexes.sql           — Индексы и ограничения
+  migrations/               — Миграции БД 000–008 (применяются автоматически)
+  legacy/                   — Архивные SQL-скрипты, заменённые миграциями (не применять вручную)
+  add_trigger.sql           — Опциональный DB-триггер синхронизации статусов SIM (не миграция)
+  diagnostics.sql           — Диагностика рассинхрона терминалов и SIM (ops, см. OPS.md)
+  fix_sim_status.sql        — Разовая коррекция статусов SIM (ops)
 libs/
   QXlsx/                      — Git submodule (QtExcel/QXlsx)
 config/

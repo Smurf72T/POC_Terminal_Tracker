@@ -81,3 +81,18 @@ jobs:
           name: POC_Terminal_Tracker-portable
           path: POC_Terminal_Tracker-*-portable.zip
           if-no-files-found: error
+
+      - name: Generate SHA256 checksum
+        shell: powershell
+        run: |
+          $zip = Get-ChildItem POC_Terminal_Tracker-*-portable.zip | Select-Object -First 1
+          $hash = Get-FileHash $zip.FullName -Algorithm SHA256
+          "{0}  {1}" -f $hash.Hash, $zip.Name | Out-File -Encoding ascii POC_Terminal_Tracker-portable.zip.sha256
+          Get-Content POC_Terminal_Tracker-portable.zip.sha256
+
+      - name: Upload SHA256 checksum
+        uses: actions/upload-artifact@v5
+        with:
+          name: POC_Terminal_Tracker-portable-sha256
+          path: POC_Terminal_Tracker-portable.zip.sha256
+          if-no-files-found: error

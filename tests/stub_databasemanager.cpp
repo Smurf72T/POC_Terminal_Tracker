@@ -1,34 +1,46 @@
-// Stub для тестов — минимальная реализация DatabaseManager
-#include "databasemanager.h"
+// Stub для тестов — заглушка DatabaseManager через интерфейс IDatabaseManager.
+// Реализует интерфейс вместо переопределения QObject-класса, поэтому
+// #include "moc_databasemanager.cpp" больше не нужен.
+#include "database/idatabasemanager.h"
 #include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QJsonObject>
+#include <QStringList>
 #include <functional>
 
-DatabaseManager& DatabaseManager::instance()
+class StubDatabaseManager : public IDatabaseManager
 {
-    static DatabaseManager inst;
+public:
+    bool initialize(const QString &) override { return true; }
+    bool isConnected() const override { return false; }
+    void close() override {}
+    void listenForDataChanges() override {}
+
+    bool runMigrations(const QString &) override { return true; }
+    QStringList pendingMigrations() override { return {}; }
+    QSqlDatabase &getDatabase() override
+    {
+        static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "stub");
+        return db;
+    }
+    QJsonObject configObject() const override { return {}; }
+    QSqlQuery executeQuery(const QString &, bool) override { return QSqlQuery(getDatabase()); }
+    bool executeTransaction(const std::function<bool(QSqlDatabase &)> &) override { return true; }
+    QString generateDocNumber(const QString &) override { return "DOC-2026-000001"; }
+    void logAction(const QString &, const QString &, int, const QString &, const QString &, const QString &) override {}
+
+    void notifyDataChanged() override {}
+    void setCurrentUser(const QString &) override {}
+    void setAuditUsername(const QString &) override {}
+    void setSessionRole(const QString &) override {}
+    QString getCurrentUser() const override { return "test"; }
+    void setCurrentUserRole(const QString &) override {}
+    QString getCurrentUserRole() const override { return "admin"; }
+    bool isCurrentUserAdmin() const override { return true; }
+};
+
+IDatabaseManager &databaseManager()
+{
+    static StubDatabaseManager inst;
     return inst;
 }
-
-bool DatabaseManager::initialize(const QString&) { return true; }
-bool DatabaseManager::isConnected() const { return false; }
-void DatabaseManager::close() {}
-bool DatabaseManager::runMigrations(const QString&) { return true; }
-QStringList DatabaseManager::pendingMigrations() { return {}; }
-QSqlDatabase& DatabaseManager::getDatabase() { static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "stub"); return db; }
-QSqlQuery DatabaseManager::executeQuery(const QString&, bool) { return QSqlQuery(getDatabase()); }
-bool DatabaseManager::executeTransaction(const std::function<bool(QSqlDatabase&)>&) { return true; }
-QString DatabaseManager::generateDocNumber(const QString&) { return "DOC-2026-000001"; }
-void DatabaseManager::logAction(const QString&, const QString&, int, const QString&, const QString&, const QString&) {}
-void DatabaseManager::notifyDataChanged() {}
-void DatabaseManager::setCurrentUser(const QString&) {}
-QString DatabaseManager::getCurrentUser() const { return "test"; }
-void DatabaseManager::setCurrentUserRole(const QString&) {}
-QString DatabaseManager::getCurrentUserRole() const { return "admin"; }
-bool DatabaseManager::isCurrentUserAdmin() const { return true; }
-
-bool DatabaseManager::loadConfig(const QString&) { return true; }
-void DatabaseManager::showError(const QString&) {}
-bool DatabaseManager::ensureMigrationsTable() { return true; }
-
-#include "moc_databasemanager.cpp"

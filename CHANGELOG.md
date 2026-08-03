@@ -5,6 +5,20 @@
 ### CI/CD
 - **GitHub Actions конвейер** (`.github/workflows/ci.yml`): на push в `master` / pull request — сборка Qt 6.11.1 (MSVC) + `qtcharts`, установка PostgreSQL 17, конфигурация/сборка CMake (VS generator, Release), прогон всех тестов (`ctest`, включая `test_db_integration` и `test_concurrency` против реального PostgreSQL), сборка портативного дистрибутива (`deploy` + CPack ZIP) и загрузка артефакта; запуск вручную через `workflow_dispatch`
 
+### Аудит (31.07.2026)
+- **Проверка sha256 при скачивании обновлений**: `UpdateManager` читает поле `sha256` из манифеста и отклоняет файл при несовпадении контрольной суммы (`src/update/updatemanager.*`); формат манифеста обновлён в `docs/OPS.md`
+- **Архивные SQL-скрипты перенесены в `sql/legacy/`** (`add_indexes.sql`, `audit_log.sql`, `doc_sequences.sql`) — их содержимое покрыто миграциями 000–003; операционные `diagnostics.sql`/`fix_sim_status.sql` остаются ops-инструментами
+- **Миграция `008_cleanup_legacy.sql`**: удалена неиспользуемая последовательность `seq_doc_numbers` (счётчики миграций в тестах обновлены 8 → 9)
+- **Безопасность по умолчанию**: `DatabaseManager` больше не логирует до входа как `admin` (дефолты `system`/`user`); `QMessageBox::warning(nullptr)` в `applyStyle()` получил parent
+- **`CheckBoxDelegate.h` добавлен в `HEADERS`** в `CMakeLists.txt` (корректная moc-обработка)
+- **CI**: артефакт портативного ZIP сопровождается `POC_Terminal_Tracker-portable.zip.sha256`
+
+### Аудит (03.08.2026)
+- **Пагинация `TerminalsForm`**: таблица грузится страницами (LIMIT/OFFSET, 1000 строк), счётчик «X–Y из Z», кнопки Первая/Назад/Вперёд/Последняя, сброс на первую страницу при поиске — защита от 100k+ строк в памяти
+- **Фоновый бэкап/восстановление**: новый `src/ops/backupworker.*` — `QThread` + собственное соединение QPSQL в рабочем потоке; ручной бэкап (`MainWindow`) и автобэкапы (`OpsScheduler`) больше не блокируют UI через `QProcess::waitForFinished`, результат показывается по завершении
+- **HTTPS certificate pinning**: новый параметр `update.pinned_sha256` (SPKI SHA-256, base64) — сертификат сервера проверяется при загрузке манифеста и скачивании обновления; документация и `openssl`-пример в `docs/OPS.md`
+- **Стаб без moc-хака**: введён интерфейс `src/database/idatabasemanager.h` + глобальный `databaseManager()`; `tests/stub_databasemanager.cpp` реализует интерфейс вместо `#include "moc_databasemanager.cpp"`, `Validator` ходит в БД через интерфейс
+
 ## [1.5.0] — 2026-07-31
 
 ### Multi-user & concurrency

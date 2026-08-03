@@ -16,13 +16,18 @@
 #include <QtCharts/QBarCategoryAxis>
 #include <QtCharts/QValueAxis>
 
+#include "ops/backupmanager.h"
+
 namespace Ui {
     class MainWindow;
 }
 
+class QThread;
 class OpsScheduler;
 
 class UpdateManager;
+
+class BackupWorker;
 
 class MainWindow : public QMainWindow
 {
@@ -79,6 +84,10 @@ private:
     UpdateManager *m_updater = nullptr;
     QLabel *m_backupStatusLabel = nullptr;
 
+    QThread *m_backupThread = nullptr;
+    BackupWorker *m_backupWorker = nullptr;
+    bool m_backupBusy = false;
+
     void setupUI();
     void setupCharts();
     void updateCharts();
@@ -93,8 +102,17 @@ private:
     void openBulkImport();
     void performBackup();
     void performRestore();
+    void ensureBackupWorker();
     void showExpiryNotifications();
     void showGlobalSearch();
+
+signals:
+    void backupRequested(const QString &filePath, const QString &password);
+    void restoreRequested(const QString &filePath, const QString &password);
+
+private slots:
+    void onManualBackupFinished(const BackupManager::BackupResult &result);
+    void onManualRestoreFinished(bool ok, const QString &filePath, const QString &error);
 };
 
 #endif // MAINWINDOW_H

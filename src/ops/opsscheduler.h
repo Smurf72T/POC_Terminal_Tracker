@@ -5,7 +5,11 @@
 #include <QDateTime>
 #include <QJsonObject>
 
+#include "ops/backupmanager.h"
+
 class QTimer;
+class QThread;
+class BackupWorker;
 
 class OpsScheduler : public QObject
 {
@@ -13,6 +17,7 @@ class OpsScheduler : public QObject
 
 public:
     explicit OpsScheduler(const QJsonObject &config, QObject *parent = nullptr);
+    ~OpsScheduler() override;
 
     void start();
 
@@ -32,16 +37,22 @@ public slots:
 signals:
     void backupFinished(bool ok, const QString &filePath, const QString &message);
     void integrityFinished(bool ok, const QString &summary);
+    void backupRequested(const QString &filePath, const QString &password);
 
 private slots:
     void checkSchedule();
+    void onBackupWorkerFinished(const BackupManager::BackupResult &result);
 
 private:
-    bool runScheduledBackup();
+    void runScheduledBackup();
+    void ensureBackupWorker();
     void enforceRetention();
     void readConfig(const QJsonObject &config);
 
     QTimer *m_timer = nullptr;
+    QThread *m_backupThread = nullptr;
+    BackupWorker *m_backupWorker = nullptr;
+    bool m_backupInProgress = false;
 
     bool m_backupEnabled = false;
     bool m_integrityEnabled = false;

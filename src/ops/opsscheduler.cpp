@@ -1,6 +1,7 @@
 #include "opsscheduler.h"
 
 #include "backupmanager.h"
+#include "backupworker.h"
 #include "database/databasemanager.h"
 #include "opslog.h"
 #include "utils/logging.h"
@@ -10,9 +11,11 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QSqlRecord>
+#include <QThread>
 #include <QTimer>
 #include <QVariant>
 
@@ -64,6 +67,18 @@ OpsScheduler::OpsScheduler(const QJsonObject &config, QObject *parent)
     m_timer = new QTimer(this);
     m_timer->setInterval(kSchedulerTickMs);
     connect(m_timer, &QTimer::timeout, this, &OpsScheduler::checkSchedule);
+}
+
+OpsScheduler::~OpsScheduler()
+{
+    if (m_backupThread) {
+        m_backupThread->quit();
+        m_backupThread->wait();
+        delete m_backupWorker;
+        delete m_backupThread;
+        m_backupWorker = nullptr;
+        m_backupThread = nullptr;
+    }
 }
 
 void OpsScheduler::start()
@@ -141,9 +156,8 @@ void OpsScheduler::checkSchedule()
 {
     QDateTime now = QDateTime::currentDateTime();
 
-    if (m_backupEnabled && (m_lastBackupAt.secsTo(now) >= m_backupIntervalSec)) {
-        bool ok = runScheduledBackup();
-        m_lastBackupAt = ok ? now : now.addSecs(-qMax(0, m_backupIntervalSec - 600));
+    if (m_backupEnabled && !m_backupInProgress && (m_lastBackupAt.secsTo(now) >= m_backupIntervalSec)) {
+        runScheduledBackup();
     }
 
     if (m_integrityEnabled && (m_lastIntegrityAt.isNull() || m_lastIntegrityAt.secsTo(now) >= m_integrityIntervalSec)) {
@@ -152,42 +166,76 @@ void OpsScheduler::checkSchedule()
     }
 }
 
-bool OpsScheduler::runScheduledBackup()
+void OpsScheduler::ensureBackupWorker()
+{
+    if (m_backupThread)
+        return;
+
+    m_backupThread = new QThread;
+    m_backupWorker = new BackupWorker;
+
+    // Параметры соединения снимаем в главном потоке до moveToThread():
+    // внутри рабочего потока используется собственное соединение.
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    BackupWorker::ConnectionParams params;
+    params.host = db.hostName();
+    params.port = db.port();
+    params.databaseName = db.databaseName();
+    params.user = db.userName();
+    params.password = db.password();
+    params.connectOptions = db.connectOptions();
+    m_backupWorker->setConnectionParams(params);
+
+    m_backupWorker->moveToThread(m_backupThread);
+    connect(this, &OpsScheduler::backupRequested, m_backupWorker, &BackupWorker::createBackup,
+            Qt::QueuedConnection);
+    connect(m_backupWorker, &BackupWorker::backupFinished, this, &OpsScheduler::onBackupWorkerFinished);
+    m_backupThread->start();
+}
+
+void OpsScheduler::runScheduledBackup()
 {
     if (!DatabaseManager::instance().isConnected()) {
         OpsLog::instance().error("Автоматический бэкап пропущен: нет подключения к БД");
         emit backupFinished(false, QString(), "Нет подключения к БД");
-        return false;
+        return;
     }
 
     QDir dir(m_backupDirectory);
     if (!dir.mkpath(".")) {
         OpsLog::instance().error("Автоматический бэкап не выполнен: не удалось создать каталог " + m_backupDirectory);
         emit backupFinished(false, QString(), "Не удалось создать каталог бэкапов");
-        return false;
+        return;
     }
 
     QString filePath = dir.absoluteFilePath(
         QString("backup_poc_%1.sql").arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")));
 
     QString password = DatabaseManager::instance().getDatabase().password();
-    BackupManager::BackupResult result = BackupManager::createBackup(
-        DatabaseManager::instance().getDatabase(), filePath, password);
 
-    QString message;
+    ensureBackupWorker();
+    m_backupInProgress = true;
+    emit backupRequested(filePath, password);
+}
+
+void OpsScheduler::onBackupWorkerFinished(const BackupManager::BackupResult &result)
+{
+    m_backupInProgress = false;
+
     if (result.ok) {
-        message = QString("Автоматический бэкап создан (метод: %1): %2, размер %3 KB")
-                      .arg(result.method, filePath)
-                      .arg(QString::number(result.size / 1024));
-        OpsLog::instance().info(message);
+        m_lastBackupAt = QDateTime::currentDateTime();
         enforceRetention();
+        QString message = QString("Автоматический бэкап создан (метод: %1): %2, размер %3 KB")
+                              .arg(result.method, result.filePath)
+                              .arg(QString::number(result.size / 1024));
+        OpsLog::instance().info(message);
+        emit backupFinished(true, result.filePath, message);
     } else {
-        message = QString("Автоматический бэкап не удался: %1").arg(result.error);
+        m_lastBackupAt = QDateTime::currentDateTime().addSecs(-qMax(0, m_backupIntervalSec - 600));
+        QString message = QString("Автоматический бэкап не удался: %1").arg(result.error);
         OpsLog::instance().error(message);
+        emit backupFinished(false, result.filePath, message);
     }
-
-    emit backupFinished(result.ok, filePath, message);
-    return result.ok;
 }
 
 void OpsScheduler::enforceRetention()

@@ -27,7 +27,13 @@
    - `sql\migrations\` — папку с миграциями БД.
 4. Запустите `POC_Terminal_Tracker.exe`. При первом запуске миграции
    `sql\migrations\*.sql` применятся автоматически. Дефолтный пользователь —
-   `admin` / `admin123` (обязательно смените пароль при первом входе).
+   `admin` / `admin123`.
+
+> **⚠️ ВАЖНО (безопасность):** дефолтный пароль `admin123` захардкожен в
+> миграции `001_initial.sql` и известен всем, кто имеет доступ к коду. Смените
+> его **немедленно при первом входе** (приложение принудительно предложит смену)
+> и не используйте его ни в одной боевой базе. Если приложение уже
+> эксплуатировалось с дефолтным паролем — смените пароль повторно.
 
 ### 1.3. Разрешения
 
@@ -55,7 +61,7 @@
   },
   "application": {
     "name": "POC Terminal Tracker",
-    "version": "1.3.0"
+    "version": "1.5.1"
   },
   "log_directory": "",
   "backup": {
@@ -67,6 +73,10 @@
   "monitoring": {
     "integrity_enabled": true,
     "integrity_interval_hours": 24
+  },
+  "update": {
+    "url": "",
+    "check_on_startup": true
   }
 }
 ```
@@ -301,7 +311,8 @@ psql -U postgres -d pocbase -f sql\migrations\00X_xxx.sql
 ```json
 "update": {
   "url": "https://example.com/poc/update.json",
-  "check_on_startup": true
+  "check_on_startup": true,
+  "pinned_sha256": ""
 }
 ```
 
@@ -311,10 +322,30 @@ psql -U postgres -d pocbase -f sql\migrations\00X_xxx.sql
 {
   "version": "1.4.1",
   "release_notes": "Что изменилось",
-  "download_url": "https://example.com/poc/POC_Terminal_Tracker-1.4.1-portable.zip"
+  "download_url": "https://example.com/poc/POC_Terminal_Tracker-1.4.1-portable.zip",
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 }
 ```
 
+- Поле `sha256` (hex, 64 символа) опционально, но **настоятельно рекомендуется**:
+  после скачивания приложение проверяет контрольную сумму архива и отклоняет
+  файл при несовпадении (защита от повреждения/подмены при передаче).
+  Пример генерации: `Get-FileHash POC_Terminal_Tracker-1.4.1-portable.zip -Algorithm SHA256`.
+- `pinned_sha256` — отпечаток публичного ключа сервера (base64 SHA-256 от
+  SubjectPublicKeyInfo сертификата, 44 символа). Опционально, но **настоятельно
+  рекомендуется** для HTTPS: при включении приложение проверяет сертификат
+  сервера при загрузке манифеста и скачивании и отклоняет обновление, если
+  отпечаток не совпадает (защита от MITM даже при скомпрометированных корневых
+  сертификатах). Пример генерации:
+  ```bash
+  openssl s_client -connect example.com:443 -servername example.com </dev/null 2>/dev/null \
+    | openssl x509 -pubkey -noout \
+    | openssl pkey -pubin -outform DER \
+    | openssl dgst -sha256 -binary \
+    | openssl enc -base64
+  ```
+  Если `url` начинается с `http://`, а pin задан — проверка будет отклонять
+  запросы (используйте HTTPS).
 - При старте (если `check_on_startup=true`) и по «Сервис → Проверка обновлений»
   приложение загружает манифест и сравнивает версии.
 - Если новая версия найдена — диалог «Скачать/Позже»; при скачивании файл

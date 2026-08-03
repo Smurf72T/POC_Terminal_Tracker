@@ -25,6 +25,7 @@
   },
   "update": {
     "url": "",
-    "check_on_startup": true
+    "check_on_startup": true,
+    "pinned_sha256": ""
   }
 }

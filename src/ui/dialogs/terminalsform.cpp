@@ -10,6 +10,9 @@
 #include <QLineEdit>
 #include <QDateTime>
 #include <QDebug>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QLabel>
 
 TerminalsForm::TerminalsForm(QWidget *parent) :
     QDialog(parent),
@@ -45,12 +48,39 @@ TerminalsForm::TerminalsForm(QWidget *parent) :
     ui->tableView->setColumnWidth(3, 150);
     ui->tableView->setColumnWidth(4, 150);
 
+    // Пагинация: таблица может содержать сотни тысяч строк, поэтому
+    // данные грузятся страницами (LIMIT/OFFSET), а не целиком в память.
+    auto *pageBar = new QHBoxLayout;
+    m_btnFirst = new QPushButton("Первая", this);
+    m_btnPrev = new QPushButton("← Назад", this);
+    m_pageLabel = new QLabel(this);
+    m_pageLabel->setAlignment(Qt::AlignCenter);
+    m_pageLabel->setMinimumWidth(220);
+    m_btnNext = new QPushButton("Вперёд →", this);
+    m_btnLast = new QPushButton("Последняя", this);
+    pageBar->addWidget(m_btnFirst);
+    pageBar->addWidget(m_btnPrev);
+    pageBar->addStretch();
+    pageBar->addWidget(m_pageLabel);
+    pageBar->addStretch();
+    pageBar->addWidget(m_btnNext);
+    pageBar->addWidget(m_btnLast);
+    ui->verticalLayout->insertLayout(2, pageBar);
+
+    connect(m_btnFirst, &QPushButton::clicked, this, [this]() { goToPage(0); });
+    connect(m_btnPrev, &QPushButton::clicked, this, [this]() { goToPage(m_offset - m_pageSize); });
+    connect(m_btnNext, &QPushButton::clicked, this, [this]() { goToPage(m_offset + m_pageSize); });
+    connect(m_btnLast, &QPushButton::clicked, this, [this]() {
+        goToPage(qMax(0, ((m_totalRows - 1) / m_pageSize) * m_pageSize));
+    });
+
     loadModel();
 
     searchTimer = new QTimer(this);
     searchTimer->setSingleShot(true);
     searchTimer->setInterval(300);
     connect(searchTimer, &QTimer::timeout, this, [this]() {
+        m_offset = 0;
         loadModel(ui->lineEditSearch->text());
     });
     connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
@@ -65,6 +95,33 @@ TerminalsForm::~TerminalsForm()
 
 void TerminalsForm::loadModel(const QString &filter)
 {
+    QString whereClause;
+    QStringList likeBinds;
+    if (!filter.isEmpty()) {
+        QString escaped = filter;
+        escaped.replace("\\", "\\\\");
+        escaped.replace("%", "\\%");
+        escaped.replace("_", "\\_");
+        QString likeFilter = "%" + escaped + "%";
+        whereClause = " WHERE (t.serialnumber LIKE :f1 "
+                      "OR t.imei1 LIKE :f2 "
+                      "OR t.imei2 LIKE :f3 "
+                      "OR m.modelname LIKE :f4)";
+        likeBinds = {likeFilter, likeFilter, likeFilter, likeFilter};
+    }
+
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+
+    // Общее число строк — для пагинации и счётчика «X–Y из Z».
+    QSqlQuery countQuery(db);
+    countQuery.prepare("SELECT COUNT(*) FROM tblterminals t "
+                       "LEFT JOIN tblmodels m ON t.modelid = m.modelid" + whereClause);
+    for (int i = 0; i < likeBinds.size(); ++i)
+        countQuery.bindValue(QString(":f%1").arg(i + 1), likeBinds.at(i));
+    m_totalRows = 0;
+    if (countQuery.exec() && countQuery.next())
+        m_totalRows = countQuery.value(0).toInt();
+
     QString queryStr =
         "SELECT t.terminalid, t.serialnumber, "
         "COALESCE(m.modelname, 'Неизвестная') AS modelname, "
@@ -75,34 +132,63 @@ void TerminalsForm::loadModel(const QString &filter)
         "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS was_repaired "
         "FROM tblterminals t "
         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-        "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid";
+        "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid" +
+        whereClause +
+        " ORDER BY t.serialnumber LIMIT :limit OFFSET :offset";
 
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-
-    if (!filter.isEmpty()) {
-        QString escaped = filter;
-        escaped.replace("\\", "\\\\");
-        escaped.replace("%", "\\%");
-        escaped.replace("_", "\\_");
-        QString likeFilter = "%" + escaped + "%";
-        queryStr += " WHERE (t.serialnumber LIKE :f1 "
-                    "OR t.imei1 LIKE :f2 "
-                    "OR t.imei2 LIKE :f3 "
-                    "OR m.modelname LIKE :f4)";
-        queryStr += " ORDER BY t.serialnumber";
-        query.prepare(queryStr);
-        query.bindValue(":f1", likeFilter);
-        query.bindValue(":f2", likeFilter);
-        query.bindValue(":f3", likeFilter);
-        query.bindValue(":f4", likeFilter);
-    } else {
-        queryStr += " ORDER BY t.serialnumber";
-        query.prepare(queryStr);
-    }
+    QSqlQuery query(db);
+    query.prepare(queryStr);
+    for (int i = 0; i < likeBinds.size(); ++i)
+        query.bindValue(QString(":f%1").arg(i + 1), likeBinds.at(i));
+    query.bindValue(":limit", m_pageSize);
+    query.bindValue(":offset", m_offset);
 
     if (query.exec()) {
         model->setQuery(std::move(query));
     }
+
+    refreshPagination();
+}
+
+void TerminalsForm::refreshPagination()
+{
+    if (!m_pageLabel)
+        return;
+
+    int rows = model->rowCount();
+    if (m_totalRows == 0) {
+        m_pageLabel->setText("Нет записей");
+        m_btnFirst->setEnabled(false);
+        m_btnPrev->setEnabled(false);
+        m_btnNext->setEnabled(false);
+        m_btnLast->setEnabled(false);
+        return;
+    }
+
+    int first = m_offset + 1;
+    int last = m_offset + rows;
+    m_pageLabel->setText(QString("Записи %1 – %2 из %3").arg(first).arg(last).arg(m_totalRows));
+
+    bool hasPrev = m_offset > 0;
+    bool hasNext = last < m_totalRows;
+    m_btnFirst->setEnabled(hasPrev);
+    m_btnPrev->setEnabled(hasPrev);
+    m_btnNext->setEnabled(hasNext);
+    m_btnLast->setEnabled(hasNext);
+}
+
+void TerminalsForm::goToPage(int newOffset)
+{
+    if (newOffset < 0)
+        newOffset = 0;
+    int maxOffset = qMax(0, ((m_totalRows - 1) / m_pageSize) * m_pageSize);
+    if (newOffset > maxOffset)
+        newOffset = maxOffset;
+    if (newOffset == m_offset)
+        return;
+
+    m_offset = newOffset;
+    loadModel(ui->lineEditSearch->text());
 }
 
 void TerminalsForm::on_btnAdd_clicked()

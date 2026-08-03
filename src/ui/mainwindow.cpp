@@ -3,6 +3,7 @@
 #include "database/databasemanager.h"
 #include "utils/logging.h"
 #include "ops/backupmanager.h"
+#include "ops/backupworker.h"
 #include "ops/opslog.h"
 #include "ops/opsscheduler.h"
 #include "update/updatemanager.h"
@@ -61,6 +62,7 @@
 #include <QUrl>
 #include <QDir>
 #include <QJsonObject>
+#include <QThread>
 #include <memory>
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -205,6 +207,14 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    if (m_backupThread) {
+        m_backupThread->quit();
+        m_backupThread->wait();
+        delete m_backupWorker;
+        delete m_backupThread;
+        m_backupWorker = nullptr;
+        m_backupThread = nullptr;
+    }
     delete ui;
 }
 
@@ -973,8 +983,45 @@ void MainWindow::openBulkImport()
     openForm(new BulkImportForm(this));
 }
 
+void MainWindow::ensureBackupWorker()
+{
+    if (m_backupThread)
+        return;
+
+    m_backupThread = new QThread;
+    m_backupWorker = new BackupWorker;
+
+    // Параметры соединения снимаем в главном потоке до moveToThread():
+    // внутри рабочего потока используется собственное соединение.
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    BackupWorker::ConnectionParams params;
+    params.host = db.hostName();
+    params.port = db.port();
+    params.databaseName = db.databaseName();
+    params.user = db.userName();
+    params.password = db.password();
+    params.connectOptions = db.connectOptions();
+    m_backupWorker->setConnectionParams(params);
+
+    m_backupWorker->moveToThread(m_backupThread);
+    connect(this, &MainWindow::backupRequested, m_backupWorker, &BackupWorker::createBackup,
+            Qt::QueuedConnection);
+    connect(this, &MainWindow::restoreRequested, m_backupWorker, &BackupWorker::restore,
+            Qt::QueuedConnection);
+    connect(m_backupWorker, &BackupWorker::backupFinished,
+            this, &MainWindow::onManualBackupFinished);
+    connect(m_backupWorker, &BackupWorker::restoreFinished,
+            this, &MainWindow::onManualRestoreFinished);
+    m_backupThread->start();
+}
+
 void MainWindow::performBackup()
 {
+    if (m_backupBusy) {
+        QMessageBox::information(this, "Бэкап", "Резервное копирование уже выполняется.");
+        return;
+    }
+
     QString filePath = QFileDialog::getSaveFileName(this,
         "Сохранить резервную копию БД",
         QString("backup_poc_%1.sql").arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")),
@@ -998,8 +1045,17 @@ void MainWindow::performBackup()
         "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
     if (!passwordOk) return;
 
-    BackupManager::BackupResult result = BackupManager::createBackup(
-        DatabaseManager::instance().getDatabase(), filePath, password);
+    // Бэкап выполняется в фоновом потоке, чтобы pg_dump не блокировал интерфейс.
+    ensureBackupWorker();
+    m_backupBusy = true;
+    statusBar()->showMessage("Создание резервной копии...", 0);
+    emit backupRequested(filePath, password);
+}
+
+void MainWindow::onManualBackupFinished(const BackupManager::BackupResult &result)
+{
+    m_backupBusy = false;
+    statusBar()->clearMessage();
 
     if (result.ok) {
         QString msg = QString("Резервная копия создана:\n%1\nРазмер: %2 KB")
@@ -1031,6 +1087,11 @@ void MainWindow::onActionRestore_triggered()
 
 void MainWindow::performRestore()
 {
+    if (m_backupBusy) {
+        QMessageBox::information(this, "Восстановление", "Операция с БД уже выполняется.");
+        return;
+    }
+
     QString filePath = QFileDialog::getOpenFileName(this,
         "Выберите файл резервной копии",
         QString(),
@@ -1054,8 +1115,19 @@ void MainWindow::performRestore()
         "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
     if (!passwordOk) return;
 
-    QString error;
-    if (!BackupManager::restoreDatabase(DatabaseManager::instance().getDatabase(), filePath, password, &error)) {
+    // Восстановление выполняется в фоновом потоке, чтобы psql не блокировал интерфейс.
+    ensureBackupWorker();
+    m_backupBusy = true;
+    statusBar()->showMessage("Восстановление базы данных...", 0);
+    emit restoreRequested(filePath, password);
+}
+
+void MainWindow::onManualRestoreFinished(bool ok, const QString &filePath, const QString &error)
+{
+    m_backupBusy = false;
+    statusBar()->clearMessage();
+
+    if (!ok) {
         QMessageBox::critical(this, "Ошибка восстановления", error);
         OpsLog::instance().error(QString("Восстановление БД не удалось: %1").arg(error));
         return;

@@ -1,5 +1,5 @@
 #include "validator.h"
-#include "database/databasemanager.h"
+#include "database/idatabasemanager.h"
 
 QRegularExpression& Validator::imeiRegex()
 {
@@ -37,7 +37,7 @@ bool Validator::validateSerialNotEmpty(const QString& serial)
 
 bool Validator::checkUniqueSerial(const QString& serial, int excludeTerminalId)
 {
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    QSqlQuery query(databaseManager().getDatabase());
 
     if (excludeTerminalId >= 0) {
         query.prepare("SELECT COUNT(*) FROM tblterminals "
@@ -114,7 +114,7 @@ bool Validator::checkDuplicateIMEI(const QString& imei, int excludeTerminalId)
 {
     if (imei.isEmpty() || imei == "000000000000000") return false;
 
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    QSqlQuery query(databaseManager().getDatabase());
     if (excludeTerminalId >= 0) {
         query.prepare("SELECT COUNT(*) FROM tblterminals "
                       "WHERE (imei1 = :imei OR imei2 = :imei) AND terminalid != :id");

@@ -3,6 +3,7 @@
 #include "ops/opslog.h"
 #include "update/version.h"
 
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -11,6 +12,9 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QSslCertificate>
+#include <QSslConfiguration>
+#include <QSslKey>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
@@ -22,6 +26,33 @@ UpdateManager::UpdateManager(const QJsonObject &config, QObject *parent)
     m_url = update["url"].toString().trimmed();
     m_checkOnStartup = update["check_on_startup"].toBool(true);
     m_currentVersion = config["application"].toObject()["version"].toString("1.0.0");
+
+    // Публичный ключ сервера в формате SHA-256 (base64, SubjectPublicKeyInfo).
+    // Если задан — сертификат обновляющегося сервера должен ему совпадать,
+    // иначе проверка/скачивание обновления отклоняется (защита от MITM).
+    m_pinnedSha256 = update["pinned_sha256"].toString().trimmed();
+    if (!m_pinnedSha256.isEmpty() && m_pinnedSha256.length() != 44) {
+        OpsLog::instance().warning(
+            "update.pinned_sha256 имеет некорректный формат (ожидается base64 SHA-256 SPKI, 44 символа) "
+            "— проверка отпечатка сертификата отключена");
+        m_pinnedSha256.clear();
+    }
+}
+
+QString UpdateManager::sha256Hex(const QByteArray &data)
+{
+    return QString::fromLatin1(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex());
+}
+
+QString UpdateManager::spkiSha256Base64(const QSslCertificate &cert)
+{
+    QByteArray spki = cert.publicKey().toDer();
+    return QString::fromLatin1(QCryptographicHash::hash(spki, QCryptographicHash::Sha256).toBase64());
+}
+
+bool UpdateManager::certificateMatchesPin(const QSslCertificate &cert) const
+{
+    return !cert.isNull() && spkiSha256Base64(cert) == m_pinnedSha256;
 }
 
 bool UpdateManager::isEnabled() const
@@ -82,6 +113,17 @@ void UpdateManager::handleManifest(QNetworkReply *reply)
         return;
     }
 
+    if (!m_pinnedSha256.isEmpty()) {
+        const QSslCertificate cert = reply->sslConfiguration().peerCertificate();
+        if (!certificateMatchesPin(cert)) {
+            QString msg = "Обновление отклонено: сертификат сервера не соответствует "
+                          "отпечатку update.pinned_sha256 (возможна подмена соединения)";
+            OpsLog::instance().error(msg);
+            emit checkFailed(msg);
+            return;
+        }
+    }
+
     QByteArray data = reply->readAll();
     QJsonParseError parseErr;
     QJsonDocument doc = QJsonDocument::fromJson(data, &parseErr);
@@ -110,6 +152,11 @@ void UpdateManager::handleManifest(QNetworkReply *reply)
 
     QString notes = manifest["release_notes"].toString();
     QString downloadUrl = manifest["download_url"].toString().trimmed();
+    m_expectedSha256 = manifest["sha256"].toString().trimmed().toLower();
+    if (!m_expectedSha256.isEmpty() && m_expectedSha256.length() != 64) {
+        OpsLog::instance().warning("Манифест обновлений содержит некорректный sha256 — проверка контрольной суммы отключена");
+        m_expectedSha256.clear();
+    }
     OpsLog::instance().info(QString("Доступна новая версия %1").arg(newVersion));
     emit updateAvailable(newVersion, notes, downloadUrl);
     emit checkFinished(true);
@@ -149,7 +196,35 @@ void UpdateManager::downloadUpdate(const QString &url)
             return;
         }
 
+        if (!m_pinnedSha256.isEmpty()) {
+            const QSslCertificate cert = reply->sslConfiguration().peerCertificate();
+            if (!certificateMatchesPin(cert)) {
+                QString msg = "Обновление отклонено: сертификат сервера не соответствует "
+                              "отпечатку update.pinned_sha256 (возможна подмена соединения)";
+                OpsLog::instance().error(msg);
+                emit downloadFailed(msg);
+                return;
+            }
+        }
+
         QByteArray data = reply->readAll();
+
+        QString expectedSha256 = m_expectedSha256;
+        m_expectedSha256.clear();
+
+        if (!expectedSha256.isEmpty()) {
+            QString actualSha256 = sha256Hex(data);
+            if (actualSha256 != expectedSha256) {
+                QString msg = QString("Контрольная сумма обновления не совпала (ожидалось %1, получено %2). "
+                                      "Файл отклонён — возможно, он повреждён или подменён.")
+                                  .arg(expectedSha256, actualSha256);
+                OpsLog::instance().error(msg);
+                emit downloadFailed(msg);
+                return;
+            }
+            OpsLog::instance().info("Контрольная сумма обновления (sha256) подтверждена");
+        }
+
         QString fileName = QFileInfo(reply->url().path()).fileName();
         if (fileName.isEmpty())
             fileName = "POC_Terminal_Tracker_update.bin";

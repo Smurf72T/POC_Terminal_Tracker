@@ -58,6 +58,7 @@ set(SOURCES
         src/utils/validator.cpp
         src/utils/logging.cpp
         src/ops/backupmanager.cpp
+        src/ops/backupworker.cpp
         src/ops/opslog.cpp
         src/ops/opsscheduler.cpp
         src/update/updatemanager.cpp
@@ -65,6 +66,7 @@ set(SOURCES
 
 set(HEADERS
         src/database/databasemanager.h
+        src/database/idatabasemanager.h
         src/database/submiterrortablemodel.h
         src/ui/mainwindow.h
         src/ui/dialogs/manufacturersform.h
@@ -76,6 +78,7 @@ set(HEADERS
         src/ui/dialogs/receiptform.h
         src/ui/delegates/comboboxdelegate.h
         src/ui/delegates/comboboxmodel.h
+        src/ui/delegates/CheckBoxDelegate.h
         src/ui/dialogs/rentalform.h
         src/ui/dialogs/returnform.h
         src/ui/dialogs/statuschangeform.h
@@ -93,6 +96,7 @@ set(HEADERS
         src/utils/validator.h
         src/utils/logging.h
         src/ops/backupmanager.h
+        src/ops/backupworker.h
         src/ops/opslog.h
         src/ops/opsscheduler.h
         src/update/updatemanager.h

@@ -39,6 +39,11 @@ DatabaseManager& DatabaseManager::instance()
     return instance;
 }
 
+IDatabaseManager &databaseManager()
+{
+    return DatabaseManager::instance();
+}
+
 bool DatabaseManager::initialize(const QString& configPath)
 {
     if (m_initialized) {
