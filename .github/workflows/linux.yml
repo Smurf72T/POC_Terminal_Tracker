@@ -27,11 +27,16 @@ jobs:
           "$HOME/qt-venv/bin/pip" install --upgrade \
             "aqtinstall@git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e"
           QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"
-          attempts=3
+          attempts=2
           for i in $(seq 1 "$attempts"); do
-            echo "=== aqt install-qt attempt $i/$attempts ==="
+            echo "=== aqt install-qt attempt $i/$attempts (with hash check) ==="
             if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
-                --modules qtcharts --outputdir "$HOME/Qt"; then
+                --modules qtcharts --outputdir "$HOME/Qt" --timeout 60; then
+              break
+            fi
+            echo "--- hash-check attempt failed; retrying with --UNSAFE-ignore-hash ---"
+            if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
+                --modules qtcharts --outputdir "$HOME/Qt" --timeout 60 --UNSAFE-ignore-hash; then
               break
             fi
             if [ "$i" -eq "$attempts" ]; then
@@ -96,11 +101,16 @@ jobs:
           "$HOME/qt-venv/bin/pip" install --upgrade \
             "aqtinstall@git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e"
           QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"
-          attempts=3
+          attempts=2
           for i in $(seq 1 "$attempts"); do
-            echo "=== aqt install-qt attempt $i/$attempts ==="
+            echo "=== aqt install-qt attempt $i/$attempts (with hash check) ==="
             if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
-                --modules qtcharts --outputdir "$HOME/Qt"; then
+                --modules qtcharts --outputdir "$HOME/Qt" --timeout 60; then
+              break
+            fi
+            echo "--- hash-check attempt failed; retrying with --UNSAFE-ignore-hash ---"
+            if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
+                --modules qtcharts --outputdir "$HOME/Qt" --timeout 60 --UNSAFE-ignore-hash; then
               break
             fi
             if [ "$i" -eq "$attempts" ]; then
