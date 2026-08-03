@@ -9,7 +9,7 @@
 - **Проверка sha256 при скачивании обновлений**: `UpdateManager` читает поле `sha256` из манифеста и отклоняет файл при несовпадении контрольной суммы (`src/update/updatemanager.*`); формат манифеста обновлён в `docs/OPS.md`
 - **Архивные SQL-скрипты перенесены в `sql/legacy/`** (`add_indexes.sql`, `audit_log.sql`, `doc_sequences.sql`) — их содержимое покрыто миграциями 000–003; операционные `diagnostics.sql`/`fix_sim_status.sql` остаются ops-инструментами
 - **Миграция `008_cleanup_legacy.sql`**: удалена неиспользуемая последовательность `seq_doc_numbers` (счётчики миграций в тестах обновлены 8 → 9)
-- **Безопасность по умолчанию**: `DatabaseManager` больше не логирует до входа как `admin` (дефолты `system`/`user`); `QMessageBox::warning(nullptr)` в `applyStyle()` получил parent
+- **Безопасность по умолчанию**: `DatabaseManager` больше не логирует до входа как `admin` (дефолты `system`/`user`)
 - **`CheckBoxDelegate.h` добавлен в `HEADERS`** в `CMakeLists.txt` (корректная moc-обработка)
 - **CI**: артефакт портативного ZIP сопровождается `POC_Terminal_Tracker-portable.zip.sha256`
 

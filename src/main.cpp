@@ -19,7 +19,7 @@ static void applyStyle(QApplication& app)
         app.setStyleSheet(style);
         styleFile.close();
     } else {
-        QMessageBox::warning(&app, "Стиль", "Не удалось загрузить modern.qss");
+        QMessageBox::warning(nullptr, "Стиль", "Не удалось загрузить modern.qss");
     }
 }
 
