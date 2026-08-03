@@ -20,14 +20,29 @@ jobs:
           submodules: recursive
 
       - name: Install Qt 6.11.1 (gcc_64) + qtcharts
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.1'
-          target: 'desktop'
-          arch: 'gcc_64'
-          modules: 'qtcharts'
-          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e'
-          cache: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$HOME/qt-venv"
+          "$HOME/qt-venv/bin/pip" install --upgrade \
+            "aqtinstall@git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e"
+          QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"
+          attempts=3
+          for i in $(seq 1 "$attempts"); do
+            echo "=== aqt install-qt attempt $i/$attempts ==="
+            if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
+                --modules qtcharts --outputdir "$HOME/Qt" -V; then
+              break
+            fi
+            if [ "$i" -eq "$attempts" ]; then
+              echo "aqt install-qt failed after $attempts attempts" >&2
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+          echo "Qt installed to: $QT_ROOT_DIR"
+          test -x "$QT_ROOT_DIR/bin/qmake"
 
       - name: Install PostgreSQL client + server
         run: |
@@ -74,14 +89,29 @@ jobs:
           submodules: recursive
 
       - name: Install Qt 6.11.1 (gcc_64) + qtcharts
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.1'
-          target: 'desktop'
-          arch: 'gcc_64'
-          modules: 'qtcharts'
-          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e'
-          cache: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$HOME/qt-venv"
+          "$HOME/qt-venv/bin/pip" install --upgrade \
+            "aqtinstall@git+https://github.com/miurahr/aqtinstall.git@16db45a70b5905ad596941b223469bc86a56901e"
+          QT_ROOT_DIR="$HOME/Qt/6.11.1/gcc_64"
+          attempts=3
+          for i in $(seq 1 "$attempts"); do
+            echo "=== aqt install-qt attempt $i/$attempts ==="
+            if "$HOME/qt-venv/bin/aqt" install-qt linux desktop 6.11.1 gcc_64 \
+                --modules qtcharts --outputdir "$HOME/Qt" -V; then
+              break
+            fi
+            if [ "$i" -eq "$attempts" ]; then
+              echo "aqt install-qt failed after $attempts attempts" >&2
+              exit 1
+            fi
+            sleep 30
+          done
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR" >> "$GITHUB_ENV"
+          echo "Qt installed to: $QT_ROOT_DIR"
+          test -x "$QT_ROOT_DIR/bin/qmake"
 
       - name: Install build deps + gcovr
         run: |
