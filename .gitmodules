@@ -1,3 +1,5 @@
 [submodule "libs/QXlsx"]
 	path = libs/QXlsx
 	url = https://github.com/QtExcel/QXlsx.git
+	# Закреплено на теге v1.5.1.1 (commit 8a13e1c86e5d4fb5e3b2fb09c7b632514f1d54ca).
+	# Обновлять только осознанно: bump = смена тега + коммит нового gitlink.
