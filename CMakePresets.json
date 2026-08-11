@@ -1,0 +1,60 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev-mingw",
+      "displayName": "Dev (Windows, Qt 6.11.1 + MinGW 13.10)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev-mingw",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "E:/Qt/6.11.1/mingw_64",
+        "CMAKE_C_COMPILER": "E:/Qt/Tools/mingw1310_64/bin/gcc.exe",
+        "CMAKE_CXX_COMPILER": "E:/Qt/Tools/mingw1310_64/bin/g++.exe",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "dev-linux",
+      "displayName": "Dev (Linux, системный Qt)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev-linux",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "/usr/lib/x86_64-linux-gnu/cmake",
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev-mingw",
+      "configurePreset": "dev-mingw"
+    },
+    {
+      "name": "dev-linux",
+      "configurePreset": "dev-linux"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev-mingw",
+      "configurePreset": "dev-mingw",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "dev-linux",
+      "configurePreset": "dev-linux",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
