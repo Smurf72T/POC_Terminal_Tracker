@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QStandardItemModel>
 #include <QModelIndex>
+#include <QMap>
 
 namespace Ui {
     class RentalForm;
@@ -33,6 +34,9 @@ private:
     bool isPosted = false;
     bool m_editMode = false;
     int m_editDocId = 0;
+    // Снимок деталей документа из БД (terminalid -> simcardid) для
+    // корректного определения статусов при редактировании проведённого документа.
+    QMap<int, int> m_originalDetails;
 
     void loadClientsToDelegate();
     void loadFreeTerminalsToDelegate();
