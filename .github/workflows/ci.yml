@@ -3,6 +3,11 @@ name: CI
 on:
   push:
     branches: [ master ]
+    # Коммит автоматического bump (config.json + CHANGELOG.md) не должен
+    # перезапускать workflow — иначе получается бесконечный цикл.
+    paths-ignore:
+      - 'config/config.json'
+      - 'CHANGELOG.md'
   pull_request:
   workflow_dispatch:
 
