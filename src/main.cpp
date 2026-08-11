@@ -40,12 +40,30 @@ static QString readAppVersion(const QString &configPath)
     return doc.object()["application"].toObject()["version"].toString();
 }
 
+// Путь к config.json независимо от рабочего каталога: рядом с exe (портативная
+// сборка), уровнем/двумя уровнями выше (разработка, CMake build) и CWD как fallback.
+static QString appConfigPath()
+{
+    const QString base = QCoreApplication::applicationDirPath();
+    const QStringList candidates = {
+        base + "/config/config.json",
+        base + "/../config/config.json",
+        base + "/../../config/config.json",
+        QStringLiteral("config/config.json")
+    };
+    for (const QString &c : candidates) {
+        if (QFileInfo::exists(c))
+            return c;
+    }
+    return candidates.last();
+}
+
 static int runHealthCheck()
 {
     // Без GUI-диалогов: вывод результата в stdout, код возврата 0/1/2.
     DatabaseManager::setSuppressDialogs(true);
 
-    if (!DatabaseManager::instance().initialize()) {
+    if (!DatabaseManager::instance().initialize(appConfigPath())) {
         std::printf("DB_ERROR: не удалось подключиться к базе данных или применить миграции\n");
         DatabaseManager::instance().close();
         return 1;
@@ -101,14 +119,14 @@ int main(int argc, char *argv[])
     }
 
     if (args.contains("--version")) {
-        QString version = readAppVersion("config/config.json");
+        QString version = readAppVersion(appConfigPath());
         std::printf("%s\n", (version.isEmpty() ? QString("unknown") : version).toUtf8().constData());
         return 0;
     }
 
     // Частая причина «не подключается к БД»: пустой пароль при отсутствии .env/POC_DB_PASSWORD.
     {
-        QFile cfgFile("config/config.json");
+        QFile cfgFile(appConfigPath());
         if (cfgFile.open(QIODevice::ReadOnly)) {
             QJsonDocument cfgDoc = QJsonDocument::fromJson(cfgFile.readAll());
             const QJsonObject dbCfg = cfgDoc.object()["database"].toObject();
@@ -118,7 +136,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (!DatabaseManager::instance().initialize()) {
+    if (!DatabaseManager::instance().initialize(appConfigPath())) {
         QWidget splash;
         splash.setWindowTitle("POC Terminal Tracker");
         splash.resize(400, 100);
