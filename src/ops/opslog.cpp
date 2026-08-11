@@ -21,6 +21,9 @@ static QString levelToString(OpsLog::Level level)
     return "INFO";
 }
 
+// Максимальное число архивов ops.log при ротации (ops.log.1 … ops.log.N).
+static const int kMaxLogArchives = 5;
+
 OpsLog& OpsLog::instance()
 {
     static OpsLog instance;
@@ -61,7 +64,12 @@ void OpsLog::rotateIfNeeded(const QString &filePath)
     if (info.size() <= 1024 * 1024)
         return;
 
-    QFile::remove(filePath + ".1");
+    // Циклическая ротация: ops.log.1 — свежайший архив, ops.log.N — самый старый.
+    QFile::remove(filePath + "." + QString::number(kMaxLogArchives));
+    for (int i = kMaxLogArchives - 1; i >= 1; --i) {
+        QFile::rename(filePath + "." + QString::number(i),
+                      filePath + "." + QString::number(i + 1));
+    }
     QFile::rename(filePath, filePath + ".1");
 }
 
