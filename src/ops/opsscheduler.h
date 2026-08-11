@@ -66,7 +66,6 @@ private:
 
     QDateTime m_lastBackupAt;
     QDateTime m_lastIntegrityAt;
-    bool m_initialIntegrityScheduled = false;
 };
 
 #endif // OPSSCHEDULER_H

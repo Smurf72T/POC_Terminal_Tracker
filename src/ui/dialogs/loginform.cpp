@@ -2,6 +2,7 @@
 #include "ui_loginform.h"
 #include "database/databasemanager.h"
 #include "utils/password_utils.h"
+#include "utils/logging.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -95,7 +96,7 @@ void LoginForm::on_btnLogin_clicked()
             upd.bindValue(":uname", username);
 
             if (!upd.exec()) {
-                qWarning() << "Не удалось обновить счётчик попыток:" << upd.lastError().text();
+                qCWarning(logDB) << "Не удалось обновить счётчик попыток:" << upd.lastError().text();
                 ui->labelError->setText("Неверный пароль!");
                 return;
             }
@@ -122,7 +123,7 @@ void LoginForm::on_btnLogin_clicked()
                       "WHERE username = :uname");
         clear.bindValue(":uname", username);
         if (!clear.exec()) {
-            qWarning() << "Не удалось сбросить счётчик попыток:" << clear.lastError().text();
+            qCWarning(logDB) << "Не удалось сбросить счётчик попыток:" << clear.lastError().text();
         }
 
         m_userId = query.value(0).toInt();

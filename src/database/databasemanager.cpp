@@ -336,7 +336,7 @@ void DatabaseManager::notifyDataChanged()
 void DatabaseManager::showError(const QString& message)
 {
     if (s_suppressDialogs) {
-        qCritical() << message;
+        qCCritical(logDB) << message;
         return;
     }
     // В рабочем потоке (бэкап, миграции) модальный диалог заблокировал бы и поток,

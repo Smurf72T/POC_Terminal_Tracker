@@ -46,7 +46,7 @@ PaymentForm::~PaymentForm()
 void PaymentForm::loadClients()
 {
     if (!DatabaseManager::instance().isConnected()) {
-        qDebug() << "[PaymentForm] База данных не подключена";
+        qCWarning(logDB) << "PaymentForm: база данных не подключена";
         return;
     }
 
