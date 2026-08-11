@@ -27,7 +27,9 @@ StatusChangeForm::StatusChangeForm(QWidget *parent) :
     ui->comboBoxActionType->setItemData(3, "lost");
 
     ui->dateEdit->setDate(QDate::currentDate());
-    generateDocNumber();
+
+    // Номер документа генерируется при проведении (не здесь), чтобы не
+    // сжигать значения последовательности для отменённых форм.
 
     rowsModel->setHorizontalHeaderLabels(
         {"Выбрать", "Серийный номер", "Модель", "IMEI 1", "Статус", "Был в ремонте"});
@@ -63,16 +65,6 @@ QString StatusChangeForm::actionTitle() const
 void StatusChangeForm::updateWindowTitle()
 {
     setWindowTitle(QString("Документ: %1").arg(actionTitle()));
-}
-
-void StatusChangeForm::generateDocNumber()
-{
-    QString number = DatabaseManager::instance().generateDocNumber("statuschange");
-    if (!number.isEmpty()) {
-        ui->lineEditNumber->setText(number);
-    } else {
-        ui->lineEditNumber->setText("ИС-00001");
-    }
 }
 
 int StatusChangeForm::targetStatus() const
@@ -313,6 +305,15 @@ void StatusChangeForm::on_btnPost_clicked()
             return;
         }
     } else {
+        if (ui->lineEditNumber->text().trimmed().isEmpty()) {
+            QString num = DatabaseManager::instance().generateDocNumber("statuschange");
+            if (num.isEmpty()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+                return;
+            }
+            ui->lineEditNumber->setText(num);
+        }
         query.prepare("INSERT INTO tblstatuschangedocs (docnumber, docdate, actiontype, comment, basedocid) "
                       "VALUES (:num, :date, :type, :comm, :base) RETURNING statuschangedocid");
         query.bindValue(":num", ui->lineEditNumber->text());
@@ -550,10 +551,18 @@ void StatusChangeForm::loadForEdit(int docId)
 
 void StatusChangeForm::on_btnPrint_clicked()
 {
+    if (!m_editMode && ui->lineEditNumber->text().trimmed().isEmpty()) {
+        QString num = DatabaseManager::instance().generateDocNumber("statuschange");
+        if (num.isEmpty()) {
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+            return;
+        }
+        ui->lineEditNumber->setText(num);
+    }
+
     QString type = actionType();
     QString title;
-    if (type == "repair") title = "АКТ ПЕРЕДАЧИ В РЕМОНТ";
-    else if (type == "repair_return") title = "АКТ ВОЗВРАТА ИЗ РЕМОНТА";
+    if (type == "repair") title = "АКТ ПЕРЕДАЧИ В РЕМОНТ";    else if (type == "repair_return") title = "АКТ ВОЗВРАТА ИЗ РЕМОНТА";
     else if (type == "writeoff") title = "АКТ СПИСАНИЯ";
     else if (type == "lost") title = "АКТ УТЕРИ";
     else return;

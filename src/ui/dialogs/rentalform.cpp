@@ -28,8 +28,8 @@ RentalForm::RentalForm(QWidget *parent) :
     // Настройка даты (сегодня)
     ui->dateEdit->setDate(QDate::currentDate());
 
-    // Генерация номера
-    generateDocNumber();
+    // Номер документа генерируется при проведении (не здесь), чтобы не
+    // сжигать значения последовательности для отменённых форм.
 
     // Настройка модели для табличной части
     rowsModel = new QStandardItemModel(0, 3, this); // 3 колонки
@@ -121,16 +121,6 @@ void RentalForm::loadFreeSIMsToDelegate()
     // Устанавливаем делегат на колонку SIM (редактируемый: можно выбрать
     // существующую SIM-карту или ввести новый номер)
     ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(sims, this, true));
-}
-
-void RentalForm::generateDocNumber()
-{
-    QString number = DatabaseManager::instance().generateDocNumber("rental");
-    if (!number.isEmpty()) {
-        ui->lineEditNumber->setText(number);
-    } else {
-        ui->lineEditNumber->setText("АР-00001");
-    }
 }
 
 void RentalForm::loadForEdit(int docId)
@@ -295,6 +285,15 @@ void RentalForm::on_btnPost_clicked()
             return;
         }
     } else {
+        if (ui->lineEditNumber->text().trimmed().isEmpty()) {
+            QString num = DatabaseManager::instance().generateDocNumber("rental");
+            if (num.isEmpty()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+                return;
+            }
+            ui->lineEditNumber->setText(num);
+        }
         query.prepare("INSERT INTO tblrentaldocs (docnumber, docdate, clientid, comments) "
                       "VALUES (:num, :date, :client, :comm) RETURNING rentaldocid");
         query.bindValue(":num", ui->lineEditNumber->text());

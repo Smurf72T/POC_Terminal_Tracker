@@ -33,7 +33,6 @@ private:
     void loadClientsToComboBox();
     void loadRentalDocs(int clientId);
     void loadRentalDetails(int rentalDocId);
-    void generateDocNumber();
 
     bool m_editMode = false;
     int m_editDocId = 0;

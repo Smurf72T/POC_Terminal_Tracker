@@ -41,7 +41,6 @@ private:
     void loadClientsToDelegate();
     void loadFreeTerminalsToDelegate();
     void loadFreeSIMsToDelegate();
-    void generateDocNumber();
 };
 
 #endif // RENTALFORM_H

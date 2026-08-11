@@ -21,7 +21,9 @@ ReturnForm::ReturnForm(QWidget *parent) :
     resize(900, 600);
 
     ui->dateEdit->setDate(QDate::currentDate());
-    generateDocNumber();
+
+    // Номер документа генерируется при проведении (не здесь), чтобы не
+    // сжигать значения последовательности для отменённых форм.
 
     // Настройка модели таблицы
     rowsModel = new QStandardItemModel(0, 3, this);
@@ -142,16 +144,6 @@ void ReturnForm::on_comboBoxRentalDoc_currentIndexChanged(int index)
 {
     int rentalDocId = ui->comboBoxRentalDoc->itemData(index).toInt();
     loadRentalDetails(rentalDocId);
-}
-
-void ReturnForm::generateDocNumber()
-{
-    QString number = DatabaseManager::instance().generateDocNumber("return");
-    if (!number.isEmpty()) {
-        ui->lineEditNumber->setText(number);
-    } else {
-        ui->lineEditNumber->setText("ВР-00001");
-    }
 }
 
 void ReturnForm::loadForEdit(int docId)
@@ -433,6 +425,15 @@ void ReturnForm::on_btnPost_clicked()
     }
 
     // 1. Создаем шапку документа возврата
+    if (ui->lineEditNumber->text().trimmed().isEmpty()) {
+        QString num = DatabaseManager::instance().generateDocNumber("return");
+        if (num.isEmpty()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+            return;
+        }
+        ui->lineEditNumber->setText(num);
+    }
     query.prepare("INSERT INTO tblreturndocs (docnumber, docdate, clientid, comments) "
                   "VALUES (:num, :date, :client, :comm) RETURNING returndocid");
     query.bindValue(":num", ui->lineEditNumber->text());
@@ -540,6 +541,15 @@ void ReturnForm::on_btnPrint_clicked()
     if (clientId == 0) {
         QMessageBox::warning(this, "Внимание", "Сначала выберите клиента!");
         return;
+    }
+
+    if (!m_editMode && ui->lineEditNumber->text().trimmed().isEmpty()) {
+        QString num = DatabaseManager::instance().generateDocNumber("return");
+        if (num.isEmpty()) {
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+            return;
+        }
+        ui->lineEditNumber->setText(num);
     }
 
     QString html = "<html><head><meta charset='utf-8'>"

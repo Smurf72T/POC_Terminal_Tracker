@@ -33,7 +33,6 @@ private:
     QStandardItemModel *rowsModel;
 
     void loadModelsToDelegate();
-    void generateDocNumber();
 
     QList<QPair<int, QString>> m_models;
     bool m_editMode = false;

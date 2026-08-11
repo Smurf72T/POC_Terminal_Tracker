@@ -26,8 +26,8 @@ ReceiptForm::ReceiptForm(QWidget *parent) :
     // Настройка даты (сегодня)
     ui->dateEdit->setDate(QDate::currentDate());
 
-    // Генерация номера
-    generateDocNumber();
+    // Номер документа генерируется при проведении (не здесь), чтобы не
+    // сжигать значения последовательности для отменённых форм.
 
     // Настройка модели для табличной части
     rowsModel = new QStandardItemModel(0, 4, this); // 4 колонки
@@ -63,16 +63,6 @@ void ReceiptForm::loadModelsToDelegate()
 
     // Устанавливаем делегат на колонку 1 (Модель)
     ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(m_models, this));
-}
-
-void ReceiptForm::generateDocNumber()
-{
-    QString number = DatabaseManager::instance().generateDocNumber("receipt");
-    if (!number.isEmpty()) {
-        ui->lineEditNumber->setText(number);
-    } else {
-        ui->lineEditNumber->setText("ПП-00001");
-    }
 }
 
 void ReceiptForm::loadForEdit(int docId)
@@ -199,6 +189,15 @@ void ReceiptForm::on_btnPost_clicked()
         }
         docId = m_editDocId;
     } else {
+        if (ui->lineEditNumber->text().trimmed().isEmpty()) {
+            QString num = DatabaseManager::instance().generateDocNumber("receipt");
+            if (num.isEmpty()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+                return;
+            }
+            ui->lineEditNumber->setText(num);
+        }
         query.prepare("INSERT INTO tblreceiptdocs (docnumber, docdate, comments) "
                       "VALUES (:num, :date, :comm) RETURNING receiptdocid");
         query.bindValue(":num", ui->lineEditNumber->text());
@@ -355,6 +354,15 @@ void ReceiptForm::on_btnPost_clicked()
 
 void ReceiptForm::on_btnPrint_clicked()
 {
+    if (!m_editMode && ui->lineEditNumber->text().trimmed().isEmpty()) {
+        QString num = DatabaseManager::instance().generateDocNumber("receipt");
+        if (num.isEmpty()) {
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+            return;
+        }
+        ui->lineEditNumber->setText(num);
+    }
+
     QString html = "<html><head><meta charset='utf-8'>"
                    "<style>"
                    "body { font-family: 'Times New Roman', serif; font-size: 14px; }"

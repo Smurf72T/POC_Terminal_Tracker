@@ -42,7 +42,6 @@ private:
     QString actionType() const;
     QString actionTitle() const;
     void updateWindowTitle();
-    void generateDocNumber();
     void loadRepairDocs();
     void loadTerminals();
     void loadTerminalsFromRepairDoc(int repairDocId);
