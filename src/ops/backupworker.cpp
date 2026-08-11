@@ -56,12 +56,12 @@ QSqlDatabase BackupWorker::createRawConnection()
     return db;
 }
 
-void BackupWorker::createBackup(const QString &filePath, const QString &password)
+void BackupWorker::createBackup(const QString &filePath, const QString &connectionPassword, const QString &passphrase)
 {
     QSqlDatabase db = openConnection();
     BackupManager::BackupResult result;
     if (db.isOpen()) {
-        result = BackupManager::createBackup(db, filePath, password);
+        result = BackupManager::createBackup(db, filePath, connectionPassword, passphrase);
     } else {
         result.filePath = filePath;
         result.error = "Не удалось открыть соединение с БД в фоновом потоке";
@@ -72,13 +72,13 @@ void BackupWorker::createBackup(const QString &filePath, const QString &password
     emit backupFinished(result);
 }
 
-void BackupWorker::restore(const QString &filePath, const QString &password)
+void BackupWorker::restore(const QString &filePath, const QString &connectionPassword, const QString &passphrase)
 {
     QString error;
     bool ok = false;
     QSqlDatabase db = openConnection();
     if (db.isOpen()) {
-        ok = BackupManager::restoreDatabase(db, filePath, password, &error);
+        ok = BackupManager::restoreDatabase(db, filePath, connectionPassword, passphrase, &error);
     } else {
         error = "Не удалось открыть соединение с БД в фоновом потоке";
     }

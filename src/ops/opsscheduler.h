@@ -37,7 +37,7 @@ public slots:
 signals:
     void backupFinished(bool ok, const QString &filePath, const QString &message);
     void integrityFinished(bool ok, const QString &summary);
-    void backupRequested(const QString &filePath, const QString &password);
+    void backupRequested(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
 
 private slots:
     void checkSchedule();
@@ -61,6 +61,8 @@ private:
     int m_integrityIntervalSec = 24 * 3600;
     QString m_backupDirectory;
     int m_retentionCount = 14;
+    // Отдельная passphrase для шифрования бэкапов (не пароль БД).
+    QString m_backupPassphrase;
 
     QDateTime m_lastBackupAt;
     QDateTime m_lastIntegrityAt;

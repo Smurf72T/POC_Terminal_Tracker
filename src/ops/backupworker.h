@@ -35,8 +35,8 @@ public:
     ~BackupWorker() override;
 
 public slots:
-    void createBackup(const QString &filePath, const QString &password);
-    void restore(const QString &filePath, const QString &password);
+    void createBackup(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
+    void restore(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
 
 signals:
     void backupFinished(const BackupManager::BackupResult &result);

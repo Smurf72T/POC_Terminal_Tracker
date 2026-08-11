@@ -24,6 +24,7 @@ static QJsonObject makeConfig(bool backupEnabled = false, int backupHours = 24,
     backup["interval_hours"] = backupHours;
     backup["directory"] = backupDir;
     backup["retention_count"] = retention;
+    backup["passphrase"] = "test-passphrase";
 
     QJsonObject monitoring;
     monitoring["integrity_enabled"] = integrityEnabled;

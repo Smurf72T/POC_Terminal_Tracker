@@ -1056,18 +1056,22 @@ void MainWindow::performBackup()
     if (reply != QMessageBox::Yes) return;
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    QString user = db.userName();
 
-    bool passwordOk;
-    QString password = QInputDialog::getText(this, "Пароль PostgreSQL",
-        "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
-    if (!passwordOk) return;
+    // Пароль БД для подключения к pg_dump берём из конфигурации приложения.
+    QString connectionPassword = db.password();
+
+    // Для шифрования бэкапа — отдельная passphrase (не пароль БД).
+    bool passOk;
+    QString passphrase = QInputDialog::getText(this, "Пароль для шифрования бэкапа",
+        "Введите passphrase для шифрования (пусто — без шифрования):",
+        QLineEdit::Password, QString(), &passOk);
+    if (!passOk) return;
 
     // Бэкап выполняется в фоновом потоке, чтобы pg_dump не блокировал интерфейс.
     ensureBackupWorker();
     m_backupBusy = true;
     statusBar()->showMessage("Создание резервной копии...", 0);
-    emit backupRequested(filePath, password);
+    emit backupRequested(filePath, connectionPassword, passphrase);
 }
 
 void MainWindow::onManualBackupFinished(const BackupManager::BackupResult &result)
@@ -1126,18 +1130,22 @@ void MainWindow::performRestore()
     if (reply != QMessageBox::Yes) return;
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    QString user = db.userName();
 
-    bool passwordOk;
-    QString password = QInputDialog::getText(this, "Пароль PostgreSQL",
-        "Введите пароль для пользователя " + user + ":", QLineEdit::Password, QString(), &passwordOk);
-    if (!passwordOk) return;
+    // Пароль БД для подключения к psql берём из конфигурации приложения.
+    QString connectionPassword = db.password();
+
+    // Passphrase для расшифровки бэкапа (та же, что использовалась при создании).
+    bool passOk;
+    QString passphrase = QInputDialog::getText(this, "Пароль бэкапа",
+        "Введите passphrase бэкапа (пусто — для незашифрованного файла):",
+        QLineEdit::Password, QString(), &passOk);
+    if (!passOk) return;
 
     // Восстановление выполняется в фоновом потоке, чтобы psql не блокировал интерфейс.
     ensureBackupWorker();
     m_backupBusy = true;
     statusBar()->showMessage("Восстановление базы данных...", 0);
-    emit restoreRequested(filePath, password);
+    emit restoreRequested(filePath, connectionPassword, passphrase);
 }
 
 void MainWindow::onManualRestoreFinished(bool ok, const QString &filePath, const QString &error)

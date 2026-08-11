@@ -17,9 +17,11 @@ public:
         qint64 size = 0;
     };
 
-    static BackupResult createBackup(const QSqlDatabase &db, const QString &filePath, const QString &password);
+    static BackupResult createBackup(const QSqlDatabase &db, const QString &filePath,
+                                     const QString &connectionPassword, const QString &passphrase);
     static bool createFallbackBackup(const QSqlDatabase &db, const QString &filePath, const QString &dbname, QString *error = nullptr);
-    static bool restoreDatabase(const QSqlDatabase &db, const QString &filePath, const QString &password, QString *error = nullptr);
+    static bool restoreDatabase(const QSqlDatabase &db, const QString &filePath,
+                                const QString &connectionPassword, const QString &passphrase, QString *error = nullptr);
 };
 
 Q_DECLARE_METATYPE(BackupManager::BackupResult)

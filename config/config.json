@@ -17,7 +17,8 @@
     "enabled": false,
     "interval_hours": 24,
     "directory": "",
-    "retention_count": 14
+    "retention_count": 14,
+    "passphrase": ""
   },
   "monitoring": {
     "integrity_enabled": true,

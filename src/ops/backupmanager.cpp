@@ -215,7 +215,8 @@ QString formatSqlValue(const QVariant &val)
 
 } // namespace
 
-BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, const QString &filePath, const QString &password)
+BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, const QString &filePath,
+                                                         const QString &connectionPassword, const QString &passphrase)
 {
     BackupResult result;
     result.filePath = filePath;
@@ -226,7 +227,7 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
     QString user = db.userName();
 
     // Дамп пишется во временный plain-файл, затем финализируется:
-    // при непустом пароле — шифрование AES-256-CBC (openssl), иначе — копирование как есть.
+    // при непустом passphrase — шифрование AES-256-CBC (openssl), иначе — копирование как есть.
     QTemporaryDir tmpDir;
     if (!tmpDir.isValid()) {
         result.error = "Не удалось создать временную директорию для бэкапа";
@@ -250,7 +251,7 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
 
     QProcess process;
     auto env = process.environment();
-    env.append(QString("PGPASSWORD=%1").arg(password));
+    env.append(QString("PGPASSWORD=%1").arg(connectionPassword));
     process.setEnvironment(env);
     process.start("pg_dump", args);
 
@@ -279,9 +280,9 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
     }
 
     QString finalizeError;
-    bool finalized = password.isEmpty()
+    bool finalized = passphrase.isEmpty()
         ? (QFile::remove(filePath), QFile::copy(plainPath, filePath))
-        : encryptBackupFile(plainPath, filePath, password, &finalizeError);
+        : encryptBackupFile(plainPath, filePath, passphrase, &finalizeError);
     if (!finalized) {
         result.ok = false;
         result.error = finalizeError.isEmpty()
@@ -291,7 +292,7 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
     }
 
     result.ok = true;
-    result.encrypted = !password.isEmpty();
+    result.encrypted = !passphrase.isEmpty();
     result.size = QFileInfo(filePath).size();
     return result;
 }
@@ -464,7 +465,8 @@ bool BackupManager::createFallbackBackup(const QSqlDatabase &db, const QString &
     return true;
 }
 
-bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &filePath, const QString &password, QString *error)
+bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &filePath,
+                                    const QString &connectionPassword, const QString &passphrase, QString *error)
 {
     QString host = db.hostName();
     QString port = QString::number(db.port());
@@ -479,7 +481,7 @@ bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &fileP
         return false;
     }
     QString sqlPath = tmpDir.filePath("restore.sql");
-    if (!decryptBackupFile(filePath, sqlPath, password, error))
+    if (!decryptBackupFile(filePath, sqlPath, passphrase, error))
         return false;
 
     QStringList args;
@@ -492,7 +494,7 @@ bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &fileP
 
     QProcess process;
     auto env = process.environment();
-    env.append(QString("PGPASSWORD=%1").arg(password));
+    env.append(QString("PGPASSWORD=%1").arg(connectionPassword));
     process.setEnvironment(env);
     process.start("psql", args);
 

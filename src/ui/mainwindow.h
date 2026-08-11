@@ -110,8 +110,8 @@ private:
     void showGlobalSearch();
 
 signals:
-    void backupRequested(const QString &filePath, const QString &password);
-    void restoreRequested(const QString &filePath, const QString &password);
+    void backupRequested(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
+    void restoreRequested(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
 
 private slots:
     void onManualBackupFinished(const BackupManager::BackupResult &result);

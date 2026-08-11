@@ -701,7 +701,7 @@ void TestDbIntegration::test_backup_and_opslog()
     // createBackup: pg_dump (если доступен в PATH) либо fallback — в любом случае файл создаётся
     QString backupFull = tempDir + "/backup_full.sql";
     BackupManager::BackupResult result = BackupManager::createBackup(
-        m_testDb, backupFull, m_testDb.password());
+        m_testDb, backupFull, m_testDb.password(), m_testDb.password());
     QVERIFY2(result.ok, qPrintable(result.error));
     QVERIFY2(result.size > 0, qPrintable("бэкап пустой"));
     QVERIFY2(result.method == "pg_dump" || result.method == "fallback",
@@ -733,7 +733,7 @@ void TestDbIntegration::test_backup_and_opslog()
         QString rErr;
         QVERIFY2(openConnection(restoreDb, restoreDbName, m_env, m_dbConfig, &rErr), qPrintable(rErr));
         QString restoreErr;
-        QVERIFY2(BackupManager::restoreDatabase(restoreDb, backupFull, m_testDb.password(), &restoreErr),
+        QVERIFY2(BackupManager::restoreDatabase(restoreDb, backupFull, m_testDb.password(), m_testDb.password(), &restoreErr),
                  qPrintable(restoreErr));
         restoreDb.close();
         QSqlDatabase::removeDatabase("restoreConnection");
@@ -765,7 +765,7 @@ void TestDbIntegration::test_backup_and_opslog()
     // Бэкап без пароля — plaintext SQL (обратная совместимость)
     QString backupPlain = tempDir + "/backup_plain.sql";
     BackupManager::BackupResult plainResult = BackupManager::createBackup(
-        m_testDb, backupPlain, QString());
+        m_testDb, backupPlain, m_testDb.password(), QString());
     QVERIFY2(plainResult.ok, qPrintable(plainResult.error));
     QVERIFY2(!plainResult.encrypted, qPrintable("бэкап без пароля не должен быть зашифрован"));
     QFile pf(backupPlain);

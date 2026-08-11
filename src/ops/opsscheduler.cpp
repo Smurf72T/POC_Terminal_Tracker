@@ -140,6 +140,7 @@ void OpsScheduler::readConfig(const QJsonObject &config)
     m_backupIntervalSec = qMax(1, hours) * 3600;
     m_backupDirectory = backup["directory"].toString().trimmed();
     m_retentionCount = qMax(0, backup["retention_count"].toInt(14));
+    m_backupPassphrase = backup["passphrase"].toString();
 
     QJsonObject monitoring = config["monitoring"].toObject();
     m_integrityEnabled = monitoring["integrity_enabled"].toBool(false);
@@ -239,11 +240,13 @@ void OpsScheduler::runScheduledBackup()
     QString filePath = dir.absoluteFilePath(
         QString("backup_poc_%1.sql").arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")));
 
-    QString password = DatabaseManager::instance().getDatabase().password();
+    // Для подключения к pg_dump используем пароль БД, для шифрования —
+    // отдельную passphrase из конфига (backup.passphrase).
+    QString connectionPassword = DatabaseManager::instance().getDatabase().password();
 
     ensureBackupWorker();
     m_backupInProgress = true;
-    emit backupRequested(filePath, password);
+    emit backupRequested(filePath, connectionPassword, m_backupPassphrase);
 }
 
 void OpsScheduler::onBackupWorkerFinished(const BackupManager::BackupResult &result)
