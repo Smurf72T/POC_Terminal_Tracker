@@ -247,10 +247,16 @@ QJsonObject DatabaseManager::configObject() const
 QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMessage)
 {
     if (!m_circuitBreaker.isAllowed()) {
+        // Не выполняем заведомо некорректный SQL ради заполнения lastError —
+        // сразу возвращаем запрос с понятной ошибкой.
+        const QString message = QStringLiteral(
+            "База данных временно недоступна: слишком много неудачных запросов подряд. "
+            "Повторите действие через несколько секунд.");
         QSqlQuery sqlQuery(m_database);
-        sqlQuery.exec("SELECT \xEF\xBF\xBD_breaker_open");  // заведомо некорректный SQL — ошибка в lastError()
+        sqlQuery.setLastError(QSqlError(QStringLiteral("circuit breaker open"),
+                                        message, QSqlError::StatementError));
         if (showErrorMessage)
-            showError(sqlQuery.lastError().text());
+            showError(message);
         return sqlQuery;
     }
 
@@ -270,7 +276,8 @@ QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMess
 bool DatabaseManager::executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc)
 {
     if (!m_circuitBreaker.isAllowed()) {
-        showError("Соединение временно недоступно (circuit breaker разомкнут)");
+        showError("База данных временно недоступна: слишком много неудачных запросов подряд. "
+                  "Повторите действие через несколько секунд.");
         return false;
     }
 
