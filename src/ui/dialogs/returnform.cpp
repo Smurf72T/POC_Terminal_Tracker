@@ -402,7 +402,7 @@ void ReturnForm::on_btnPost_clicked()
 
             QSqlQuery upd(db);
             upd.prepare("UPDATE tblterminals SET status = 1, currentsimcardid = :sid WHERE terminalid = :tid");
-            upd.bindValue(":sid", simId > 0 ? QVariant(simId) : QVariant(QVariant::Int));
+            upd.bindValue(":sid", simId > 0 ? QVariant(simId) : QVariant());
             upd.bindValue(":tid", termId);
             if (!upd.exec()) {
                 db.rollback();

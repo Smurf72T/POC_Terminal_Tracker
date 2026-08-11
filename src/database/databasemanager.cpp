@@ -247,17 +247,16 @@ QJsonObject DatabaseManager::configObject() const
 QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMessage)
 {
     if (!m_circuitBreaker.isAllowed()) {
+        // Запрос не выполняется: circuit breaker открыт после серии сбоев БД.
         // Не выполняем заведомо некорректный SQL ради заполнения lastError —
-        // сразу возвращаем запрос с понятной ошибкой.
+        // возвращаем невыполненный запрос и сообщаем о проблеме.
         const QString message = QStringLiteral(
             "База данных временно недоступна: слишком много неудачных запросов подряд. "
             "Повторите действие через несколько секунд.");
-        QSqlQuery sqlQuery(m_database);
-        sqlQuery.setLastError(QSqlError(QStringLiteral("circuit breaker open"),
-                                        message, QSqlError::StatementError));
+        qCWarning(logDB) << message;
         if (showErrorMessage)
             showError(message);
-        return sqlQuery;
+        return QSqlQuery(m_database);
     }
 
     QSqlQuery sqlQuery(m_database);
