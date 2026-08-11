@@ -11,6 +11,9 @@
       "displayName": "Dev (Windows, Qt 6.11.1 + MinGW 13.10)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/dev-mingw",
+      "environment": {
+        "PATH": "E:/Qt/Tools/Ninja;E:/Qt/Tools/mingw1310_64/bin;E:/Qt/6.11.1/mingw_64/bin;$penv{PATH}"
+      },
       "cacheVariables": {
         "CMAKE_PREFIX_PATH": "E:/Qt/6.11.1/mingw_64",
         "CMAKE_C_COMPILER": "E:/Qt/Tools/mingw1310_64/bin/gcc.exe",
