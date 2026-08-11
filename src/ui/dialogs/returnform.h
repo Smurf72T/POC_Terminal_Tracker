@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QStandardItemModel>
+#include <QSet>
 
 namespace Ui {
     class ReturnForm;
@@ -36,6 +37,10 @@ private:
 
     bool m_editMode = false;
     int m_editDocId = 0;
+    // Cнимок возвращённых терминалов и связанного документа аренды для
+    // корректной обработки статусов при редактировании проведённого возврата.
+    QSet<int> m_originalReturned;
+    int m_editRentalDocId = 0;
 };
 
 #endif // RETURNFORM_H

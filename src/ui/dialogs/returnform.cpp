@@ -158,6 +158,8 @@ void ReturnForm::loadForEdit(int docId)
 {
     m_editMode = true;
     m_editDocId = docId;
+    m_originalReturned.clear();
+    m_editRentalDocId = 0;
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
     QSqlQuery query(db);
@@ -197,6 +199,7 @@ void ReturnForm::loadForEdit(int docId)
 
     if (rentalQuery.exec() && rentalQuery.next()) {
         int rentalDocId = rentalQuery.value(0).toInt();
+        m_editRentalDocId = rentalDocId;
         int rentalIndex = ui->comboBoxRentalDoc->findData(rentalDocId);
         if (rentalIndex >= 0) {
             ui->comboBoxRentalDoc->setCurrentIndex(rentalIndex);
@@ -212,6 +215,8 @@ void ReturnForm::loadForEdit(int docId)
         while (termQuery.next()) {
             returnedTerminals.append(termQuery.value(0).toInt());
         }
+        for (int tid : returnedTerminals)
+            m_originalReturned.insert(tid);
 
         for (int i = 0; i < rowsModel->rowCount(); ++i) {
             QStandardItem *checkItem = rowsModel->item(i, 0);
@@ -290,6 +295,127 @@ void ReturnForm::on_btnPost_clicked()
             if (!query.exec()) {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + query.lastError().text());
+                return;
+            }
+        }
+
+        // ---- Статусы терминалов/SIM при редактировании проведённого возврата ----
+        QSet<int> checked;
+        for (int tid : terminalsToReturn) checked.insert(tid);
+
+        QList<int> newlyReturned;
+        for (int tid : checked) {
+            if (!m_originalReturned.contains(tid)) newlyReturned.append(tid);
+        }
+        QList<int> restored;
+        for (int tid : m_originalReturned) {
+            if (!checked.contains(tid)) restored.append(tid);
+        }
+
+        // Терминалы, добавленные в возврат: переводим «в аренде» -> «свободен»
+        for (int termId : newlyReturned) {
+            QSqlQuery lockTerm(db);
+            lockTerm.prepare("SELECT status, currentsimcardid FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+            lockTerm.bindValue(":id", termId);
+            if (!lockTerm.exec() || !lockTerm.next()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
+                return;
+            }
+            if (lockTerm.value(0).toInt() != 1) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Терминал %1 уже не находится в аренде!").arg(termId));
+                return;
+            }
+            int simId = lockTerm.value(1).toInt();
+
+            QSqlQuery upd(db);
+            upd.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = NULL WHERE terminalid = :id");
+            upd.bindValue(":id", termId);
+            if (!upd.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД",
+                    QString("Не удалось обновить статус терминала %1:\n%2").arg(termId).arg(upd.lastError().text()));
+                return;
+            }
+            if (simId > 0) {
+                QSqlQuery updSim(db);
+                updSim.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
+                updSim.bindValue(":id", simId);
+                if (!updSim.exec()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка БД",
+                        QString("Не удалось обновить статус SIM-карты %1:\n%2").arg(simId).arg(updSim.lastError().text()));
+                    return;
+                }
+            }
+        }
+
+        // Терминалы, убранные из возврата: возвращаем в аренду (с прежней SIM)
+        for (int termId : restored) {
+            QSqlQuery lockTerm(db);
+            lockTerm.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+            lockTerm.bindValue(":id", termId);
+            if (!lockTerm.exec() || !lockTerm.next()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
+                return;
+            }
+            if (lockTerm.value(0).toInt() != 0) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Терминал %1 уже находится в аренде!").arg(termId));
+                return;
+            }
+
+            // Прежняя SIM-карта из документа аренды
+            QSqlQuery origSim(db);
+            origSim.prepare("SELECT simcardid FROM tblrentaldetails WHERE rentaldocid = :rd AND terminalid = :tid LIMIT 1");
+            origSim.bindValue(":rd", m_editRentalDocId);
+            origSim.bindValue(":tid", termId);
+            int simId = 0;
+            if (origSim.exec() && origSim.next()) {
+                simId = origSim.value(0).toInt();
+            }
+
+            if (simId > 0) {
+                QSqlQuery lockSim(db);
+                lockSim.prepare("SELECT status FROM tblsimcards WHERE simcardid = :id FOR UPDATE NOWAIT");
+                lockSim.bindValue(":id", simId);
+                if (!lockSim.exec() || !lockSim.next()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка",
+                        QString("Не удалось заблокировать SIM-карту %1. Возможно, она уже обрабатывается.").arg(simId));
+                    return;
+                }
+                if (lockSim.value(0).toInt() != 0) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка",
+                        QString("SIM-карта %1 занята, не удалось восстановить аренду терминала %2.").arg(simId).arg(termId));
+                    return;
+                }
+                QSqlQuery updSim(db);
+                updSim.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
+                updSim.bindValue(":id", simId);
+                if (!updSim.exec()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка БД",
+                        QString("Не удалось обновить статус SIM-карты %1:\n%2").arg(simId).arg(updSim.lastError().text()));
+                    return;
+                }
+            }
+
+            QSqlQuery upd(db);
+            upd.prepare("UPDATE tblterminals SET status = 1, currentsimcardid = :sid WHERE terminalid = :tid");
+            upd.bindValue(":sid", simId > 0 ? QVariant(simId) : QVariant(QVariant::Int));
+            upd.bindValue(":tid", termId);
+            if (!upd.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД",
+                    QString("Не удалось восстановить терминал %1:\n%2").arg(termId).arg(upd.lastError().text()));
                 return;
             }
         }
