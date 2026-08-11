@@ -336,6 +336,17 @@ void StatusChangeForm::on_btnPost_clicked()
 
     int target = targetStatus();
 
+    // Терминалы, убранные из документа при редактировании, должны быть
+    // возвращены в прежний статус (откат операции).
+    QSet<int> checked;
+    for (int tid : terminalIds) checked.insert(tid);
+    QList<int> removed;
+    if (m_editMode) {
+        for (int tid : m_originalTerminals) {
+            if (!checked.contains(tid)) removed.append(tid);
+        }
+    }
+
     for (int termId : terminalIds) {
         QSqlQuery checkQuery(db);
         checkQuery.prepare(
@@ -352,13 +363,23 @@ void StatusChangeForm::on_btnPost_clicked()
         }
 
         int currentStatus = checkQuery.value(0).toInt();
-        if (!expectStatus(currentStatus)) {
+        bool ok = expectStatus(currentStatus);
+        // При редактировании терминал может уже стоять в целевом статусе —
+        // это допустимо (повторное применение идемпотентно).
+        if (m_editMode) ok = ok || (currentStatus == target);
+        if (!ok) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
                 QString("Терминал %1 имеет статус «%2», операция «%3» для него недоступна.")
                     .arg(termId).arg(statusText(currentStatus)).arg(actionTitle()));
             return;
         }
+
+        // Прежний статус: для терминалов из исходного документа берём снимок,
+        // для добавленных — текущий статус.
+        int oldStatus = currentStatus;
+        if (m_editMode && m_originalTerminals.contains(termId))
+            oldStatus = m_originalStatus.value(termId, currentStatus);
 
         QSqlQuery updateQuery(db);
         updateQuery.prepare(
@@ -377,14 +398,67 @@ void StatusChangeForm::on_btnPost_clicked()
 
         QSqlQuery detailQuery(db);
         detailQuery.prepare(
-            "INSERT INTO tblstatuschangedetails (statuschangedocid, terminalid) "
-            "VALUES (:did, :tid)");
+            "INSERT INTO tblstatuschangedetails (statuschangedocid, terminalid, old_status) "
+            "VALUES (:did, :tid, :old)");
         detailQuery.bindValue(":did", docId);
         detailQuery.bindValue(":tid", termId);
+        detailQuery.bindValue(":old", oldStatus);
         if (!detailQuery.exec()) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                 "Ошибка связи: " + detailQuery.lastError().text());
+            return;
+        }
+    }
+
+    // Откат статусов для терминалов, убранных из документа
+    for (int termId : removed) {
+        QSqlQuery checkQuery(db);
+        checkQuery.prepare(
+            "SELECT status FROM tblterminals "
+            "WHERE terminalid = :id FOR UPDATE NOWAIT");
+        checkQuery.bindValue(":id", termId);
+
+        if (!checkQuery.exec() || !checkQuery.next()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.")
+                    .arg(termId));
+            return;
+        }
+
+        int currentStatus = checkQuery.value(0).toInt();
+        if (currentStatus != target) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                QString("Статус терминала %1 («%2») уже изменён другим документом, "
+                        "откат невозможен. Уберите его вручную.")
+                    .arg(termId).arg(statusText(currentStatus)));
+            return;
+        }
+
+        int oldStatus = m_originalStatus.value(termId, -1);
+        if (oldStatus < 0) {
+            if (m_originalActionType == "repair") oldStatus = 0;
+            else if (m_originalActionType == "repair_return") oldStatus = 2;
+            else {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка",
+                    QString("Прежний статус терминала %1 неизвестен (документ проведён до "
+                            "введения снимков статусов). Верните его вручную.").arg(termId));
+                return;
+            }
+        }
+
+        QSqlQuery updateQuery(db);
+        updateQuery.prepare("UPDATE tblterminals SET status = :status WHERE terminalid = :id");
+        updateQuery.bindValue(":status", oldStatus);
+        updateQuery.bindValue(":id", termId);
+        if (!updateQuery.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД",
+                QString("Не удалось восстановить статус терминала %1:\n%2")
+                    .arg(termId).arg(updateQuery.lastError().text()));
             return;
         }
     }
@@ -408,6 +482,9 @@ void StatusChangeForm::loadForEdit(int docId)
 {
     m_editMode = true;
     m_editDocId = docId;
+    m_originalTerminals.clear();
+    m_originalStatus.clear();
+    m_originalActionType.clear();
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
     QSqlQuery query(db);
@@ -425,6 +502,8 @@ void StatusChangeForm::loadForEdit(int docId)
     QString actionType = query.value(2).toString();
     QString comment = query.value(3).toString();
     int basedocid = query.value(4).toInt();
+
+    m_originalActionType = actionType;
 
     ui->lineEditNumber->setText(docNumber);
     ui->lineEditNumber->setReadOnly(true);
@@ -444,13 +523,18 @@ void StatusChangeForm::loadForEdit(int docId)
     }
 
     QSqlQuery detailQuery(db);
-    detailQuery.prepare("SELECT terminalid FROM tblstatuschangedetails WHERE statuschangedocid = :id");
+    detailQuery.prepare("SELECT terminalid, old_status FROM tblstatuschangedetails WHERE statuschangedocid = :id");
     detailQuery.bindValue(":id", docId);
 
     QList<int> docTerminals;
     if (detailQuery.exec()) {
         while (detailQuery.next()) {
-            docTerminals.append(detailQuery.value(0).toInt());
+            int tid = detailQuery.value(0).toInt();
+            docTerminals.append(tid);
+            m_originalTerminals.insert(tid);
+            if (!detailQuery.value(1).isNull()) {
+                m_originalStatus.insert(tid, detailQuery.value(1).toInt());
+            }
         }
     }
 

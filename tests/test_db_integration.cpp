@@ -340,7 +340,7 @@ void TestDbIntegration::test_schema_objects()
                                QString("seq_statuschange_doc_number")})
         QVERIFY2(found.contains(seq), qPrintable("Нет последовательности: " + seq));
 
-    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 10);
+    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 11);
 }
 
 void TestDbIntegration::test_number_generation()

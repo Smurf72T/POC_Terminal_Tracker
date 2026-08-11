@@ -3,6 +3,8 @@
 
 #include <QDialog>
 #include <QStandardItemModel>
+#include <QHash>
+#include <QSet>
 
 namespace Ui {
     class StatusChangeForm;
@@ -31,6 +33,11 @@ private:
     QStandardItemModel *rowsModel;
     bool m_editMode = false;
     int m_editDocId = 0;
+    // Снимок состава и прежних статусов терминалов документа для корректного
+    // отката статусов при редактировании проведённого документа.
+    QSet<int> m_originalTerminals;
+    QHash<int, int> m_originalStatus;
+    QString m_originalActionType;
 
     QString actionType() const;
     QString actionTitle() const;
