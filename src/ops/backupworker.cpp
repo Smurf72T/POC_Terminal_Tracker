@@ -25,6 +25,11 @@ BackupWorker::~BackupWorker()
     delete m_pool;
 }
 
+void BackupWorker::requestCancel()
+{
+    m_cancelRequested.store(true);
+}
+
 QSqlDatabase BackupWorker::openConnection()
 {
     if (!m_pool) {
@@ -61,7 +66,7 @@ void BackupWorker::createBackup(const QString &filePath, const QString &connecti
     QSqlDatabase db = openConnection();
     BackupManager::BackupResult result;
     if (db.isOpen()) {
-        result = BackupManager::createBackup(db, filePath, connectionPassword, passphrase);
+        result = BackupManager::createBackup(db, filePath, connectionPassword, passphrase, &m_cancelRequested);
     } else {
         result.filePath = filePath;
         result.error = "Не удалось открыть соединение с БД в фоновом потоке";
@@ -78,7 +83,7 @@ void BackupWorker::restore(const QString &filePath, const QString &connectionPas
     bool ok = false;
     QSqlDatabase db = openConnection();
     if (db.isOpen()) {
-        ok = BackupManager::restoreDatabase(db, filePath, connectionPassword, passphrase, &error);
+        ok = BackupManager::restoreDatabase(db, filePath, connectionPassword, passphrase, &error, &m_cancelRequested);
     } else {
         error = "Не удалось открыть соединение с БД в фоновом потоке";
     }

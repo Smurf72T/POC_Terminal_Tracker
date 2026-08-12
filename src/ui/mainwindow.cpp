@@ -209,7 +209,12 @@ MainWindow::~MainWindow()
 {
     if (m_backupThread) {
         m_backupThread->quit();
-        m_backupThread->wait();
+        if (!m_backupThread->wait(5000)) {
+            qCWarning(logApp) << "Backup worker: не дождались завершения за 5 c, запрашиваем отмену";
+            m_backupThread->requestInterruption();
+            m_backupWorker->requestCancel();
+            m_backupThread->wait(5000);
+        }
         delete m_backupWorker;
         delete m_backupThread;
         m_backupWorker = nullptr;

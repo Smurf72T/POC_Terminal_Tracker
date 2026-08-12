@@ -22,6 +22,8 @@ constexpr int kPgDumpTimeoutMs = 60000;
 constexpr int kPsqlTimeoutMs = 120000;
 constexpr int kKillWaitMs = 5000;
 
+bool waitForFinishedWithCancel(QProcess &process, int timeoutMs, std::atomic<bool> *cancelRequested);
+
 // Маркер зашифрованного бэкапа (первая строка файла).
 // Формат: "POCENC1\n" + шифротекст openssl enc -aes-256-cbc -pbkdf2.
 const char kEncMarker[] = "POCENC1\n";
@@ -48,7 +50,8 @@ QString findOpenssl()
     return QString();
 }
 
-bool runOpenssl(const QStringList &args, const QString &passphrase, QString *error)
+bool runOpenssl(const QStringList &args, const QString &passphrase, QString *error,
+                std::atomic<bool> *cancelRequested)
 {
     static const QString kOpenssl = findOpenssl();
     if (kOpenssl.isEmpty()) {
@@ -69,11 +72,13 @@ bool runOpenssl(const QStringList &args, const QString &passphrase, QString *err
         process.write(passphrase.toUtf8() + "\n");
     }
     process.closeWriteChannel();
-    if (!process.waitForFinished(kPgDumpTimeoutMs)) {
+    if (!waitForFinishedWithCancel(process, kPgDumpTimeoutMs, cancelRequested)) {
         process.kill();
         process.waitForFinished(kKillWaitMs);
         if (error)
-            *error = "openssl не завершился за 60 секунд и был остановлен";
+            *error = cancelRequested && cancelRequested->load()
+                ? "Операция отменена пользователем"
+                : "openssl не завершился за 60 секунд и был остановлен";
         return false;
     }
     QString stderrText = process.readAllStandardError();
@@ -87,6 +92,23 @@ bool runOpenssl(const QStringList &args, const QString &passphrase, QString *err
     return true;
 }
 
+// Ожидает завершения процесса, периодически проверяя флаг отмены.
+bool waitForFinishedWithCancel(QProcess &process, int timeoutMs, std::atomic<bool> *cancelRequested)
+{
+    if (!cancelRequested)
+        return process.waitForFinished(timeoutMs);
+    const int kPollIntervalMs = 200;
+    int elapsedMs = 0;
+    while (elapsedMs < timeoutMs) {
+        if (process.waitForFinished(qMin(kPollIntervalMs, timeoutMs - elapsedMs)))
+            return true;
+        elapsedMs += kPollIntervalMs;
+        if (cancelRequested->load())
+            return false;
+    }
+    return false;
+}
+
 bool isEncryptedBackup(const QString &path)
 {
     QFile f(path);
@@ -97,7 +119,8 @@ bool isEncryptedBackup(const QString &path)
 
 // Шифрует plain-файл в файл с маркером POCENC1 + шифротекстом AES-256-CBC.
 bool encryptBackupFile(const QString &plainPath, const QString &outPath,
-                       const QString &passphrase, QString *error)
+                       const QString &passphrase, QString *error,
+                       std::atomic<bool> *cancelRequested)
 {
     QTemporaryFile cipherFile("enc-XXXXXX.bin");
     if (!cipherFile.open()) {
@@ -110,7 +133,7 @@ bool encryptBackupFile(const QString &plainPath, const QString &outPath,
 
     if (!runOpenssl({"enc", "-aes-256-cbc", "-pbkdf2", "-iter", "100000",
                      "-salt", "-pass", "stdin",
-                     "-in", plainPath, "-out", cipherPath}, passphrase, error))
+                     "-in", plainPath, "-out", cipherPath}, passphrase, error, cancelRequested))
         return false;
 
     QFile in(cipherPath);
@@ -144,7 +167,8 @@ bool encryptBackupFile(const QString &plainPath, const QString &outPath,
 // Подготавливает SQL-файл для psql: расшифровывает бэкап (если он с маркером)
 // или копирует как есть (обратная совместимость с незашифрованными дампами).
 bool decryptBackupFile(const QString &inPath, const QString &outPath,
-                       const QString &passphrase, QString *error)
+                       const QString &passphrase, QString *error,
+                       std::atomic<bool> *cancelRequested)
 {
     if (!isEncryptedBackup(inPath)) {
         QFile::remove(outPath);
@@ -182,7 +206,7 @@ bool decryptBackupFile(const QString &inPath, const QString &outPath,
     QFile::remove(outPath);
     return runOpenssl({"enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "100000",
                        "-pass", "stdin",
-                       "-in", bodyFile.fileName(), "-out", outPath}, passphrase, error);
+                       "-in", bodyFile.fileName(), "-out", outPath}, passphrase, error, cancelRequested);
 }
 
 QString escapeSqlLiteral(const QString &value)
@@ -227,10 +251,16 @@ QString formatSqlValue(const QVariant &val)
 } // namespace
 
 BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, const QString &filePath,
-                                                         const QString &connectionPassword, const QString &passphrase)
+                                                         const QString &connectionPassword, const QString &passphrase,
+                                                         std::atomic<bool> *cancelRequested)
 {
     BackupResult result;
     result.filePath = filePath;
+
+    if (cancelRequested && cancelRequested->load()) {
+        result.error = "Операция отменена пользователем";
+        return result;
+    }
 
     QString host = db.hostName();
     QString port = QString::number(db.port());
@@ -266,11 +296,15 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
     process.setEnvironment(env);
     process.start("pg_dump", args);
 
-    if (!process.waitForFinished(kPgDumpTimeoutMs)) {
+    if (!waitForFinishedWithCancel(process, kPgDumpTimeoutMs, cancelRequested)) {
         process.kill();
         process.waitForFinished(kKillWaitMs);
+        if (cancelRequested && cancelRequested->load()) {
+            result.error = "Операция отменена пользователем";
+            return result;
+        }
         result.error = "pg_dump не завершился за 60 секунд, выполнен fallback-дамп";
-        if (createFallbackBackup(db, plainPath, dbname, &result.error))
+        if (createFallbackBackup(db, plainPath, dbname, &result.error, cancelRequested))
             result.method = "fallback";
         else
             return result;
@@ -281,7 +315,7 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
             result.error = QString("pg_dump завершился с ошибкой (код %1):\n%2")
                                .arg(exitCode)
                                .arg(error.left(2000));
-            if (createFallbackBackup(db, plainPath, dbname, &result.error))
+            if (createFallbackBackup(db, plainPath, dbname, &result.error, cancelRequested))
                 result.method = "fallback";
             else
                 return result;
@@ -293,7 +327,7 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
     QString finalizeError;
     bool finalized = passphrase.isEmpty()
         ? (QFile::remove(filePath), QFile::copy(plainPath, filePath))
-        : encryptBackupFile(plainPath, filePath, passphrase, &finalizeError);
+        : encryptBackupFile(plainPath, filePath, passphrase, &finalizeError, cancelRequested);
     if (!finalized) {
         result.ok = false;
         result.error = finalizeError.isEmpty()
@@ -308,7 +342,8 @@ BackupManager::BackupResult BackupManager::createBackup(const QSqlDatabase &db, 
     return result;
 }
 
-bool BackupManager::createFallbackBackup(const QSqlDatabase &db, const QString &filePath, const QString &dbname, QString *error)
+bool BackupManager::createFallbackBackup(const QSqlDatabase &db, const QString &filePath, const QString &dbname,
+                                         QString *error, std::atomic<bool> *cancelRequested)
 {
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -322,6 +357,8 @@ bool BackupManager::createFallbackBackup(const QSqlDatabase &db, const QString &
     out << "-- Резервная копия БД " << dbname << "\n";
     out << "-- Создана: " << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n";
     out << "-- Восстановление: psql -U <user> -d <dbname> -f <file>\n\n";
+
+    auto cancelled = [cancelRequested]() { return cancelRequested && cancelRequested->load(); };
 
     QSqlQuery tableQuery(db);
     if (!tableQuery.exec("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")) {
@@ -361,6 +398,13 @@ bool BackupManager::createFallbackBackup(const QSqlDatabase &db, const QString &
 
     out << "-- 3. Создание таблиц (FK добавляются в конце)\n";
     for (const QString &table : tables) {
+        if (cancelled()) {
+            file.close();
+            QFile::remove(filePath);
+            if (error)
+                *error = "Операция отменена пользователем";
+            return false;
+        }
         QSqlQuery colQuery(db);
         colQuery.prepare("SELECT column_name, data_type, is_nullable, column_default "
                          "FROM information_schema.columns "
@@ -391,6 +435,13 @@ bool BackupManager::createFallbackBackup(const QSqlDatabase &db, const QString &
 
     out << "-- 4. Данные\n";
     for (const QString &table : tables) {
+        if (cancelled()) {
+            file.close();
+            QFile::remove(filePath);
+            if (error)
+                *error = "Операция отменена пользователем";
+            return false;
+        }
         QSqlQuery colQuery(db);
         colQuery.prepare("SELECT column_name FROM information_schema.columns "
                          "WHERE table_schema = 'public' AND table_name = :tbl "
@@ -477,12 +528,19 @@ bool BackupManager::createFallbackBackup(const QSqlDatabase &db, const QString &
 }
 
 bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &filePath,
-                                    const QString &connectionPassword, const QString &passphrase, QString *error)
+                                    const QString &connectionPassword, const QString &passphrase,
+                                    QString *error, std::atomic<bool> *cancelRequested)
 {
     QString host = db.hostName();
     QString port = QString::number(db.port());
     QString dbname = db.databaseName();
     QString user = db.userName();
+
+    if (cancelRequested && cancelRequested->load()) {
+        if (error)
+            *error = "Операция отменена пользователем";
+        return false;
+    }
 
     // Бэкап может быть зашифрован (маркер POCENC1) — расшифровываем во временный файл.
     QTemporaryDir tmpDir;
@@ -492,7 +550,7 @@ bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &fileP
         return false;
     }
     QString sqlPath = tmpDir.filePath("restore.sql");
-    if (!decryptBackupFile(filePath, sqlPath, passphrase, error))
+    if (!decryptBackupFile(filePath, sqlPath, passphrase, error, cancelRequested))
         return false;
 
     QStringList args;
@@ -509,18 +567,24 @@ bool BackupManager::restoreDatabase(const QSqlDatabase &db, const QString &fileP
     process.setEnvironment(env);
     process.start("psql", args);
 
-    if (!process.waitForFinished(kPsqlTimeoutMs)) {
+    if (!waitForFinishedWithCancel(process, kPsqlTimeoutMs, cancelRequested)) {
         process.kill();
         process.waitForFinished(kKillWaitMs);
         if (error) {
-            *error = QString("psql не завершился за 120 секунд и был остановлен.\n"
-                             "Данные могли остаться в прежнем состоянии (restore выполняется "
-                             "в одной транзакции).\n\n"
-                             "Попробуйте восстановить вручную:\n"
-                             "openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass pass:<пароль> "
-                             "-in \"%1\" -out restore.sql\n"
-                             "psql -U %2 -d %3 -f restore.sql")
-                         .arg(filePath, user, dbname);
+            if (cancelRequested && cancelRequested->load()) {
+                *error = "Восстановление отменено пользователем.\n"
+                         "Данные могли остаться в прежнем состоянии (restore выполняется "
+                         "в одной транзакции).";
+            } else {
+                *error = QString("psql не завершился за 120 секунд и был остановлен.\n"
+                                 "Данные могли остаться в прежнем состоянии (restore выполняется "
+                                 "в одной транзакции).\n\n"
+                                 "Попробуйте восстановить вручную:\n"
+                                 "openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -pass pass:<пароль> "
+                                 "-in \"%1\" -out restore.sql\n"
+                                 "psql -U %2 -d %3 -f restore.sql")
+                                 .arg(filePath, user, dbname);
+            }
         }
         return false;
     }

@@ -5,6 +5,8 @@
 #include <QSqlDatabase>
 #include <QString>
 
+#include <atomic>
+
 class BackupManager
 {
 public:
@@ -17,11 +19,17 @@ public:
         qint64 size = 0;
     };
 
+    // cancelRequested — опциональный флаг отмены (проверяется в длинных циклах
+    // и при ожидании pg_dump/psql/openssl). Если запрошена отмена — операция
+    // прерывается с ошибкой. Может быть nullptr.
     static BackupResult createBackup(const QSqlDatabase &db, const QString &filePath,
-                                     const QString &connectionPassword, const QString &passphrase);
-    static bool createFallbackBackup(const QSqlDatabase &db, const QString &filePath, const QString &dbname, QString *error = nullptr);
+                                     const QString &connectionPassword, const QString &passphrase,
+                                     std::atomic<bool> *cancelRequested = nullptr);
+    static bool createFallbackBackup(const QSqlDatabase &db, const QString &filePath, const QString &dbname,
+                                     QString *error = nullptr, std::atomic<bool> *cancelRequested = nullptr);
     static bool restoreDatabase(const QSqlDatabase &db, const QString &filePath,
-                                const QString &connectionPassword, const QString &passphrase, QString *error = nullptr);
+                                const QString &connectionPassword, const QString &passphrase,
+                                QString *error = nullptr, std::atomic<bool> *cancelRequested = nullptr);
 };
 
 Q_DECLARE_METATYPE(BackupManager::BackupResult)

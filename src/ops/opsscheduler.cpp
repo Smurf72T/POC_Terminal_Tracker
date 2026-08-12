@@ -75,7 +75,13 @@ OpsScheduler::~OpsScheduler()
 {
     if (m_backupThread) {
         m_backupThread->quit();
-        m_backupThread->wait();
+        if (!m_backupThread->wait(5000)) {
+            qCWarning(logApp) << "OpsScheduler: не дождались завершения потока за 5 c, запрашиваем отмену";
+            OpsLog::instance().warning("Не дождались завершения потока бэкапа за 5 c — запрошена отмена");
+            m_backupThread->requestInterruption();
+            m_backupWorker->requestCancel();
+            m_backupThread->wait(5000);
+        }
         delete m_backupWorker;
         delete m_backupThread;
         m_backupWorker = nullptr;

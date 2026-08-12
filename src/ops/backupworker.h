@@ -5,6 +5,8 @@
 #include <QSqlDatabase>
 #include <QString>
 
+#include <atomic>
+
 #include "ops/backupmanager.h"
 
 class ConnectionPool;
@@ -31,6 +33,10 @@ public:
     // Должен вызываться до moveToThread().
     void setConnectionParams(const ConnectionParams &params);
 
+    // Запрашивает отмену текущей операции (проверяется в длинных циклах
+    // createFallbackBackup/restoreDatabase). Потокобезопасно.
+    void requestCancel();
+
     BackupWorker();
     ~BackupWorker() override;
 
@@ -48,6 +54,7 @@ private:
 
     ConnectionParams m_params;
     ConnectionPool *m_pool = nullptr;
+    std::atomic<bool> m_cancelRequested{false};
 };
 
 #endif // BACKUPWORKER_H
