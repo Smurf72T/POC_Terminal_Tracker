@@ -55,6 +55,26 @@ static QMap<QString, QString> loadEnvFile(const QString &filePath)
     return env;
 }
 
+// На Linux предупреждает, если .env доступен на запись группе или остальным
+// (права 0644/0664): файл содержит секреты (пароль БД/кодовая фраза бэкапа).
+void warnOnInsecureEnvPermissions(const QString &filePath)
+{
+#ifdef Q_OS_LINUX
+    QFileInfo info(filePath);
+    if (!info.exists())
+        return;
+    const QFileInfo::Permissions perms = info.permissions();
+    const bool groupWritable = perms & QFileInfo::WriteGroup;
+    const bool otherWritable = perms & QFileInfo::WriteOther;
+    if (groupWritable || otherWritable) {
+        qCWarning(logApp) << "Файл .env (" << filePath << ") содержит секреты, но доступен"
+                          << "на запись другим пользователям. Выполните: chmod 600" << filePath;
+    }
+#else
+    Q_UNUSED(filePath);
+#endif
+}
+
 DatabaseManager& DatabaseManager::instance()
 {
     static DatabaseManager instance;
@@ -120,10 +140,17 @@ bool DatabaseManager::openConnection()
     };
 
     QMap<QString, QString> env;
+    QString loadedEnvPath;
     for (const QString &candidate : envCandidates) {
-        env = loadEnvFile(candidate);
-        if (!env.isEmpty()) break;
+        QMap<QString, QString> candidateEnv = loadEnvFile(candidate);
+        if (!candidateEnv.isEmpty()) {
+            env = candidateEnv;
+            loadedEnvPath = candidate;
+            break;
+        }
     }
+    if (!loadedEnvPath.isEmpty())
+        warnOnInsecureEnvPermissions(loadedEnvPath);
 
     QJsonObject dbConfig = m_config["database"].toObject();
 

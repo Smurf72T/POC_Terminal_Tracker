@@ -141,6 +141,43 @@ static int runHealthCheck(bool applyMigrations)
     return 0;
 }
 
+static int fixEnvPermissions()
+{
+    // Находит первый существующий .env (тот же порядок, что и DatabaseManager).
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QFileInfo cfgInfo(appConfigPath());
+    const QStringList candidates = {
+        appDir + "/.env",
+        appDir + "/../.env",
+        cfgInfo.absolutePath() + "/.env",
+        cfgInfo.absolutePath() + "/../../.env"
+    };
+    QString found;
+    for (const QString &candidate : candidates) {
+        if (QFileInfo::exists(candidate)) {
+            found = candidate;
+            break;
+        }
+    }
+
+#ifdef Q_OS_LINUX
+    if (found.isEmpty()) {
+        std::printf("ENV_ERROR: .env не найден\n");
+        return 1;
+    }
+    QFile envFile(found);
+    if (envFile.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+        std::printf("ENV_OK: права на %s установлены 0600\n", found.toUtf8().constData());
+        return 0;
+    }
+    std::printf("ENV_ERROR: не удалось изменить права на %s\n", found.toUtf8().constData());
+    return 1;
+#else
+    std::printf("ENV_SKIP: --fix-env-permissions работает только на Linux\n");
+    return 0;
+#endif
+}
+
 static void printUsage(const char *appName)
 {
     std::printf("POC Terminal Tracker\n");
@@ -148,6 +185,7 @@ static void printUsage(const char *appName)
     std::printf("  --check-db   проверка подключения к БД и применённых миграций (без GUI, read-only)\n");
     std::printf("  --check-db --apply-migrations   применить миграции и проверить БД (не read-only)\n");
     std::printf("  --version    вывод версии приложения\n");
+    std::printf("  --fix-env-permissions   установить права 0600 на .env (Linux)\n");
     std::printf("  -h, --help   этот экран\n");
 }
 
@@ -166,6 +204,9 @@ int main(int argc, char *argv[])
 
     if (args.contains("--check-db"))
         return runHealthCheck(args.contains("--apply-migrations"));
+
+    if (args.contains("--fix-env-permissions"))
+        return fixEnvPermissions();
 
     if (args.contains("-h") || args.contains("--help")) {
         printUsage(appName.toUtf8().constData());
