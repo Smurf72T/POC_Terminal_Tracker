@@ -48,7 +48,7 @@ QString findOpenssl()
     return QString();
 }
 
-bool runOpenssl(const QStringList &args, QString *error)
+bool runOpenssl(const QStringList &args, const QString &passphrase, QString *error)
 {
     static const QString kOpenssl = findOpenssl();
     if (kOpenssl.isEmpty()) {
@@ -58,6 +58,17 @@ bool runOpenssl(const QStringList &args, QString *error)
     }
     QProcess process;
     process.start(kOpenssl, args);
+    if (!process.waitForStarted(kKillWaitMs)) {
+        if (error)
+            *error = "Не удалось запустить openssl: " + process.errorString();
+        return false;
+    }
+    // Пароль передаём через stdin (аргумент -pass stdin), чтобы он не был виден
+    // в списке аргументов процесса (/proc/<pid>/cmdline).
+    if (!passphrase.isEmpty()) {
+        process.write(passphrase.toUtf8() + "\n");
+    }
+    process.closeWriteChannel();
     if (!process.waitForFinished(kPgDumpTimeoutMs)) {
         process.kill();
         process.waitForFinished(kKillWaitMs);
@@ -98,8 +109,8 @@ bool encryptBackupFile(const QString &plainPath, const QString &outPath,
     cipherFile.close();
 
     if (!runOpenssl({"enc", "-aes-256-cbc", "-pbkdf2", "-iter", "100000",
-                     "-salt", "-pass", "pass:" + passphrase,
-                     "-in", plainPath, "-out", cipherPath}, error))
+                     "-salt", "-pass", "stdin",
+                     "-in", plainPath, "-out", cipherPath}, passphrase, error))
         return false;
 
     QFile in(cipherPath);
@@ -170,8 +181,8 @@ bool decryptBackupFile(const QString &inPath, const QString &outPath,
 
     QFile::remove(outPath);
     return runOpenssl({"enc", "-d", "-aes-256-cbc", "-pbkdf2", "-iter", "100000",
-                       "-pass", "pass:" + passphrase,
-                       "-in", bodyFile.fileName(), "-out", outPath}, error);
+                       "-pass", "stdin",
+                       "-in", bodyFile.fileName(), "-out", outPath}, passphrase, error);
 }
 
 QString escapeSqlLiteral(const QString &value)
