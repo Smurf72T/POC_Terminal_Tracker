@@ -384,8 +384,7 @@ void ReceiptForm::on_btnPrint_clicked()
 
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
-        QString modelIdx = rowsModel->data(rowsModel->index(i, 1)).toString();
-        int modelId = modelIdx.toInt();
+        int modelId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
         QString modelName;
         for (const auto &m : m_models) {
             if (m.first == modelId) { modelName = m.second; break; }
