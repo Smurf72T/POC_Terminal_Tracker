@@ -32,6 +32,9 @@ UpdateManager::UpdateManager(const QJsonObject &config, QObject *parent)
     }
     m_checkOnStartup = update["check_on_startup"].toBool(true);
     m_currentVersion = config["application"].toObject()["version"].toString("1.0.0");
+    m_timeoutMs = update["timeout_ms"].toInt(30000);
+    if (m_timeoutMs <= 0)
+        m_timeoutMs = 30000;
 
     // Публичный ключ сервера в формате SHA-256 (base64, SubjectPublicKeyInfo).
     // Если задан — сертификат обновляющегося сервера должен ему совпадать,
@@ -116,6 +119,7 @@ void UpdateManager::checkForUpdates()
                          QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QString("POC_Terminal_Tracker/%1").arg(m_currentVersion));
+    request.setTransferTimeout(m_timeoutMs);
 
     QNetworkReply *reply = m_nam.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { handleManifest(reply); });
@@ -126,7 +130,13 @@ void UpdateManager::handleManifest(QNetworkReply *reply)
     reply->deleteLater();
 
     if (reply->error() != QNetworkReply::NoError) {
-        QString msg = QString("Не удалось проверить обновления: %1").arg(reply->errorString());
+        QString msg;
+        if (reply->error() == QNetworkReply::OperationCanceledError
+            || reply->error() == QNetworkReply::TimeoutError) {
+            msg = QString("Таймаут проверки обновлений: сервер не ответил за %1 с.").arg(m_timeoutMs / 1000);
+        } else {
+            msg = QString("Не удалось проверить обновления: %1").arg(reply->errorString());
+        }
         OpsLog::instance().warning(msg);
         emit checkFailed(msg);
         return;
@@ -203,6 +213,7 @@ void UpdateManager::downloadUpdate(const QString &url)
                          QNetworkRequest::NoLessSafeRedirectPolicy);
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QString("POC_Terminal_Tracker/%1").arg(m_currentVersion));
+    request.setTransferTimeout(m_timeoutMs);
 
     m_downloadReply = m_nam.get(request);
 
@@ -215,7 +226,13 @@ void UpdateManager::downloadUpdate(const QString &url)
         reply->deleteLater();
 
         if (reply->error() != QNetworkReply::NoError) {
-            QString msg = "Ошибка скачивания: " + reply->errorString();
+            QString msg;
+            if (reply->error() == QNetworkReply::OperationCanceledError
+                || reply->error() == QNetworkReply::TimeoutError) {
+                msg = QString("Таймаут скачивания обновления: сервер не ответил за %1 с.").arg(m_timeoutMs / 1000);
+            } else {
+                msg = "Ошибка скачивания: " + reply->errorString();
+            }
             OpsLog::instance().error(msg);
             emit downloadFailed(msg);
             return;

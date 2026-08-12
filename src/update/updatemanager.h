@@ -52,6 +52,7 @@ private:
     QString m_currentVersion = "1.0.0";
     QString m_pinnedSha256;
     QString m_expectedSha256;
+    int m_timeoutMs = 30000;
     QNetworkReply *m_downloadReply = nullptr;
 };
 

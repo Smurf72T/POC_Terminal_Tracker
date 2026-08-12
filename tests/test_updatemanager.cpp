@@ -1,5 +1,13 @@
 #include <QTest>
 #include <QString>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QSignalSpy>
+#include <QElapsedTimer>
+#include <QUrl>
+#include <QCoreApplication>
 
 #include "update/updatemanager.h"
 
@@ -12,6 +20,7 @@ private slots:
     void insecureUrlsRejected();
     void localHttpAllowed();
     void emptyUrlRejected();
+    void hangingServerTimesOut();
 };
 
 void TestUpdateManager::httpsUrlsAccepted()
@@ -42,6 +51,46 @@ void TestUpdateManager::localHttpAllowed()
 void TestUpdateManager::emptyUrlRejected()
 {
     QVERIFY(!UpdateManager::isSecureUpdateUrl(QString()));
+}
+
+void TestUpdateManager::hangingServerTimesOut()
+{
+    // Сервер принимает соединение и не отвечает — проверяем, что checkForUpdates
+    // завершается ошибкой таймаута в пределах заданного таймаута.
+    QTcpServer server;
+    QVERIFY2(server.listen(QHostAddress::LocalHost, 0), qPrintable(server.errorString()));
+    QList<QTcpSocket*> openSockets;
+    QObject::connect(&server, &QTcpServer::newConnection, [&server, &openSockets]() {
+        // Принимаем соединение, но не отвечаем — клиент должен упереться в таймаут.
+        while (server.hasPendingConnections()) {
+            QTcpSocket *socket = server.nextPendingConnection();
+            openSockets.append(socket);
+        }
+    });
+
+    QJsonObject config;
+    config["application"] = QJsonObject{{"version", "1.0.0"}};
+    config["update"] = QJsonObject{
+        {"url", QString("http://localhost:%1/update.json").arg(server.serverPort())},
+        {"timeout_ms", 500}
+    };
+
+    UpdateManager um(config);
+    QSignalSpy failedSpy(&um, &UpdateManager::checkFailed);
+
+    QElapsedTimer timer;
+    timer.start();
+    um.checkForUpdates();
+
+    // Ждём сигнал checkFailed (таймаут) в пределах разумного времени.
+    QTRY_VERIFY_WITH_TIMEOUT(failedSpy.count() > 0, 5000);
+
+    QVERIFY(timer.elapsed() < 4000);
+    QVERIFY2(failedSpy.first().at(0).toString().contains("Таймаут", Qt::CaseInsensitive),
+             qPrintable(failedSpy.first().at(0).toString()));
+    QCoreApplication::processEvents();
+    qDeleteAll(openSockets);
+    server.close();
 }
 
 QTEST_GUILESS_MAIN(TestUpdateManager)
