@@ -30,7 +30,7 @@ public:
     // Миграции БД
     bool runMigrations(const QString &migrationsDir = "sql/migrations/") override;
     QStringList pendingMigrations() override;
-    QSqlDatabase& getDatabase() override;
+    const QSqlDatabase &getDatabase() const override;
     QJsonObject configObject() const override;
     QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true) override;
     bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc) override;

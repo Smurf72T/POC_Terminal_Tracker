@@ -239,7 +239,7 @@ void DatabaseManager::close()
     m_initialized = false;
 }
 
-QSqlDatabase& DatabaseManager::getDatabase()
+const QSqlDatabase &DatabaseManager::getDatabase() const
 {
     return m_database;
 }

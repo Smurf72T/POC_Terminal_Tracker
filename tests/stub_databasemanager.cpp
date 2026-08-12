@@ -18,7 +18,7 @@ public:
 
     bool runMigrations(const QString &) override { return true; }
     QStringList pendingMigrations() override { return {}; }
-    QSqlDatabase &getDatabase() override
+    const QSqlDatabase &getDatabase() const override
     {
         static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "stub");
         return db;

@@ -25,7 +25,7 @@ public:
     // Миграции БД
     virtual bool runMigrations(const QString &migrationsDir) = 0;
     virtual QStringList pendingMigrations() = 0;
-    virtual QSqlDatabase &getDatabase() = 0;
+    virtual const QSqlDatabase &getDatabase() const = 0;
     virtual QJsonObject configObject() const = 0;
     virtual QSqlQuery executeQuery(const QString &query, bool showErrorMessage) = 0;
     virtual bool executeTransaction(const std::function<bool(QSqlDatabase &)> &transactionFunc) = 0;
