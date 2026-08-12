@@ -58,6 +58,36 @@ static QString appConfigPath()
     return candidates.last();
 }
 
+// Ищет значение ключа в .env рядом с exe, рядом с config.json и в корне проекта —
+// тем же порядком, что и DatabaseManager (чтобы предупреждение не было ложным).
+static QString envValueFromDotEnv(const QString &configPath, const QString &key)
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QFileInfo cfgInfo(configPath);
+    const QStringList candidates = {
+        appDir + "/.env",
+        appDir + "/../.env",
+        cfgInfo.absolutePath() + "/.env",
+        cfgInfo.absolutePath() + "/../../.env"
+    };
+    for (const QString &candidate : candidates) {
+        QFile f(candidate);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+            continue;
+        while (!f.atEnd()) {
+            QString line = QString::fromUtf8(f.readLine()).trimmed();
+            if (line.isEmpty() || line.startsWith('#'))
+                continue;
+            const int eq = line.indexOf('=');
+            if (eq <= 0)
+                continue;
+            if (line.left(eq).trimmed() == key)
+                return line.mid(eq + 1).trimmed();
+        }
+    }
+    return QString();
+}
+
 static int runHealthCheck()
 {
     // Без GUI-диалогов: вывод результата в stdout, код возврата 0/1/2.
@@ -130,7 +160,10 @@ int main(int argc, char *argv[])
         if (cfgFile.open(QIODevice::ReadOnly)) {
             QJsonDocument cfgDoc = QJsonDocument::fromJson(cfgFile.readAll());
             const QJsonObject dbCfg = cfgDoc.object()["database"].toObject();
-            if (dbCfg["password"].toString().isEmpty() && qEnvironmentVariableIsEmpty("POC_DB_PASSWORD"))
+            const QString envPassword = envValueFromDotEnv(appConfigPath(), "POC_DB_PASSWORD");
+            if (dbCfg["password"].toString().isEmpty()
+                && qEnvironmentVariableIsEmpty("POC_DB_PASSWORD")
+                && envPassword.isEmpty())
                 qCWarning(logApp) << "config.json: database.password пуст и POC_DB_PASSWORD не задан — "
                                   << "подключение к БД, скорее всего, не удастся. Настройте .env или config.json";
         }
