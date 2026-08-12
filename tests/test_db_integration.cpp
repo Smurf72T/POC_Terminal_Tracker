@@ -241,6 +241,18 @@ bool TestDbIntegration::applyMigrations()
             return false;
         }
     }
+
+    // Миграции больше не создают дефолтного admin (пароль не хранится в репозитории,
+    // P0-3). Для тестов ролевой политики seed'им admin напрямую.
+    QSqlQuery seedAdmin(m_testDb);
+    seedAdmin.prepare("INSERT INTO tbl_users (username, display_name, password_hash, role, is_active) "
+                      "VALUES ('admin', 'Администратор', 'test', 'admin', TRUE) "
+                      "ON CONFLICT (username) DO NOTHING");
+    if (!seedAdmin.exec()) {
+        qWarning() << "Не удалось создать admin для тестов:" << seedAdmin.lastError().text();
+        return false;
+    }
+
     return true;
 }
 

@@ -61,6 +61,9 @@ private:
     void showError(const QString& message);
     bool ensureMigrationsTable();
     bool applyPendingMigrations();
+    void seedAdminAccount();
+    static QString generateRandomPassword();
+    static void printOneTimeAdminPassword(const QString &password);
 
     QSqlDatabase m_database;
     QJsonObject m_config;

@@ -1,5 +1,6 @@
 #include "databasemanager.h"
 #include "utils/logging.h"
+#include "utils/password_utils.h"
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
@@ -14,6 +15,8 @@
 #include <QStringConverter>
 #include <QTextStream>
 #include <QThread>
+#include <QRandomGenerator>
+#include <cstdio>
 
 namespace {
 
@@ -166,6 +169,8 @@ bool DatabaseManager::initialize(const QString& configPath)
         close();
         return false;
     }
+
+    seedAdminAccount();
 
     listenForDataChanges();
 
@@ -569,4 +574,69 @@ bool DatabaseManager::applyPendingMigrations()
     }
 
     return true;
+}
+
+void DatabaseManager::seedAdminAccount()
+{
+    // Дефолтная учётная запись admin не содержится в миграциях (пароль не должен
+    // храниться в репозитории). Здесь после применения миграций создаём её со
+    // случайным паролем и выводим пароль один раз. must_change_password=TRUE —
+    // пароль придётся сменить при первом входе.
+    QSqlQuery exists(m_database);
+    exists.prepare("SELECT password_hash FROM tbl_users WHERE username = 'admin'");
+    if (exists.exec() && exists.next()) {
+        QString hash = exists.value(0).toString().trimmed();
+        if (hash.isEmpty()) {
+            const QString password = generateRandomPassword();
+            QSqlQuery upd(m_database);
+            upd.prepare("UPDATE tbl_users SET password_hash = :h, must_change_password = TRUE "
+                        "WHERE username = 'admin'");
+            upd.bindValue(":h", hashPassword(password));
+            if (upd.exec()) {
+                qCInfo(logDB) << "Учётной записи admin задан новый случайный пароль";
+                printOneTimeAdminPassword(password);
+            } else {
+                qCCritical(logDB) << "Не удалось установить пароль admin:"
+                                  << upd.lastError().text();
+            }
+        }
+        return;
+    }
+
+    const QString password = generateRandomPassword();
+    QSqlQuery ins(m_database);
+    ins.prepare("INSERT INTO tbl_users (username, display_name, password_hash, role, is_active, must_change_password) "
+                "VALUES ('admin', 'Администратор', :h, 'admin', TRUE, TRUE)");
+    ins.bindValue(":h", hashPassword(password));
+    if (ins.exec()) {
+        qCInfo(logDB) << "Создана учётная запись admin со случайным паролем";
+        printOneTimeAdminPassword(password);
+    } else {
+        qCCritical(logDB) << "Не удалось создать учётную запись admin:"
+                          << ins.lastError().text();
+    }
+}
+
+QString DatabaseManager::generateRandomPassword()
+{
+    const QString chars =
+        "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    QString password;
+    password.reserve(16);
+    QRandomGenerator *rng = QRandomGenerator::global();
+    for (int i = 0; i < 16; ++i)
+        password += chars.at(rng->bounded(chars.size()));
+    return password;
+}
+
+void DatabaseManager::printOneTimeAdminPassword(const QString &password)
+{
+    // Печатаем пароль один раз в stdout (--check-db / первый запуск).
+    std::printf("\n============================================================\n"
+                "Создана учётная запись admin со СЛУЧАЙНЫМ паролем.\n"
+                "Одноразовый пароль (смените его при первом входе):\n\n"
+                "    %s\n\n"
+                "============================================================\n\n",
+                password.toUtf8().constData());
+    std::fflush(stdout);
 }

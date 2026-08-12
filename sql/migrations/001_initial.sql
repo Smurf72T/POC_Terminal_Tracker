@@ -14,12 +14,9 @@ CREATE TABLE IF NOT EXISTS tbl_users (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Дефолтный admin (пароль будет сброшен при первом входе)
-INSERT INTO tbl_users (username, display_name, password_hash, role, is_active)
-VALUES ('admin', 'Администратор',
-        'a1b2c3d4e5f6a7b8e4e0e1680400b99f8d57de3bf3abec3f6c9ad99440eae0721df5d3fca66a2597',
-        'admin', TRUE)
-ON CONFLICT (username) DO NOTHING;
+-- ВНИМАНИЕ: дефолтная учётная запись admin НЕ создаётся здесь (и пароль не
+-- хранится в репозитории). Учётка seed'ится приложением после применения
+-- миграций со случайным паролем, который выводится один раз (см. DatabaseManager).
 
 -- Таблица аудита
 CREATE TABLE IF NOT EXISTS tbl_audit_log (
