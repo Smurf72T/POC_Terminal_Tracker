@@ -89,8 +89,28 @@ bool DatabaseManager::initialize(const QString& configPath)
         return false;
     }
 
+    if (!openConnection()) {
+        return false;
+    }
+
+    if (!runMigrations()) {
+        showError("Не удалось применить миграции базы данных: " + m_database.lastError().text());
+        close();
+        return false;
+    }
+
+    seedAdminAccount();
+
+    listenForDataChanges();
+
+    m_initialized = true;
+    return true;
+}
+
+bool DatabaseManager::openConnection()
+{
     // Ищем .env: рядом с executable, затем рядом с config.json, затем в корне проекта
-    QFileInfo configInfo(configPath);
+    QFileInfo configInfo(m_configPath);
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList envCandidates = {
         appDir + "/.env",
@@ -164,17 +184,34 @@ bool DatabaseManager::initialize(const QString& configPath)
         }
     }
 
-    if (!runMigrations()) {
-        showError("Не удалось применить миграции базы данных: " + m_database.lastError().text());
-        close();
+    return true;
+}
+
+bool DatabaseManager::checkConnection(const QString &configPath, QString *error)
+{
+    if (m_initialized) {
+        return true;
+    }
+
+    if (!loadConfig(configPath)) {
+        if (error)
+            *error = "Не удалось загрузить конфигурационный файл";
         return false;
     }
 
-    seedAdminAccount();
+    if (!openConnection()) {
+        if (error)
+            *error = m_database.lastError().text();
+        return false;
+    }
 
-    listenForDataChanges();
-
-    m_initialized = true;
+    QSqlQuery q(m_database);
+    if (!q.exec("SELECT 1") || !q.next()) {
+        if (error)
+            *error = q.lastError().text();
+        close();
+        return false;
+    }
     return true;
 }
 
@@ -219,6 +256,7 @@ bool DatabaseManager::loadConfig(const QString& configPath)
     }
 
     m_config = doc.object();
+    m_configPath = configPath;
     return true;
 }
 
@@ -483,6 +521,50 @@ QStringList DatabaseManager::pendingMigrations()
         if (!applied.contains(it.fileName())) {
             pending.append(it.filePath());
         }
+    }
+    pending.sort();
+    return pending;
+}
+
+QStringList DatabaseManager::pendingMigrationsReadOnly() const
+{
+    QStringList pending;
+
+    // НЕ создаём schema_migrations (read-only диагностика): если таблицы нет —
+    // БД свежая, все миграции считаются ожидающими.
+    QSet<QString> applied;
+    QSqlQuery probe(m_database);
+    if (probe.exec("SELECT to_regclass('public.schema_migrations')") && probe.next()) {
+        if (!probe.value(0).isNull()) {
+            QSqlQuery q(m_database);
+            if (q.exec("SELECT version FROM schema_migrations ORDER BY version")) {
+                while (q.next())
+                    applied.insert(q.value(0).toString());
+            }
+        }
+    }
+
+    QString migrationsDir;
+    QStringList candidates = {
+        QCoreApplication::applicationDirPath() + "/sql/migrations/",
+        QCoreApplication::applicationDirPath() + "/../sql/migrations/",
+        QCoreApplication::applicationDirPath() + "/../../sql/migrations/"
+    };
+    for (const QString &c : candidates) {
+        QDir d(c);
+        if (d.exists()) { migrationsDir = d.absolutePath(); break; }
+    }
+    if (migrationsDir.isEmpty()) {
+        qCInfo(logMigration) << "Директория миграций не найдена";
+        return pending;
+    }
+
+    QDirIterator it(migrationsDir, QStringList() << "*.sql", QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        it.next();
+        QString fileName = it.fileName();
+        if (!applied.contains(fileName))
+            pending.append(it.filePath());
     }
     pending.sort();
     return pending;

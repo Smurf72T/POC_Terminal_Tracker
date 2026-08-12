@@ -27,9 +27,19 @@ public:
     void close() override;
     void listenForDataChanges() override;
 
+    // Проверка подключения без применения миграций (read-only диагностика):
+    // загружает конфиг, открывает соединение, выполняет SELECT 1.
+    // При успехе соединение остаётся открытым (для последующего read-only
+    // запроса pendingMigrations). Ошибка — в *error.
+    bool checkConnection(const QString &configPath, QString *error);
+
     // Миграции БД
     bool runMigrations(const QString &migrationsDir = "sql/migrations/") override;
     QStringList pendingMigrations() override;
+
+    // Read-only версия pendingMigrations: НЕ создаёт schema_migrations.
+    // Если таблицы нет — все .sql-файлы считаются ожидающими (свежая БД).
+    QStringList pendingMigrationsReadOnly() const;
     const QSqlDatabase &getDatabase() const override;
     QJsonObject configObject() const override;
     QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true) override;
@@ -59,6 +69,7 @@ private:
 
     bool loadConfig(const QString& configPath);
     void showError(const QString& message);
+    bool openConnection();
     bool ensureMigrationsTable();
     bool applyPendingMigrations();
     void seedAdminAccount();
@@ -67,6 +78,7 @@ private:
 
     QSqlDatabase m_database;
     QJsonObject m_config;
+    QString m_configPath;
     bool m_initialized = false;
     bool m_listening = false;
     QString m_currentUser = "system";

@@ -88,13 +88,36 @@ static QString envValueFromDotEnv(const QString &configPath, const QString &key)
     return QString();
 }
 
-static int runHealthCheck()
+static int runHealthCheck(bool applyMigrations)
 {
     // Без GUI-диалогов: вывод результата в stdout, код возврата 0/1/2.
     DatabaseManager::setSuppressDialogs(true);
 
-    if (!DatabaseManager::instance().initialize(appConfigPath())) {
-        std::printf("DB_ERROR: не удалось подключиться к базе данных или применить миграции\n");
+    if (applyMigrations) {
+        // Полная проверка: применяет миграции и проверяет подключение (--check-db --apply-migrations).
+        if (!DatabaseManager::instance().initialize(appConfigPath())) {
+            std::printf("DB_ERROR: не удалось подключиться к базе данных или применить миграции\n");
+            DatabaseManager::instance().close();
+            return 1;
+        }
+
+        QSqlQuery q(DatabaseManager::instance().getDatabase());
+        if (!q.exec("SELECT 1") || !q.next()) {
+            std::printf("DB_ERROR: %s\n", q.lastError().text().toUtf8().constData());
+            DatabaseManager::instance().close();
+            return 1;
+        }
+
+        std::printf("DB_OK\n");
+        DatabaseManager::instance().close();
+        return 0;
+    }
+
+    // Read-only проверка: открываем соединение и выполняем SELECT 1 без миграций,
+    // чтобы диагностика не изменяла схему БД (не создавались таблицы).
+    QString error;
+    if (!DatabaseManager::instance().checkConnection(appConfigPath(), &error)) {
+        std::printf("DB_ERROR: %s\n", error.toUtf8().constData());
         DatabaseManager::instance().close();
         return 1;
     }
@@ -106,7 +129,7 @@ static int runHealthCheck()
         return 1;
     }
 
-    QStringList pending = DatabaseManager::instance().pendingMigrations();
+    QStringList pending = DatabaseManager::instance().pendingMigrationsReadOnly();
     if (!pending.isEmpty()) {
         std::printf("DB_WARN: не применены миграции: %s\n", pending.join(", ").toUtf8().constData());
         DatabaseManager::instance().close();
@@ -122,7 +145,8 @@ static void printUsage(const char *appName)
 {
     std::printf("POC Terminal Tracker\n");
     std::printf("Использование: %s [опции]\n", appName);
-    std::printf("  --check-db   проверка подключения к БД и применённых миграций (без GUI)\n");
+    std::printf("  --check-db   проверка подключения к БД и применённых миграций (без GUI, read-only)\n");
+    std::printf("  --check-db --apply-migrations   применить миграции и проверить БД (не read-only)\n");
     std::printf("  --version    вывод версии приложения\n");
     std::printf("  -h, --help   этот экран\n");
 }
@@ -141,7 +165,7 @@ int main(int argc, char *argv[])
     const QString appName = args.isEmpty() ? "POC Terminal Tracker" : QFileInfo(args[0]).fileName();
 
     if (args.contains("--check-db"))
-        return runHealthCheck();
+        return runHealthCheck(args.contains("--apply-migrations"));
 
     if (args.contains("-h") || args.contains("--help")) {
         printUsage(appName.toUtf8().constData());
@@ -215,3 +239,4 @@ int main(int argc, char *argv[])
 
     return a.exec();
 }
+
