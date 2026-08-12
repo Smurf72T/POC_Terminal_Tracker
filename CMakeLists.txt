@@ -292,6 +292,14 @@ if(BUILD_TESTS)
     target_link_libraries(test_circuitbreaker PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_circuitbreaker COMMAND test_circuitbreaker)
 
+    add_executable(test_reportexporter tests/test_reportexporter.cpp
+            src/utils/reportexporter.cpp)
+    target_include_directories(test_reportexporter PRIVATE
+            ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/libs/QXlsx/QXlsx/header)
+    target_link_libraries(test_reportexporter PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets
+            Qt6::Sql Qt6::PrintSupport QXlsx::QXlsx)
+    add_test(NAME test_reportexporter COMMAND test_reportexporter)
+
     if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers")
         foreach(_sql_driver_pair "test_db_integration;qsqlpsql.dll" "test_concurrency;qsqlpsql.dll" "test_connectionpool;qsqlite.dll")
             list(GET _sql_driver_pair 0 _test)
@@ -311,7 +319,7 @@ if(BUILD_TESTS)
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
     foreach(_test test_password_utils test_validator test_update_utils test_updatemanager
             test_opsscheduler test_db_integration test_concurrency
-            test_ui_components test_connectionpool test_circuitbreaker)
+            test_ui_components test_connectionpool test_circuitbreaker test_reportexporter)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
             if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")
                 add_custom_command(TARGET ${_test} POST_BUILD

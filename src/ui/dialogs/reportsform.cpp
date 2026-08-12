@@ -214,7 +214,10 @@ void ReportsForm::on_btnExport_clicked()
 
     if (filePath.isEmpty()) return;
 
-    ReportExporter::exportModelToExcel(model, reportTitle, filePath, this);
+    if (!ReportExporter::exportModelToExcel(model, reportTitle, filePath, this)) {
+        QMessageBox::critical(this, "Ошибка экспорта",
+            "Не удалось сохранить отчёт в файл:\n" + filePath);
+    }
 }
 
 void ReportsForm::on_btnClose_clicked()
