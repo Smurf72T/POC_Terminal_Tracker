@@ -10,6 +10,7 @@
 #include <QDateTime>
 #include <QApplication>
 #include <QDebug>
+#include <algorithm>
 
 LoginForm::LoginForm(QWidget *parent) :
     QDialog(parent),
@@ -179,8 +180,40 @@ void LoginForm::on_btnCancel_clicked()
     reject();
 }
 
+bool LoginForm::registrationAllowed(QString *blockMessage)
+{
+    const qint64 current = QDateTime::currentMSecsSinceEpoch();
+
+    // Выбрасываем устаревшие попытки за пределами окна.
+    m_registerAttempts.erase(
+        std::remove_if(m_registerAttempts.begin(), m_registerAttempts.end(),
+                       [current](qint64 t) { return current - t > kRateLimitWindowMs; }),
+        m_registerAttempts.end());
+
+    if (m_registerAttempts.size() >= kMaxRegistrations) {
+        if (blockMessage) {
+            const qint64 oldest = m_registerAttempts.first();
+            const int minutes = static_cast<int>((kRateLimitWindowMs - (current - oldest)) / 60000) + 1;
+            *blockMessage = QString("Слишком много попыток регистрации (максимум %1 за %2 мин). "
+                                    "Подождите ~%3 мин.")
+                                .arg(kMaxRegistrations)
+                                .arg(kRateLimitWindowMs / 60000)
+                                .arg(minutes);
+        }
+        return false;
+    }
+    return true;
+}
+
 void LoginForm::on_btnRegister_clicked()
 {
+    // Лимит саморегистрации с одного клиента (не более kMaxRegistrations за окно).
+    QString blockMessage;
+    if (!registrationAllowed(&blockMessage)) {
+        QMessageBox::warning(this, "Регистрация", blockMessage);
+        return;
+    }
+
     bool ok;
     QString username = QInputDialog::getText(this, "Регистрация", "Логин:", QLineEdit::Normal, QString(), &ok);
     if (!ok || username.trimmed().isEmpty()) return;
@@ -217,6 +250,8 @@ void LoginForm::on_btnRegister_clicked()
     query.bindValue(":hash", storedHash);
 
     if (query.exec()) {
+        // Учитываем успешную заявку в rate-limit.
+        m_registerAttempts.append(QDateTime::currentMSecsSinceEpoch());
         QMessageBox::information(this, "Успех",
             "Заявка на регистрацию '" + username.trimmed() + "' отправлена.\n"
             "Учётная запись будет активирована администратором.");
