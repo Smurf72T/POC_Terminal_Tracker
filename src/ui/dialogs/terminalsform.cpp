@@ -37,6 +37,7 @@ TerminalsForm::TerminalsForm(QWidget *parent) :
     model->setHeaderData(7, Qt::Horizontal, "Дата покупки");
     model->setHeaderData(8, Qt::Horizontal, "Примечание");
     model->setHeaderData(9, Qt::Horizontal, "Был в ремонте");
+    model->setHeaderData(10, Qt::Horizontal, "Деактивирован");
 
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -129,7 +130,8 @@ void TerminalsForm::loadModel(const QString &filter)
         "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
         "COALESCE(s.simnumber, 'SIM не назначена') AS simnumber, "
         "t.purchasedate, t.notes, "
-        "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS was_repaired "
+        "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS was_repaired, "
+        "CASE WHEN t.is_deactivated THEN 'Да' ELSE 'Нет' END AS is_deactivated "
         "FROM tblterminals t "
         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
         "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid" +
@@ -261,13 +263,15 @@ void TerminalsForm::on_btnDelete_clicked()
     checkRefQuery.bindValue(":id", id);
 
     if (checkRefQuery.exec() && checkRefQuery.next() && checkRefQuery.value(0).toInt() > 0) {
-        QMessageBox::warning(this, "Ошибка удаления",
-            "Невозможно удалить терминал: на него ссылаются документы.\n"
-            "Терминал будет деактивирован вместо удаления.");
+        QMessageBox::warning(this, "Деактивация",
+            "На терминал ссылаются документы, поэтому он не может быть удалён.\n"
+            "Терминал будет помечен как деактивированный (скрыт из выбора в новых документах).");
         QSqlQuery deactivateQuery(DatabaseManager::instance().getDatabase());
-        deactivateQuery.prepare("DELETE FROM tblterminals WHERE terminalid = :id");
+        deactivateQuery.prepare("UPDATE tblterminals SET is_deactivated = TRUE WHERE terminalid = :id");
         deactivateQuery.bindValue(":id", id);
         if (deactivateQuery.exec()) {
+            DatabaseManager::instance().logAction("UPDATE", "tblterminals", id);
+            DatabaseManager::instance().notifyDataChanged();
             loadModel();
         } else {
             QMessageBox::warning(this, "Ошибка", "Не удалось деактивировать: " + deactivateQuery.lastError().text());

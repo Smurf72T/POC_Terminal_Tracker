@@ -340,7 +340,7 @@ void TestDbIntegration::test_schema_objects()
                                QString("seq_statuschange_doc_number")})
         QVERIFY2(found.contains(seq), qPrintable("Нет последовательности: " + seq));
 
-    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 11);
+    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 12);
 }
 
 void TestDbIntegration::test_number_generation()
@@ -751,7 +751,7 @@ void TestDbIntegration::test_backup_and_opslog()
         QSqlQuery mq(check);
         QVERIFY(mq.exec("SELECT count(*) FROM schema_migrations"));
         QVERIFY(mq.next());
-        QCOMPARE(mq.value(0).toInt(), 11);
+        QCOMPARE(mq.value(0).toInt(), 12);
         check.close();
         QSqlDatabase::removeDatabase("restoreCheckConnection");
     }

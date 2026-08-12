@@ -59,7 +59,7 @@ void BatchStatusForm::loadTerminals(int currentStatus)
         "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS \"Статус\" "
         "FROM tblterminals t "
         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-        "WHERE t.status = :status "
+        "WHERE t.status = :status AND t.is_deactivated = FALSE "
         "ORDER BY t.serialnumber"
     );
     query.bindValue(":status", currentStatus);

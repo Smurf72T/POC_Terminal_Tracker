@@ -79,7 +79,7 @@ void RentalForm::loadFreeTerminalsToDelegate()
     // Загрузим только свободные терминалы
     QList<QPair<int, QString>> terminals;
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 ORDER BY serialnumber")) {
+    if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 AND is_deactivated = FALSE ORDER BY serialnumber")) {
         qCWarning(logSQL) << "Failed to load free terminals:" << query.lastError().text();
         return;
     }
