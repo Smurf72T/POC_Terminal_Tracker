@@ -107,6 +107,16 @@ Per-thread пул соединений для фоновых потоков (н�
 - `validateIMEI` (15 цифр, Luhn), `validateINN` (10/12 цифр, контрольные суммы),
   `validateSerial`, `validateClientName`, `validateModelName` и др. — чистые функции без побочных эффектов.
 
+## 8а. utils/terminal_status.h — словарь статусов терминалов
+
+- `TerminalStatus::Value` — `Available=0`, `Rented=1`, `Repair=2`, `WrittenOff=3`, `Lost=4`.
+- `name(int)` — название статуса; `sqlCaseExpression(column)` — фрагмент `CASE … END` для SQL UI.
+- **ВНИМАНИЕ (расхождение схем):** в `sql/migrations/000_base_schema.sql` у `tblterminals.status`
+  стоит `CHECK (status IN (0,1,2))`, полный словарь 0..4 вводит
+  `sql/migrations/006_terminal_status_check.sql`. На новой БД, собранной целиком из миграций,
+  значение ограничение применяется в версии 006. Единый источник словаря — `terminal_status.h`,
+  не дублируйте строки имён в SQL-запросах UI.
+
 ## 9. utils/reportexporter.h — `ReportExporter`
 
 - `exportXlsx(...)` — экспорт таблицы в `.xlsx` (QXlsx), `exportPdf(...)`/`exportCsv(...)`.
