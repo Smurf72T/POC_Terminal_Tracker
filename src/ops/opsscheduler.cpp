@@ -101,7 +101,8 @@ void OpsScheduler::start()
     if (m_backupEnabled && m_backupPassphrase.isEmpty()) {
         qCWarning(logApp) << "OpsScheduler: автобэкап включён, но backup.passphrase пуст —"
                           << "резервные копии не будут шифроваться. Задайте passphrase в config.json.";
-        OpsLog::instance().warning("Автобэкап без passphrase: резервные копии не шифруются (config backup.passphrase).");
+        OpsLog::instance().warning(
+            "Автобэкап без passphrase: резервные копии не шифруются (config backup.passphrase).");
     }
 }
 

@@ -8,6 +8,10 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# DashboardView работает с виджетами из mainwindow.ui по их objectName —
+# включаем каталог .ui в пути поиска uic для дочерних подкаталогов (views/).
+set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_SOURCE_DIR}/src/ui)
+
 # Ищем Qt6 (минимальная версия 6.2 для поддержки Charts и всех используемых API)
 find_package(Qt6 6.2 REQUIRED COMPONENTS
         Core
@@ -51,6 +55,10 @@ set(SOURCES
         src/database/connectionpool.cpp
         src/database/submiterrortablemodel.cpp
         src/ui/mainwindow.cpp
+        src/ui/views/dashboardview.cpp
+        src/ui/views/chartpanel.cpp
+        src/ui/panels/backuppanel.cpp
+        src/ui/panels/maintenancepanel.cpp
         src/ui/dialogs/manufacturersform.cpp
         src/ui/dialogs/modelsform.cpp
         src/ui/dialogs/clientsform.cpp
@@ -71,6 +79,10 @@ set(SOURCES
         src/ui/dialogs/batchstatusform.cpp
         src/ui/dialogs/usermanagementform.cpp
         src/ui/dialogs/reportsform.cpp
+        src/ui/dialogs/globalsearchdialog.cpp
+        src/ui/dialogs/terminalhistorypickerdialog.cpp
+        src/ui/dialogs/freedevicesreportdialog.cpp
+        src/ui/dialogs/clientrentalreportdialog.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
         src/utils/registration_ratelimiter.cpp
@@ -89,6 +101,10 @@ set(HEADERS
         src/database/connectionpool.h
         src/database/submiterrortablemodel.h
         src/ui/mainwindow.h
+        src/ui/views/dashboardview.h
+        src/ui/views/chartpanel.h
+        src/ui/panels/backuppanel.h
+        src/ui/panels/maintenancepanel.h
         src/ui/dialogs/manufacturersform.h
         src/ui/dialogs/modelsform.h
         src/ui/dialogs/clientsform.h
@@ -112,6 +128,10 @@ set(HEADERS
         src/ui/dialogs/batchstatusform.h
         src/ui/dialogs/usermanagementform.h
         src/ui/dialogs/reportsform.h
+        src/ui/dialogs/globalsearchdialog.h
+        src/ui/dialogs/terminalhistorypickerdialog.h
+        src/ui/dialogs/freedevicesreportdialog.h
+        src/ui/dialogs/clientrentalreportdialog.h
         src/utils/reportexporter.h
         src/utils/validator.h
         src/utils/registration_ratelimiter.h
