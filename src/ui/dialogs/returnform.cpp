@@ -1,6 +1,9 @@
 #include "returnform.h"
 #include "ui_returnform.h"
 #include "database/databasemanager.h"
+#include "database/repositories/clientrepository.h"
+#include "database/repositories/documentrepository.h"
+#include "database/repositories/terminalrepository.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -11,6 +14,7 @@
 #include "utils/logging.h"
 #include <QPrintDialog>
 #include <QTextDocument>
+#include <QHash>
 
 ReturnForm::ReturnForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReturnForm)
 {
@@ -42,15 +46,9 @@ ReturnForm::~ReturnForm()
 
 void ReturnForm::loadClientsToComboBox()
 {
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname")) {
-        qCWarning(logSQL) << "Failed to load clients:" << query.lastError().text();
-        return;
-    }
-
-    while (query.next()) {
-        ui->comboBoxClient->addItem(query.value(1).toString(), query.value(0).toInt());
-    }
+    const auto clients = ClientRepository(DatabaseManager::instance().getDatabase()).loadAll();
+    for (const auto& c : clients)
+        ui->comboBoxClient->addItem(c.name, c.id);
 }
 
 void ReturnForm::loadRentalDocs(int clientId)
@@ -63,23 +61,11 @@ void ReturnForm::loadRentalDocs(int clientId)
         return;
 
     // Загружаем документы аренды для этого клиента
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT rentaldocid, docnumber, docdate FROM tblrentaldocs "
-                  "WHERE clientid = :cid ORDER BY docdate DESC");
-    query.bindValue(":cid", clientId);
-
-    if (!query.exec()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить документы: " + query.lastError().text());
-        return;
-    }
-
-    while (query.next()) {
-        int docId = query.value(0).toInt();
-        QString docNumber = query.value(1).toString();
-        QString docDate = query.value(2).toDateTime().toString("dd.MM.yyyy");
-
-        QString displayText = QString("%1 от %2").arg(docNumber, docDate);
-        ui->comboBoxRentalDoc->addItem(displayText, docId);
+    const auto docs =
+        DocumentRepository(DatabaseManager::instance().getDatabase()).loadRentalDocumentsByClient(clientId);
+    for (const auto& d : docs) {
+        QString displayText = QString("%1 от %2").arg(d.docNumber, d.date.toString("dd.MM.yyyy"));
+        ui->comboBoxRentalDoc->addItem(displayText, d.id);
     }
 }
 
@@ -91,44 +77,29 @@ void ReturnForm::loadRentalDetails(int rentalDocId)
 
     // Загружаем строки из документа аренды
     // Показываем все терминалы из документа, даже если они уже возвращены (для истории)
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT rd.terminalid, t.serialnumber, "
-                  "COALESCE(s.simnumber, 'Нет SIM') AS simnumber, "
-                  "t.status AS terminal_status, "
-                  "s.status AS sim_status "
-                  "FROM tblrentaldetails rd "
-                  "JOIN tblterminals t ON rd.terminalid = t.terminalid "
-                  "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
-                  "WHERE rd.rentaldocid = :docid "
-                  "ORDER BY t.serialnumber");
-    query.bindValue(":docid", rentalDocId);
-
-    if (!query.exec()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить детали: " + query.lastError().text());
-        return;
-    }
-
-    while (query.next()) {
-        int row = rowsModel->rowCount();
-        rowsModel->insertRow(row);
+    const auto rows = DocumentRepository(DatabaseManager::instance().getDatabase()).loadRentalRows(rentalDocId);
+    for (const auto& row : rows) {
+        int r = rowsModel->rowCount();
+        rowsModel->insertRow(r);
 
         // Колонка 0: Чекбокс "Возврат"
         QStandardItem* checkItem = new QStandardItem();
         checkItem->setCheckable(true);
         checkItem->setCheckState(Qt::Unchecked);
-        checkItem->setData(query.value(0).toInt(), Qt::UserRole); // Храним ID терминала
-        rowsModel->setItem(row, 0, checkItem);
+        checkItem->setData(row.terminalId, Qt::UserRole); // Храним ID терминала
+        rowsModel->setItem(r, 0, checkItem);
 
         // Колонка 1: Терминал (только для чтения)
-        QStandardItem* termItem = new QStandardItem(query.value(1).toString());
+        QStandardItem* termItem = new QStandardItem(row.terminalSerialNumber);
         termItem->setEditable(false);
-        termItem->setData(query.value(0).toInt(), Qt::UserRole);
-        rowsModel->setItem(row, 1, termItem);
+        termItem->setData(row.terminalId, Qt::UserRole);
+        rowsModel->setItem(r, 1, termItem);
 
         // Колонка 2: SIM (только для чтения)
-        QStandardItem* simItem = new QStandardItem(query.value(2).toString());
+        QString simNumber = row.simCardId > 0 ? row.simNumber : QString("Нет SIM");
+        QStandardItem* simItem = new QStandardItem(simNumber);
         simItem->setEditable(false);
-        rowsModel->setItem(row, 2, simItem);
+        rowsModel->setItem(r, 2, simItem);
     }
 }
 
@@ -151,43 +122,28 @@ void ReturnForm::loadForEdit(int docId)
     m_originalReturned.clear();
     m_editRentalDocId = 0;
 
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    QSqlQuery query(db);
+    const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
+    DocumentRepository documents(db);
 
-    query.prepare("SELECT docnumber, docdate, clientid, comments FROM tblreturndocs WHERE returndocid = :id");
-    query.bindValue(":id", docId);
-
-    if (!query.exec() || !query.next()) {
+    const models::DocumentHeader header = documents.loadHeader(DocumentRepository::Return, docId);
+    if (header.id == 0) {
         QMessageBox::critical(this, "Ошибка", "Не удалось загрузить документ возврата");
         return;
     }
 
-    QString docNumber = query.value(0).toString();
-    QDateTime docDate = query.value(1).toDateTime();
-    int clientId = query.value(2).toInt();
-    QString comments = query.value(3).toString();
-
-    ui->lineEditNumber->setText(docNumber);
+    ui->lineEditNumber->setText(header.docNumber);
     ui->lineEditNumber->setReadOnly(true);
-    ui->dateEdit->setDate(docDate.date());
-    ui->textEditComment->setText(comments);
+    ui->dateEdit->setDate(header.date);
+    ui->textEditComment->setText(header.comments);
     setWindowTitle(QString("Редактирование возврата ID %1").arg(docId));
 
-    int clientIndex = ui->comboBoxClient->findData(clientId);
+    int clientIndex = ui->comboBoxClient->findData(header.clientId);
     if (clientIndex >= 0) {
         ui->comboBoxClient->setCurrentIndex(clientIndex);
     }
 
-    QSqlQuery rentalQuery(db);
-    rentalQuery.prepare("SELECT DISTINCT rd.rentaldocid "
-                        "FROM tblrentaldetails rd "
-                        "JOIN tblreturndetails rtd ON rd.terminalid = rtd.terminalid "
-                        "WHERE rtd.returndocid = :id "
-                        "LIMIT 1");
-    rentalQuery.bindValue(":id", docId);
-
-    if (rentalQuery.exec() && rentalQuery.next()) {
-        int rentalDocId = rentalQuery.value(0).toInt();
+    int rentalDocId = documents.rentalDocIdForReturn(docId);
+    if (rentalDocId > 0) {
         m_editRentalDocId = rentalDocId;
         int rentalIndex = ui->comboBoxRentalDoc->findData(rentalDocId);
         if (rentalIndex >= 0) {
@@ -195,26 +151,14 @@ void ReturnForm::loadForEdit(int docId)
         }
     }
 
-    QSqlQuery termQuery(db);
-    termQuery.prepare("SELECT terminalid FROM tblreturndetails WHERE returndocid = :id");
-    termQuery.bindValue(":id", docId);
+    const QList<int> returnedTerminals = documents.returnedTerminalIds(docId);
+    for (int tid : returnedTerminals)
+        m_originalReturned.insert(tid);
 
-    if (termQuery.exec()) {
-        QList<int> returnedTerminals;
-        while (termQuery.next()) {
-            returnedTerminals.append(termQuery.value(0).toInt());
-        }
-        for (int tid : returnedTerminals)
-            m_originalReturned.insert(tid);
-
-        for (int i = 0; i < rowsModel->rowCount(); ++i) {
-            QStandardItem* checkItem = rowsModel->item(i, 0);
-            if (checkItem) {
-                int termId = checkItem->data(Qt::UserRole).toInt();
-                if (returnedTerminals.contains(termId)) {
-                    checkItem->setCheckState(Qt::Checked);
-                }
-            }
+    for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        QStandardItem* checkItem = rowsModel->item(i, 0);
+        if (checkItem && returnedTerminals.contains(checkItem->data(Qt::UserRole).toInt())) {
+            checkItem->setCheckState(Qt::Checked);
         }
     }
 }
@@ -574,20 +518,26 @@ void ReturnForm::on_btnPrint_clicked()
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
     html += "<p><b>Арендодатель:</b> ООО «POC Terminal»</p>";
 
-    QSqlQuery clientQuery(DatabaseManager::instance().getDatabase());
-    clientQuery.prepare("SELECT clientname, inn FROM tblclients WHERE clientid = :id");
-    clientQuery.bindValue(":id", clientId);
-    QString clientName, clientInn;
-    if (clientQuery.exec() && clientQuery.next()) {
-        clientName = clientQuery.value(0).toString();
-        clientInn = clientQuery.value(1).toString();
-    }
+    const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
+    const models::Client client = ClientRepository(db).loadById(clientId);
+    QString clientName = client.name;
+    QString clientInn = client.inn;
     html += "<p><b>Арендатор:</b> " + clientName.toHtmlEscaped();
     if (!clientInn.isEmpty())
         html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
     html += "</p>";
 
     html += "<table><tr><th>№</th><th>Серийный номер</th><th>Модель</th><th>IMEI 1</th></tr>";
+
+    QList<int> terminalIds;
+    for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        auto* item = rowsModel->item(i, 0);
+        if (item && item->data(Qt::UserRole).toInt() > 0)
+            terminalIds.append(item->data(Qt::UserRole).toInt());
+    }
+    QHash<int, models::Terminal> termById;
+    for (const auto& t : TerminalRepository(db).loadByIds(terminalIds))
+        termById.insert(t.id, t);
 
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         auto* item = rowsModel->item(i, 0);
@@ -596,15 +546,9 @@ void ReturnForm::on_btnPrint_clicked()
         int termId = item->data(Qt::UserRole).toInt();
         QString serial = item->text();
 
-        QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
-        termQuery.prepare("SELECT imei1, COALESCE(m.modelname, '—') FROM tblterminals t "
-                          "LEFT JOIN tblmodels m ON t.modelid = m.modelid WHERE t.terminalid = :id");
-        termQuery.bindValue(":id", termId);
-        QString imei, modelName;
-        if (termQuery.exec() && termQuery.next()) {
-            imei = termQuery.value(0).toString();
-            modelName = termQuery.value(1).toString();
-        }
+        const models::Terminal term = termById.value(termId);
+        QString imei = term.imei1;
+        QString modelName = term.modelName.isEmpty() ? QString("—") : term.modelName;
 
         html += "<tr><td>" + QString::number(i + 1) +
                 "</td>"

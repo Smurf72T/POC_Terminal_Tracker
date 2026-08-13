@@ -6,6 +6,8 @@
 #include <QString>
 #include <QVector>
 
+#include "models/client.h"
+
 // Доступ к данным таблицы tblclients без SQL в UI-слое.
 class ClientRepository {
 public:
@@ -25,6 +27,10 @@ public:
     };
 
     int countAll() const;
+    // Полная модель клиента по id; invalid, если нет.
+    models::Client loadById(int clientId) const;
+    // Все клиенты, отсортированные по имени.
+    QVector<models::Client> loadAll() const;
     // Терминалы в аренде по клиентам (col: clientid, clientname, count).
     QVector<RentalStatistic> loadRentalStatistics() const;
     void populateRentalStatistics(QSqlQueryModel* model) const;

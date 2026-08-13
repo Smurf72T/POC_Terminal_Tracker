@@ -6,11 +6,13 @@
 ## Уровни модулей
 
 ```
-src/database/  — доступ к БД, пул соединений, миграции, аудит
-src/ops/       — бэкап/восстановление, проверка целостности, планировщик
-src/update/    — проверка обновлений, загрузка манифеста и файлов
-src/utils/     — валидаторы, пароли, логирование, circuit breaker, экспорт отчётов
-src/ui/        — окна, диалоги, делегаты
+src/database/            — доступ к БД, пул соединений, миграции, аудит
+src/database/repositories/ — параметризованные SQL-запросы по доменам (без UI)
+src/models/              — value-модели бизнес-сущностей (header-only, namespace models)
+src/ops/                 — бэкап/восстановление, проверка целостности, планировщик
+src/update/              — проверка обновлений, загрузка манифеста и файлов
+src/utils/               — валидаторы, пароли, логирование, circuit breaker, экспорт отчётов
+src/ui/                  — окна, диалоги, делегаты
 ```
 
 ## 1. database/databasemanager.h — `DatabaseManager` (singleton)
@@ -55,6 +57,66 @@ Per-thread пул соединений для фоновых потоков (н�
 
 Соединения изолированы по потокам (`QThread::currentThreadId()`), используются
 уникальные имена (`QUuid`), чтобы не конфликтовать с соединением главного потока.
+
+## 2а. database/repositories/* — слой репозиториев
+
+Выносит «сырой» SQL из UI. Все репозитории принимают `const QSqlDatabase&` в
+конструкторе и работают только параметризованными запросами. Методы с префиксом
+`load*` возвращают готовые data-структуры (из `src/models/` или внутренние POD),
+методы `populate*` заполняют переданный `QSqlQueryModel`.
+
+### `TerminalRepository`
+| Метод | Назначение |
+|-------|-----------|
+| `countAll()` / `countByStatus(int)` | Счётчики для дашборда |
+| `statusCounts()` | Группировка статусов (pie-график) |
+| `loadFreeTerminals()` | Свободные терминалы с моделью и SIM (отчёт) |
+| `findIdBySerial(QString)` | id по серийному номеру (-1, если нет) |
+| `loadSerialsWithIds()` | Пары (serial, id) для выбора в UI |
+| `loadById(int)` / `loadByIds(QList<int>)` | Полная модель терминала(ов) с именем модели; порядок входного списка сохраняется |
+| `loadFreeForSelection()` | Свободные и не деактивированные для аренды |
+
+### `SimCardRepository`
+`countAll()` / `countFree()`, `loadFreeSimCards()`, `populateFreeSimCards(*)`,
+`loadById(int)`, `loadByIds(QList<int>)`, `loadFreeForSelection()` (свободные или
+привязанные к свободному терминалу).
+
+### `ClientRepository`
+`countAll()`, `loadById(int)`, `loadAll()` (сортировка по имени),
+`loadRentalStatistics()` (`clientid, clientname, count`), `populateRentalStatistics(*)`,
+`loadRentedTerminals(clientId)` — терминалы клиента в аренде (для отчёта).
+
+### `DocumentRepository`
+| Метод | Назначение |
+|-------|-----------|
+| `recentDocuments(int limit)` | Последние документы всех типов (doctype 1/2/3/5) |
+| `loadHeader(DocType, docId)` | Шапка поступления/возврата/изменения статуса |
+| `loadRentalDocument(int)` | Шапка аренды |
+| `loadRentalRows(int)` | Строки аренды с serial/SIM и статусами терминала/SIM |
+| `loadRentalDocumentsByClient(int)` | Документы аренды клиента (для выпадающего списка возврата) |
+| `loadReceiptRows(int)` | Терминалы поступления (serial, модель, IMEI 1/2) |
+| `rentalDocIdForReturn(int)` / `returnedTerminalIds(int)` | Связь возврата с арендой и возвращённые терминалы |
+
+### `PaymentRepository`
+`revenueByMonth(int months)` — выручка по месяцам с заполнением нулями (bar-график).
+
+## 2б. models/* — value-модели бизнес-сущностей
+
+Header-only структуры в `namespace models`, без QObject и зависимостей от БД.
+Наполняются репозиториями (`loadById`/`loadByIds` и т.п.).
+
+| Модель | Поля |
+|-------|------|
+| `models::Terminal` | `id, serialNumber, modelId, modelName, imei1, imei2, status, deactivated, currentSimCardId` |
+| `models::Client` | `id, name, inn, address, contactPhone, contactEmail` |
+| `models::SimCard` | `id, number, status, notes, createdAt` |
+| `models::RentalDocument` / `models::RentalRow` | шапка (`docNumber, date, clientId, comments`) и строки (`terminalId, simCardId, serial, simNumber, comment, terminalStatus, simStatus`) |
+| `models::DocumentHeader` / `models::ReceiptRow` | общая шапка; строка поступления (`terminalId, serialNumber, modelId, modelName, imei1, imei2`) |
+
+**Соглашение:** SQL репозиториев переносимый (без PostgreSQL-специфики вроде
+`to_char`/`EXTRACT`/`::date`) — тот же код работает на SQLite в тестах.
+Write-логика документов (проведение, транзакции `FOR UPDATE NOWAIT`) остаётся в
+формах; мигрируются только read-пути (загрузка, редактирование, печать).
 
 ## 3. ops/backupmanager.h — `BackupManager`
 
@@ -141,14 +203,19 @@ Per-thread пул соединений для фоновых потоков (н�
 
 | Тест | Что покрывает |
 |------|---------------|
+| `test_repositories` | Репозитории и модели на SQLite in-memory: счётчики, выборки, `loadById(s)`, `loadFreeForSelection`, шапки/строки документов, связь возврата |
 | `test_password_utils` | Хеширование PBKDF2, constant-time сравнение, сложность пароля |
 | `test_validator` | Валидаторы + fuzz-наборы (случайные входы, детерминированный seed) |
+| `test_loginform` | Rate limit саморегистрации |
 | `test_update_utils` | Парсинг/сравнение версий |
-| `test_db_integration` | Миграции, аудит, роли, rate limiting, бизнес-поток, бэкап (в т.ч. шифрование) |
-| `test_concurrency` | Гонки: номера документов, выдача SIM, массовая смена статуса, rate limiting |
+| `test_reportexporter` | Экспорт в Excel (QXlsx) / PDF, недоступный путь, null-модель |
+| `test_updatemanager` | Проверка обновлений: URL, sha256, таймауты «зависшего» сервера |
+| `test_opsscheduler` | Планировщик фоновых операций, метатип `BackupResult` |
 | `test_ui_components` | Делегаты и модели UI |
 | `test_connectionpool` | Пул соединений (QSQLITE) |
 | `test_circuitbreaker` | Переходы Closed/Open/HalfOpen |
+| `test_db_integration` | Миграции, аудит, роли, rate limiting, бизнес-поток, бэкап (в т.ч. шифрование) |
+| `test_concurrency` | Гонки: номера документов, выдача SIM, массовая смена статуса, rate limiting |
 
 Запуск: `ctest --test-dir cmake-build-debug --output-on-failure`
 (для интеграционных тестов требуется доступный PostgreSQL; без него тесты пропускаются через QSKIP).

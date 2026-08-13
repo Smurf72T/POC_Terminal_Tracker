@@ -1,6 +1,9 @@
 #include "database/repositories/terminalrepository.h"
 
+#include <QHash>
 #include <QSqlQuery>
+#include <QStringList>
+#include <QVariantList>
 
 TerminalRepository::TerminalRepository(const QSqlDatabase& db) : m_db(db) {}
 
@@ -72,6 +75,101 @@ QVector<QPair<QString, int>> TerminalRepository::loadSerialsWithIds() const
     if (query.exec("SELECT terminalid, serialnumber FROM tblterminals ORDER BY serialnumber")) {
         while (query.next())
             result.append({query.value(1).toString(), query.value(0).toInt()});
+    }
+    return result;
+}
+
+models::Terminal TerminalRepository::loadById(int terminalId) const
+{
+    QSqlQuery query = makeQuery();
+    query.prepare("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
+                  "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid "
+                  "FROM tblterminals t "
+                  "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                  "WHERE t.terminalid = :id");
+    query.bindValue(":id", terminalId);
+    if (!query.exec() || !query.next())
+        return {};
+    models::Terminal t;
+    t.id = query.value(0).toInt();
+    t.serialNumber = query.value(1).toString();
+    t.modelId = query.value(2).toInt();
+    t.modelName = query.value(3).toString();
+    t.imei1 = query.value(4).toString();
+    t.imei2 = query.value(5).toString();
+    t.status = query.value(6).toInt();
+    t.deactivated = query.value(7).toBool();
+    t.currentSimCardId = query.value(8).toInt();
+    return t;
+}
+
+QVector<models::Terminal> TerminalRepository::loadByIds(const QList<int>& ids) const
+{
+    QVector<models::Terminal> result;
+    if (ids.isEmpty())
+        return result;
+    QStringList placeholders;
+    QVariantList values;
+    for (int i = 0; i < ids.size(); ++i) {
+        placeholders << QString(":id%1").arg(i);
+        values << ids.at(i);
+    }
+    QSqlQuery query = makeQuery();
+    query.prepare(QString("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
+                          "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid "
+                          "FROM tblterminals t "
+                          "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                          "WHERE t.terminalid IN (%1) ")
+                      .arg(placeholders.join(", ")));
+    for (int i = 0; i < ids.size(); ++i)
+        query.bindValue(placeholders.at(i), values.at(i));
+    if (!query.exec())
+        return result;
+
+    QHash<int, models::Terminal> byId;
+    while (query.next()) {
+        models::Terminal t;
+        t.id = query.value(0).toInt();
+        t.serialNumber = query.value(1).toString();
+        t.modelId = query.value(2).toInt();
+        t.modelName = query.value(3).toString();
+        t.imei1 = query.value(4).toString();
+        t.imei2 = query.value(5).toString();
+        t.status = query.value(6).toInt();
+        t.deactivated = query.value(7).toBool();
+        t.currentSimCardId = query.value(8).toInt();
+        byId.insert(t.id, t);
+    }
+    for (int id : ids) {
+        if (byId.contains(id))
+            result.append(byId.value(id));
+    }
+    return result;
+}
+
+QVector<models::Terminal> TerminalRepository::loadFreeForSelection() const
+{
+    QVector<models::Terminal> result;
+    QSqlQuery query = makeQuery();
+    if (query.exec("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
+                   "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid "
+                   "FROM tblterminals t "
+                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                   "WHERE t.status = 0 AND t.is_deactivated = FALSE "
+                   "ORDER BY t.serialnumber")) {
+        while (query.next()) {
+            models::Terminal t;
+            t.id = query.value(0).toInt();
+            t.serialNumber = query.value(1).toString();
+            t.modelId = query.value(2).toInt();
+            t.modelName = query.value(3).toString();
+            t.imei1 = query.value(4).toString();
+            t.imei2 = query.value(5).toString();
+            t.status = query.value(6).toInt();
+            t.deactivated = query.value(7).toBool();
+            t.currentSimCardId = query.value(8).toInt();
+            result.append(t);
+        }
     }
     return result;
 }

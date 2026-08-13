@@ -2,6 +2,7 @@
 #include "ui_receiptform.h"
 #include "delegates/comboboxdelegate.h"
 #include "database/databasemanager.h"
+#include "database/repositories/documentrepository.h"
 #include "utils/validator.h"
 #include <QMessageBox>
 #include <QSqlQuery>
@@ -68,61 +69,45 @@ void ReceiptForm::loadForEdit(int docId)
     m_editMode = true;
     m_editDocId = docId;
 
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    QSqlQuery query(db);
+    const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
+    DocumentRepository documents(db);
 
     // Load header
-    query.prepare("SELECT docnumber, docdate, comments FROM tblreceiptdocs WHERE receiptdocid = :id");
-    query.bindValue(":id", docId);
-    if (query.exec() && query.next()) {
-        QString docnumber = query.value(0).toString();
-        QDateTime docdate = query.value(1).toDateTime();
-        QString comments = query.value(2).toString();
-
-        ui->lineEditNumber->setText(docnumber);
+    const models::DocumentHeader header = documents.loadHeader(DocumentRepository::Receipt, docId);
+    if (header.id != 0) {
+        ui->lineEditNumber->setText(header.docNumber);
         ui->lineEditNumber->setReadOnly(true);
-        ui->dateEdit->setDate(docdate.date());
-        ui->textEditComment->setText(comments);
+        ui->dateEdit->setDate(header.date);
+        ui->textEditComment->setText(header.comments);
     }
 
     // Load details
-    QSqlQuery detailQuery(db);
-    detailQuery.prepare("SELECT t.terminalid, t.serialnumber, t.modelid, t.imei1, t.imei2 "
-                        "FROM tblreceiptdetails rd "
-                        "JOIN tblterminals t ON rd.terminalid = t.terminalid "
-                        "WHERE rd.receiptdocid = :id");
-    detailQuery.bindValue(":id", docId);
-    if (detailQuery.exec()) {
-        while (detailQuery.next()) {
-            int row = rowsModel->rowCount();
-            rowsModel->insertRow(row);
+    const auto rows = documents.loadReceiptRows(docId);
+    for (const auto& row : rows) {
+        int r = rowsModel->rowCount();
+        rowsModel->insertRow(r);
 
-            int terminalId = detailQuery.value(0).toInt();
-            QString serial = detailQuery.value(1).toString();
-            int modelId = detailQuery.value(2).toInt();
-            QString imei1 = detailQuery.value(3).toString();
-            QString imei2 = detailQuery.value(4).toString();
+        QStandardItem* serialItem = new QStandardItem(row.serialNumber);
+        serialItem->setData(row.terminalId, Qt::UserRole);
+        rowsModel->setItem(r, 0, serialItem);
 
-            QStandardItem* serialItem = new QStandardItem(serial);
-            serialItem->setData(terminalId, Qt::UserRole);
-            rowsModel->setItem(row, 0, serialItem);
-
-            // Find model name from m_models list
-            QString modelName;
+        // Find model name from m_models list
+        QString modelName = row.modelName;
+        if (modelName.isEmpty()) {
             for (const auto& pair : m_models) {
-                if (pair.first == modelId) {
+                if (pair.first == row.modelId) {
                     modelName = pair.second;
                     break;
                 }
             }
-            QStandardItem* modelItem = new QStandardItem();
-            modelItem->setText(modelName);
-            modelItem->setData(modelId, Qt::UserRole);
-            rowsModel->setItem(row, 1, modelItem);
-
-            rowsModel->setItem(row, 2, new QStandardItem(imei1));
-            rowsModel->setItem(row, 3, new QStandardItem(imei2));
         }
+        QStandardItem* modelItem = new QStandardItem();
+        modelItem->setText(modelName);
+        modelItem->setData(row.modelId, Qt::UserRole);
+        rowsModel->setItem(r, 1, modelItem);
+
+        rowsModel->setItem(r, 2, new QStandardItem(row.imei1));
+        rowsModel->setItem(r, 3, new QStandardItem(row.imei2));
     }
 
     setWindowTitle(QString("Редактирование поступления ID %1").arg(docId));

@@ -14,6 +14,44 @@ int ClientRepository::countAll() const
     return query.value(0).toInt();
 }
 
+models::Client ClientRepository::loadById(int clientId) const
+{
+    QSqlQuery query(m_db);
+    query.prepare("SELECT clientid, clientname, inn, address, contactphone, contactemail "
+                  "FROM tblclients WHERE clientid = :id");
+    query.bindValue(":id", clientId);
+    if (!query.exec() || !query.next())
+        return {};
+    models::Client c;
+    c.id = query.value(0).toInt();
+    c.name = query.value(1).toString();
+    c.inn = query.value(2).toString();
+    c.address = query.value(3).toString();
+    c.contactPhone = query.value(4).toString();
+    c.contactEmail = query.value(5).toString();
+    return c;
+}
+
+QVector<models::Client> ClientRepository::loadAll() const
+{
+    QVector<models::Client> result;
+    QSqlQuery query(m_db);
+    if (query.exec("SELECT clientid, clientname, inn, address, contactphone, contactemail "
+                   "FROM tblclients ORDER BY clientname")) {
+        while (query.next()) {
+            models::Client c;
+            c.id = query.value(0).toInt();
+            c.name = query.value(1).toString();
+            c.inn = query.value(2).toString();
+            c.address = query.value(3).toString();
+            c.contactPhone = query.value(4).toString();
+            c.contactEmail = query.value(5).toString();
+            result.append(c);
+        }
+    }
+    return result;
+}
+
 QVector<ClientRepository::RentalStatistic> ClientRepository::loadRentalStatistics() const
 {
     QVector<RentalStatistic> result;

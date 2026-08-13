@@ -122,6 +122,10 @@ psql -U postgres -d pocbase -f sql/migrations/004_role_enforcement.sql
 psql -U postgres -d pocbase -f sql/migrations/005_login_security.sql
 psql -U postgres -d pocbase -f sql/migrations/006_terminal_status_check.sql
 psql -U postgres -d pocbase -f sql/migrations/007_data_change_notify.sql
+psql -U postgres -d pocbase -f sql/migrations/008_cleanup_legacy.sql
+psql -U postgres -d pocbase -f sql/migrations/009_security_hardening.sql
+psql -U postgres -d pocbase -f sql/migrations/010_statuschange_old_status.sql
+psql -U postgres -d pocbase -f sql/migrations/011_terminals_deactivated.sql
 ```
 
 ## Логирование
@@ -146,9 +150,28 @@ QT_LOGGING_RULES="app.sql=true;app.migration=true"
 ```
 src/
   main.cpp                    — Точка входа, показ формы входа
-  database/databasemanager.*  — Подключение к БД, миграции (advisory lock), аудит, NOTIFY, .env
+  models/
+    terminal.h                — Value-модель терминала (id, серийник, IMEI, статус, деактивация)
+    client.h                  — Value-модель клиента
+    simcard.h                 — Value-модель SIM-карты
+    rentaldocument.h          — Value-модели арендного документа и строк
+    document.h                — Value-модели шапки документа и строк поступления
+  database/
+    databasemanager.*         — Подключение к БД, миграции (advisory lock), аудит, NOTIFY, .env
+    repositories/
+      terminalrepository.*    — SQL терминалов без UI: счётчики, свободные, loadById(s)
+      clientrepository.*      — SQL клиентов: count/loadAll/loadById, арендная статистика
+      simcardrepository.*     — SQL SIM: count/loadFree, loadById(s)
+      documentrepository.*    — SQL документов: шапки/строки аренды, поступления, возврата
+      paymentrepository.*     — SQL платежей: выручка по месяцам
   ui/
-    mainwindow.*              — Главное окно, дашборд
+    mainwindow.*              — Главное окно (тонкая обёртка: меню, навигация, формы)
+    views/
+      dashboardview.*         — Дашборд: счётчики, топ-клиенты, последние документы
+      chartpanel.*            — Графики: pie (статусы), bar (выручка)
+    panels/
+      backuppanel.*           — Панель бэкапа/восстановления (поток + worker)
+      maintenancepanel.*      — Панель эксплуатации (планировщик, обновления, журнал)
     dialogs/
       loginform.*             — Вход/регистрация с rate limiting
       terminalsform.*         — Справочник терминалов
@@ -162,6 +185,9 @@ src/
       paymentform.*           — Отметка оплаты
       archivedocumentsform.*  — Архив документов
       terminalhistoryform.*   — История терминала
+      terminalhistorypickerdialog.* — Выбор терминала для истории
+      globalsearchdialog.*    — Глобальный поиск (Ctrl+K)
+      freedevicesreportdialog.* / clientrentalreportdialog.* — Отчёты «Свободные устройства» / «Клиент — аренда»
       bulkimportform.*        — Массовый импорт
       auditlogform.*          — Журнал аудита
       expirynotificationsform.* — Уведомления о просрочке
@@ -172,6 +198,8 @@ src/
     password_utils.h          — PBKDF2-HMAC-SHA256 (100k итераций), constant-time проверка, обратная совместимость
     validator.*               — Валидация ИНН, IMEI (Luhn), данных
     reportexporter.*          — Экспорт в Excel (QXlsx) и PDF
+    terminal_status.h         — Единый словарь статусов терминалов (0..4)
+    registration_ratelimiter.*— Rate limit саморегистрации (чистая логика)
     logging.h                 — QLoggingCategory: app.database, app.audit, app.migration, app.sql, app.general
   ops/
     backupmanager.*           — Бэкап (pg_dump + fallback) и восстановление (psql), без UI
@@ -183,7 +211,7 @@ src/
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/
-  migrations/               — Миграции БД 000–008 (применяются автоматически)
+  migrations/               — Миграции БД 000–011 (применяются автоматически)
   legacy/                   — Архивные SQL-скрипты, заменённые миграциями (не применять вручную)
   add_trigger.sql           — Опциональный DB-триггер синхронизации статусов SIM (не миграция)
   diagnostics.sql           — Диагностика рассинхрона терминалов и SIM (ops, см. OPS.md)
@@ -193,13 +221,38 @@ libs/
 config/
   config.json                 — Настройки БД (пароль через .env)
 tests/
+  test_repositories.cpp       — Тесты репозиториев и моделей на SQLite in-memory
   test_password_utils.cpp     — Unit-тесты PBKDF2, обратная совместимость
   test_validator.cpp          — Unit-тесты IMEI, INN, Luhn, серийных номеров
+  test_loginform.cpp          — Rate limit саморегистрации
+  test_reportexporter.cpp     — Экспорт в Excel/PDF
+  test_updatemanager.cpp      — Проверка обновлений (таймауты, URL, sha256)
+  test_opsscheduler.cpp       — Планировщик фоновых операций
   test_update_utils.cpp       — Unit-тесты сравнения версий
+  test_ui_components.cpp      — Делегаты и модели UI
+  test_connectionpool.cpp     — Пул соединений (QSQLITE)
+  test_circuitbreaker.cpp     — Переходы Closed/Open/HalfOpen
   test_db_integration.cpp     — Интеграционные тесты БД (миграции, аудит, роли, rate limiting)
   test_concurrency.cpp        — Конкуренто-тесты (N потоков × отдельные соединения)
   stub_databasemanager.cpp    — Стаб DatabaseManager для тестов
 ```
+
+## Архитектура доступа к данным
+
+Слой доступа разделён на три уровня — «сырой» SQL не попадает в UI:
+
+1. **Репозитории** (`src/database/repositories/`) — параметризованные запросы и
+   готовые данные без QSql-зависимостей в сигнатурах: `TerminalRepository`,
+   `ClientRepository`, `SimCardRepository`, `DocumentRepository`, `PaymentRepository`.
+   Методы `load*` возвращают value-структуры, `populate*` заполняют `QSqlQueryModel`.
+2. **Value-модели** (`src/models/`) — `models::Terminal`, `models::Client`,
+   `models::SimCard`, `models::RentalDocument`/`RentalRow`,
+   `models::DocumentHeader`/`ReceiptRow` (header-only, без QObject).
+3. **Формы** (`src/ui/dialogs/`) — читают/пишут документы (приёмка, аренда, возврат)
+   через репозитории; write-логика (проведение, транзакции `FOR UPDATE NOWAIT`)
+   остаётся в формах.
+
+Репозитории и модели покрыты `tests/test_repositories.cpp` (SQLite in-memory, подмножественная схема).
 
 ## Архитектура открытия форм
 

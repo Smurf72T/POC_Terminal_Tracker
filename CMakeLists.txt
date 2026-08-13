@@ -101,6 +101,11 @@ set(SOURCES
 )
 
 set(HEADERS
+        src/models/terminal.h
+        src/models/client.h
+        src/models/simcard.h
+        src/models/rentaldocument.h
+        src/models/document.h
         src/database/databasemanager.h
         src/database/idatabasemanager.h
         src/database/connectionpool.h

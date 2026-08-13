@@ -1,6 +1,7 @@
 #ifndef TERMINALREPOSITORY_H
 #define TERMINALREPOSITORY_H
 
+#include <QList>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlQueryModel>
@@ -9,6 +10,8 @@
 #include <QVector>
 
 #include <utility>
+
+#include "models/terminal.h"
 
 // Доступ к данным таблицы tblterminals без SQL в UI-слое.
 // Методы с префиксом `load` возвращают готовые структуры данных,
@@ -37,6 +40,13 @@ public:
     int findIdBySerial(const QString& serialNumber) const;
     // Пары (serial, id) для выбора терминала в UI.
     QVector<QPair<QString, int>> loadSerialsWithIds() const;
+
+    // Полная модель терминала по id (с именем модели); invalid, если нет.
+    models::Terminal loadById(int terminalId) const;
+    // Терминалы по списку id (порядок вставки сохраняется, отсутствующие пропускаются).
+    QVector<models::Terminal> loadByIds(const QList<int>& ids) const;
+    // Терминалы для выбора в аренду: свободные и не деактивированные.
+    QVector<models::Terminal> loadFreeForSelection() const;
 
     // Заполняет модель колонками [serialnumber, modelname, simstatus].
     void populateFreeTerminals(QSqlQueryModel* model) const;

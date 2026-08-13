@@ -3,6 +3,10 @@
 #include "delegates/comboboxdelegate.h"
 #include "delegates/comboboxmodel.h"
 #include "database/databasemanager.h"
+#include "database/repositories/clientrepository.h"
+#include "database/repositories/documentrepository.h"
+#include "database/repositories/simcardrepository.h"
+#include "database/repositories/terminalrepository.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -12,7 +16,7 @@
 #include <QSqlRecord>
 #include "utils/logging.h"
 #include <QSet>
-#include "utils/reportexporter.h"
+#include <QHash>
 #include <QTextDocument>
 #include <QPrinter>
 #include <QPrintDialog>
@@ -53,15 +57,9 @@ RentalForm::~RentalForm()
 void RentalForm::loadClientsToDelegate()
 {
     QList<QPair<int, QString>> clients;
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname")) {
-        qCWarning(logSQL) << "Failed to load clients:" << query.lastError().text();
-        return;
-    }
-
-    while (query.next()) {
-        clients.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
-    }
+    const auto all = ClientRepository(DatabaseManager::instance().getDatabase()).loadAll();
+    for (const auto& c : all)
+        clients.append(qMakePair(c.id, c.name));
 
     // Устанавливаем делегат для колонки клиента
     ui->comboBoxClient->setItemDelegate(new ComboBoxDelegate(clients, this));
@@ -72,16 +70,9 @@ void RentalForm::loadFreeTerminalsToDelegate()
 {
     // Загрузим только свободные терминалы
     QList<QPair<int, QString>> terminals;
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 AND is_deactivated = FALSE "
-                    "ORDER BY serialnumber")) {
-        qCWarning(logSQL) << "Failed to load free terminals:" << query.lastError().text();
-        return;
-    }
-
-    while (query.next()) {
-        terminals.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
-    }
+    const auto free = TerminalRepository(DatabaseManager::instance().getDatabase()).loadFreeForSelection();
+    for (const auto& t : free)
+        terminals.append(qMakePair(t.id, t.serialNumber));
 
     // Устанавливаем делегат на колонку терминала
     ui->tableView->setItemDelegateForColumn(0, new ComboBoxDelegate(terminals, this));
@@ -90,26 +81,9 @@ void RentalForm::loadFreeTerminalsToDelegate()
 void RentalForm::loadFreeSIMsToDelegate()
 {
     QList<QPair<int, QString>> sims;
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    // ИСПРАВЛЕНО: Загружаем SIM-карты, которые:
-    // 1. status = 0 (свободны), ИЛИ
-    // 2. status = 1 (в аренде), но привязаны к терминалу со статусом 0 (возвращены)
-    if (!query.exec("SELECT s.simcardid, s.simnumber "
-                    "FROM tblsimcards s "
-                    "WHERE s.status = 0 "
-                    "OR EXISTS ("
-                    "    SELECT 1 FROM tblterminals t "
-                    "    WHERE t.currentsimcardid = s.simcardid "
-                    "    AND t.status = 0"
-                    ")"
-                    "ORDER BY s.simnumber")) {
-        qCWarning(logSQL) << "Failed to load free SIMs:" << query.lastError().text();
-        return;
-    }
-
-    while (query.next()) {
-        sims.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
-    }
+    const auto free = SimCardRepository(DatabaseManager::instance().getDatabase()).loadFreeForSelection();
+    for (const auto& s : free)
+        sims.append(qMakePair(s.id, s.number));
 
     // Устанавливаем делегат на колонку SIM (редактируемый: можно выбрать
     // существующую SIM-карту или ввести новый номер)
@@ -122,81 +96,46 @@ void RentalForm::loadForEdit(int docId)
     m_editDocId = docId;
     m_originalDetails.clear();
 
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT docnumber, docdate, clientid, comments FROM tblrentaldocs WHERE rentaldocid = :id");
-    query.bindValue(":id", docId);
-
-    if (!query.exec() || !query.next()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить документ: " + query.lastError().text());
+    const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
+    DocumentRepository documents(db);
+    const models::RentalDocument doc = documents.loadRentalDocument(docId);
+    if (doc.id == 0) {
+        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить документ аренды.");
         return;
     }
 
-    QString docNumber = query.value(0).toString();
-    QDateTime docDate = query.value(1).toDateTime();
-    int clientId = query.value(2).toInt();
-    QString comments = query.value(3).toString();
-
-    ui->lineEditNumber->setText(docNumber);
+    ui->lineEditNumber->setText(doc.docNumber);
     ui->lineEditNumber->setReadOnly(true);
-    ui->dateEdit->setDate(docDate.date());
-    ui->textEditComment->setText(comments);
+    ui->dateEdit->setDate(doc.date);
+    ui->textEditComment->setText(doc.comments);
 
     for (int i = 0; i < ui->comboBoxClient->count(); ++i) {
-        if (ui->comboBoxClient->itemData(i).toInt() == clientId) {
+        if (ui->comboBoxClient->itemData(i).toInt() == doc.clientId) {
             ui->comboBoxClient->setCurrentIndex(i);
             break;
         }
     }
 
-    QSqlQuery detailQuery(DatabaseManager::instance().getDatabase());
-    detailQuery.prepare("SELECT terminalid, simcardid, comment FROM tblrentaldetails WHERE rentaldocid = :id");
-    detailQuery.bindValue(":id", docId);
+    const auto rows = documents.loadRentalRows(docId);
+    for (const auto& row : rows) {
+        m_originalDetails.insert(row.terminalId, row.simCardId);
 
-    if (detailQuery.exec()) {
-        while (detailQuery.next()) {
-            int termId = detailQuery.value(0).toInt();
-            int simId = detailQuery.value(1).toInt();
-            QString comment = detailQuery.value(2).toString();
+        int r = rowsModel->rowCount();
+        rowsModel->insertRow(r);
 
-            m_originalDetails.insert(termId, simId);
+        QStandardItem* terminalItem = new QStandardItem();
+        terminalItem->setData(row.terminalId, Qt::UserRole);
+        terminalItem->setData(row.terminalSerialNumber, Qt::DisplayRole);
 
-            int row = rowsModel->rowCount();
-            rowsModel->insertRow(row);
+        QStandardItem* simItem = new QStandardItem();
+        simItem->setData(row.simCardId, Qt::UserRole);
+        simItem->setData(row.simCardId > 0 ? row.simNumber : QString(), Qt::DisplayRole);
 
-            QStandardItem* terminalItem = new QStandardItem();
-            terminalItem->setData(termId, Qt::UserRole);
+        QStandardItem* commentItem = new QStandardItem(row.comment);
 
-            QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
-            termQuery.prepare("SELECT serialnumber FROM tblterminals WHERE terminalid = :id");
-            termQuery.bindValue(":id", termId);
-            if (termQuery.exec() && termQuery.next()) {
-                terminalItem->setData(termQuery.value(0).toString(), Qt::DisplayRole);
-            } else {
-                terminalItem->setData("", Qt::DisplayRole);
-            }
-
-            QStandardItem* simItem = new QStandardItem();
-            simItem->setData(simId, Qt::UserRole);
-
-            if (simId > 0) {
-                QSqlQuery simQuery(DatabaseManager::instance().getDatabase());
-                simQuery.prepare("SELECT simnumber FROM tblsimcards WHERE simcardid = :id");
-                simQuery.bindValue(":id", simId);
-                if (simQuery.exec() && simQuery.next()) {
-                    simItem->setData(simQuery.value(0).toString(), Qt::DisplayRole);
-                } else {
-                    simItem->setData("", Qt::DisplayRole);
-                }
-            } else {
-                simItem->setData("", Qt::DisplayRole);
-            }
-
-            QStandardItem* commentItem = new QStandardItem(comment);
-
-            rowsModel->setItem(row, 0, terminalItem);
-            rowsModel->setItem(row, 1, simItem);
-            rowsModel->setItem(row, 2, commentItem);
-        }
+        rowsModel->setItem(r, 0, terminalItem);
+        rowsModel->setItem(r, 1, simItem);
+        rowsModel->setItem(r, 2, commentItem);
     }
 
     setWindowTitle(QString("Редактирование аренды ID %1").arg(docId));
@@ -580,16 +519,11 @@ void RentalForm::on_btnPrintAct_clicked()
     }
 
     // Получаем данные клиента
-    QSqlQuery clientQuery(DatabaseManager::instance().getDatabase());
-    clientQuery.prepare("SELECT clientname, inn, address FROM tblclients WHERE clientid = :id");
-    clientQuery.bindValue(":id", clientId);
-
-    QString clientName, clientInn, clientAddress;
-    if (clientQuery.exec() && clientQuery.next()) {
-        clientName = clientQuery.value(0).toString();
-        clientInn = clientQuery.value(1).toString();
-        clientAddress = clientQuery.value(2).toString();
-    }
+    const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
+    const models::Client client = ClientRepository(db).loadById(clientId);
+    QString clientName = client.name;
+    QString clientInn = client.inn;
+    QString clientAddress = client.address;
 
     // Формируем HTML акта
     QString html = "<html><head><meta charset='utf-8'>"
@@ -617,7 +551,26 @@ void RentalForm::on_btnPrintAct_clicked()
 
     html += "<table><tr><th>№</th><th>Серийный номер</th><th>IMEI 1</th><th>SIM-карта</th></tr>";
 
-    // Собираем данные из таблицы
+    // Собираем данные из таблицы (батч-загрузка вместо запросов по каждой строке)
+    QList<int> terminalIds;
+    QList<int> simIds;
+    for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        int termId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
+        if (termId == 0)
+            continue;
+        terminalIds.append(termId);
+        int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
+        if (simId > 0)
+            simIds.append(simId);
+    }
+
+    QHash<int, models::Terminal> termById;
+    for (const auto& t : TerminalRepository(db).loadByIds(terminalIds))
+        termById.insert(t.id, t);
+    QHash<int, models::SimCard> simById;
+    for (const auto& s : SimCardRepository(db).loadByIds(simIds))
+        simById.insert(s.id, s);
+
     int num = 1;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         int termId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
@@ -626,26 +579,13 @@ void RentalForm::on_btnPrintAct_clicked()
         if (termId == 0)
             continue;
 
-        // Получаем серийный номер и IMEI
-        QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
-        termQuery.prepare("SELECT serialnumber, imei1 FROM tblterminals WHERE terminalid = :id");
-        termQuery.bindValue(":id", termId);
-        QString serial, imei;
-        if (termQuery.exec() && termQuery.next()) {
-            serial = termQuery.value(0).toString();
-            imei = termQuery.value(1).toString();
-        }
+        const models::Terminal term = termById.value(termId);
+        QString serial = term.serialNumber;
+        QString imei = term.imei1;
 
-        // Получаем номер SIM
         QString simNumber;
-        if (simId > 0) {
-            QSqlQuery simQuery(DatabaseManager::instance().getDatabase());
-            simQuery.prepare("SELECT simnumber FROM tblsimcards WHERE simcardid = :id");
-            simQuery.bindValue(":id", simId);
-            if (simQuery.exec() && simQuery.next()) {
-                simNumber = simQuery.value(0).toString();
-            }
-        }
+        if (simId > 0)
+            simNumber = simById.value(simId).number;
 
         html += "<tr><td>" + QString::number(num++) +
                 "</td>"
