@@ -1008,25 +1008,10 @@ void MainWindow::openBulkImport()
 
 void MainWindow::ensureBackupWorker()
 {
-    if (m_backupThread)
+    m_backupWorker = createBackupWorker(m_backupThread);
+    if (!m_backupWorker)
         return;
 
-    m_backupThread = new QThread;
-    m_backupWorker = new BackupWorker;
-
-    // Параметры соединения снимаем в главном потоке до moveToThread():
-    // внутри рабочего потока используется собственное соединение.
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    BackupWorker::ConnectionParams params;
-    params.host = db.hostName();
-    params.port = db.port();
-    params.databaseName = db.databaseName();
-    params.user = db.userName();
-    params.password = db.password();
-    params.connectOptions = db.connectOptions();
-    m_backupWorker->setConnectionParams(params);
-
-    m_backupWorker->moveToThread(m_backupThread);
     connect(this, &MainWindow::backupRequested, m_backupWorker, &BackupWorker::createBackup,
             Qt::QueuedConnection);
     connect(this, &MainWindow::restoreRequested, m_backupWorker, &BackupWorker::restore,
@@ -1035,7 +1020,6 @@ void MainWindow::ensureBackupWorker()
             this, &MainWindow::onManualBackupFinished);
     connect(m_backupWorker, &BackupWorker::restoreFinished,
             this, &MainWindow::onManualRestoreFinished);
-    m_backupThread->start();
 }
 
 void MainWindow::performBackup()

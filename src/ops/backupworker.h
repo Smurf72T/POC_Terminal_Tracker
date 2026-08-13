@@ -10,6 +10,7 @@
 #include "ops/backupmanager.h"
 
 class ConnectionPool;
+class QThread;
 
 // Выполняет резервное копирование / восстановление в отдельном потоке,
 // чтобы pg_dump/psql (QProcess::waitForFinished) не блокировали UI.
@@ -56,5 +57,14 @@ private:
     ConnectionPool *m_pool = nullptr;
     std::atomic<bool> m_cancelRequested{false};
 };
+
+// Создаёт фоновый поток и worker'а резервного копирования, переносит worker
+// в поток и запускает его. Соединение с БД не переносится — параметры снимаются
+// в вызывающем (главном) потоке до moveToThread(); внутри рабочего потока
+// открывается собственное соединение.
+// Возвращает nullptr, если поток уже создан (ничего не делает повторно).
+// Подключение сигналов выполняется в вызывающем коде — набор сигналов у
+// потребителей различается (MainWindow и OpsScheduler).
+BackupWorker *createBackupWorker(QThread *&thread);
 
 #endif // BACKUPWORKER_H

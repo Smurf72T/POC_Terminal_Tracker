@@ -1,10 +1,12 @@
 #include "backupworker.h"
 
 #include "database/connectionpool.h"
+#include "database/databasemanager.h"
 #include "ops/opslog.h"
 
 #include <QSqlError>
 #include <QMetaType>
+#include <QThread>
 #include <QUuid>
 
 BackupWorker::BackupWorker()
@@ -91,4 +93,29 @@ void BackupWorker::restore(const QString &filePath, const QString &connectionPas
     if (m_pool)
         m_pool->release(db);
     emit restoreFinished(ok, filePath, error);
+}
+
+BackupWorker *createBackupWorker(QThread *&thread)
+{
+    if (thread)
+        return nullptr;
+
+    thread = new QThread;
+    BackupWorker *worker = new BackupWorker;
+
+    // Параметры соединения снимаем в главном потоке до moveToThread():
+    // внутри рабочего потока используется собственное соединение.
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+    BackupWorker::ConnectionParams params;
+    params.host = db.hostName();
+    params.port = db.port();
+    params.databaseName = db.databaseName();
+    params.user = db.userName();
+    params.password = db.password();
+    params.connectOptions = db.connectOptions();
+    worker->setConnectionParams(params);
+
+    worker->moveToThread(thread);
+    thread->start();
+    return worker;
 }
