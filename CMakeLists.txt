@@ -161,9 +161,15 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         QXlsx::QXlsx
 )
 
-# Копируем config.json в папку сборки
+# Копируем config.json в папку сборки. config.json не коммитится (см. .gitignore,
+# версия живёт в config/config.json.example) — при его отсутствии берём шаблон.
+if(EXISTS ${CMAKE_SOURCE_DIR}/config/config.json)
+    set(POC_CONFIG_TEMPLATE ${CMAKE_SOURCE_DIR}/config/config.json)
+else()
+    set(POC_CONFIG_TEMPLATE ${CMAKE_SOURCE_DIR}/config/config.json.example)
+endif()
 configure_file(
-        ${CMAKE_SOURCE_DIR}/config/config.json
+        ${POC_CONFIG_TEMPLATE}
         ${CMAKE_BINARY_DIR}/config/config.json
         COPYONLY
 )
@@ -393,7 +399,7 @@ if(WIN32)
 
         # Конфиг, миграции, документация
         list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${CMAKE_SOURCE_DIR}/config/config.json" "${DEPLOY_DIR}/config/config.json")
+                "${POC_CONFIG_TEMPLATE}" "${DEPLOY_DIR}/config/config.json")
         list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_SOURCE_DIR}/sql/migrations" "${DEPLOY_DIR}/sql/migrations")
         list(APPEND DEPLOY_CMDS COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -415,7 +421,7 @@ if(WIN32)
 
         # ---- CPack: портативный ZIP + установщик NSIS из папки deploy ----
         include(InstallRequiredSystemLibraries)
-        file(READ "${CMAKE_SOURCE_DIR}/config/config.json" POC_CONFIG_JSON)
+        file(READ "${POC_CONFIG_TEMPLATE}" POC_CONFIG_JSON)
         string(JSON POC_VERSION GET "${POC_CONFIG_JSON}" "application" "version")
 
         # Содержимое deploy (exe + Qt runtime + DLL + конфиг + docs) становится install-контентом.

@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches: [ master ]
-    # Коммит автоматического bump (config.json + CHANGELOG.md) не должен
-    # перезапускать workflow — иначе получается бесконечный цикл.
+# Коммит автоматического bump (config.json.example + CHANGELOG.md) не должен
+    # запускать pipeline заново (бесконечный цикл)
     paths-ignore:
-      - 'config/config.json'
+      - 'config/config.json.example'
       - 'CHANGELOG.md'
   pull_request:
   workflow_dispatch:
@@ -165,11 +165,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VER=$(jq -r '.application.version' config/config.json)
+          VER=$(jq -r '.application.version' config/config.json.example)
           MAJOR=${VER%%.*}; REST=${VER#*.}; MINOR=${REST%%.*}; PATCH=${REST#*.}
           NEW="$MAJOR.$MINOR.$((PATCH+1))"
-          jq ".application.version = \"$NEW\"" config/config.json > config/config.json.tmp
-          mv config/config.json.tmp config/config.json
+          jq ".application.version = \"$NEW\"" config/config.json.example > config/config.json.example.tmp
+          mv config/config.json.example.tmp config/config.json.example
 
           # Коммиты с прошлого автоматического bump (в противном случае — последние 30)
           LAST=$(git log -1 --format=%H --grep="^docs: bump version to" || true)
@@ -189,6 +189,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add config/config.json CHANGELOG.md
-          git commit -m "docs: bump version to $(jq -r '.application.version' config/config.json)"
+          git add config/config.json.example CHANGELOG.md
+          git commit -m "docs: bump version to $(jq -r '.application.version' config/config.json.example)"
           git push

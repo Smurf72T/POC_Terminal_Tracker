@@ -7,6 +7,7 @@
 #include <QIcon>
 #include <QFile>
 #include <QFileInfo>
+#include <QDir>
 #include <QJsonDocument>
 #include <QMessageBox>
 #include <QSettings>
@@ -42,16 +43,36 @@ static QString readAppVersion(const QString& configPath)
 
 // Путь к config.json независимо от рабочего каталога: рядом с exe (портативная
 // сборка), уровнем/двумя уровнями выше (разработка, CMake build) и CWD как fallback.
+// Если config.json найден — возвращаем его как есть (рабочие настройки могут
+// отличаться от шаблона). Если ни одного нет — копируем рядом лежащий
+// config.json.example в первый подходящий каталог, чтобы приложение стартовало
+// без ручного создания файла.
 static QString appConfigPath()
 {
     const QString base = QCoreApplication::applicationDirPath();
-    const QStringList candidates = {base + "/config/config.json", base + "/../config/config.json",
-                                    base + "/../../config/config.json", QStringLiteral("config/config.json")};
-    for (const QString& c : candidates) {
-        if (QFileInfo::exists(c))
-            return c;
+    const QStringList dirs = {base + "/config", base + "/../config", base + "/../../config", QStringLiteral("config")};
+
+    for (const QString& dir : dirs) {
+        const QString cfgPath = dir + "/config.json";
+        if (QFileInfo::exists(cfgPath))
+            return cfgPath;
     }
-    return candidates.last();
+
+    // config.json нигде нет — возьмём первый существующий шаблон там же, где
+    // искали конфиг, и создадим из него рабочий config.json.
+    for (const QString& dir : dirs) {
+        const QString example = dir + "/config.json.example";
+        if (QFileInfo::exists(example) && QDir(dir).exists()) {
+            const QString target = dir + "/config.json";
+            QFile::remove(target);
+            if (QFile::copy(example, target)) {
+                qCInfo(logApp) << "config.json не найден — создан из шаблона:" << example << "->" << target;
+                return target;
+            }
+        }
+    }
+
+    return dirs.last() + "/config.json";
 }
 
 // Ищет значение ключа в .env рядом с exe, рядом с config.json и в корне проекта —
