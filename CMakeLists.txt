@@ -54,6 +54,11 @@ set(SOURCES
         src/database/databasemanager.cpp
         src/database/connectionpool.cpp
         src/database/submiterrortablemodel.cpp
+        src/database/repositories/terminalrepository.cpp
+        src/database/repositories/clientrepository.cpp
+        src/database/repositories/simcardrepository.cpp
+        src/database/repositories/documentrepository.cpp
+        src/database/repositories/paymentrepository.cpp
         src/ui/mainwindow.cpp
         src/ui/views/dashboardview.cpp
         src/ui/views/chartpanel.cpp
@@ -100,6 +105,11 @@ set(HEADERS
         src/database/idatabasemanager.h
         src/database/connectionpool.h
         src/database/submiterrortablemodel.h
+        src/database/repositories/terminalrepository.h
+        src/database/repositories/clientrepository.h
+        src/database/repositories/simcardrepository.h
+        src/database/repositories/documentrepository.h
+        src/database/repositories/paymentrepository.h
         src/ui/mainwindow.h
         src/ui/views/dashboardview.h
         src/ui/views/chartpanel.h
@@ -333,8 +343,18 @@ if(BUILD_TESTS)
             Qt6::Sql Qt6::PrintSupport QXlsx::QXlsx)
     add_test(NAME test_reportexporter COMMAND test_reportexporter)
 
+    add_executable(test_repositories tests/test_repositories.cpp
+            src/database/repositories/terminalrepository.cpp
+            src/database/repositories/clientrepository.cpp
+            src/database/repositories/simcardrepository.cpp
+            src/database/repositories/documentrepository.cpp
+            src/database/repositories/paymentrepository.cpp)
+    target_include_directories(test_repositories PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_repositories PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
+    add_test(NAME test_repositories COMMAND test_repositories)
+
     if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers")
-        foreach(_sql_driver_pair "test_db_integration;qsqlpsql.dll" "test_concurrency;qsqlpsql.dll" "test_connectionpool;qsqlite.dll" "test_validator;qsqlite.dll")
+        foreach(_sql_driver_pair "test_db_integration;qsqlpsql.dll" "test_concurrency;qsqlpsql.dll" "test_connectionpool;qsqlite.dll" "test_validator;qsqlite.dll" "test_repositories;qsqlite.dll")
             list(GET _sql_driver_pair 0 _test)
             list(GET _sql_driver_pair 1 _driver)
             if(EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/${_driver}")
@@ -352,7 +372,7 @@ if(BUILD_TESTS)
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
     foreach(_test test_password_utils test_validator test_loginform test_update_utils test_updatemanager
             test_opsscheduler test_db_integration test_concurrency
-            test_ui_components test_connectionpool test_circuitbreaker test_reportexporter)
+            test_ui_components test_connectionpool test_circuitbreaker test_reportexporter test_repositories)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)
             if(DEFINED QT_DLL_DIR AND EXISTS "${QT_DLL_DIR}/${_qt_dll}")
                 add_custom_command(TARGET ${_test} POST_BUILD

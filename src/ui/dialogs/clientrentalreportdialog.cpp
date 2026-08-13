@@ -1,7 +1,7 @@
 #include "dialogs/clientrentalreportdialog.h"
 
 #include "database/databasemanager.h"
-#include "utils/logging.h"
+#include "database/repositories/clientrepository.h"
 #include "utils/reportexporter.h"
 
 #include <QFileDialog>
@@ -11,8 +11,6 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QSqlQueryModel>
 #include <QTableView>
 #include <QVBoxLayout>
@@ -54,24 +52,8 @@ ClientRentalReportDialog::ClientRentalReportDialog(int clientId, const QString& 
                              "QHeaderView::section { background: #2D2D2D; color: #FFFFFF; padding: 8px; "
                              "border: none; border-bottom: 2px solid #0D47A1; font-weight: bold; font-size: 12px; }");
 
-    QString queryStr = "SELECT m.modelname AS \"Модель\", "
-                       "t.serialnumber AS \"Серийный номер\", "
-                       "COALESCE(s.simnumber, '—') AS \"SIM-карта\", "
-                       "r.docdate::date AS \"Дата передачи\" "
-                       "FROM tblrentaldocs r "
-                       "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
-                       "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
-                       "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-                       "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
-                       "WHERE r.clientid = :clientId "
-                       "ORDER BY r.docdate DESC, t.serialnumber";
-
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare(queryStr);
-    query.bindValue(":clientId", clientId);
-    if (!query.exec())
-        qCWarning(logSQL) << "Failed to load client rental report:" << query.lastError().text();
-    m_model->setQuery(std::move(query));
+    ClientRepository repo(DatabaseManager::instance().getDatabase());
+    repo.populateRentedTerminals(m_model, clientId);
 
     groupLayout->addWidget(tableView);
     layout->addWidget(groupBox);

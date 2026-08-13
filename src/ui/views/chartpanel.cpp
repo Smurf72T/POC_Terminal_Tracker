@@ -1,13 +1,14 @@
 #include "views/chartpanel.h"
 
 #include "database/databasemanager.h"
+#include "database/repositories/paymentrepository.h"
+#include "database/repositories/terminalrepository.h"
 #include "utils/terminal_status.h"
 
 #include <QChart>
 #include <QChartView>
 #include <QHBoxLayout>
 #include <QPainter>
-#include <QSqlQuery>
 #include <QValueAxis>
 #include <QBarCategoryAxis>
 #include <QBarSeries>
@@ -56,52 +57,43 @@ void ChartPanel::applyDarkTheme(bool dark)
 
 void ChartPanel::rebuildPie()
 {
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
     auto* pieChart = qobject_cast<QChart*>(m_statusView->chart());
     if (!pieChart)
         return;
 
+    TerminalRepository repo(DatabaseManager::instance().getDatabase());
+    const auto counts = repo.statusCounts();
+
     QString signature;
-    if (query.exec("SELECT " + TerminalStatus::sqlCaseExpression("status") +
-                   " AS status_name, COUNT(*) FROM tblterminals GROUP BY status ORDER BY status")) {
-        while (query.next())
-            signature += query.value(0).toString() + "=" + query.value(1).toString() + ";";
-    }
+    for (const auto& c : counts)
+        signature += TerminalStatus::name(c.status) + "=" + QString::number(c.count) + ";";
     if (signature == m_signature.value("pie"))
         return;
 
     m_signature["pie"] = signature;
     pieChart->removeAllSeries();
     auto* pieSeries = new QPieSeries();
-    if (query.exec("SELECT " + TerminalStatus::sqlCaseExpression("status") +
-                   " AS status_name, COUNT(*) FROM tblterminals GROUP BY status ORDER BY status")) {
-        while (query.next())
-            pieSeries->append(query.value(0).toString(), query.value(1).toInt());
-    }
+    for (const auto& c : counts)
+        pieSeries->append(TerminalStatus::name(c.status), c.count);
     pieChart->addSeries(pieSeries);
 }
 
 void ChartPanel::rebuildBar()
 {
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
     auto* barChart = qobject_cast<QChart*>(m_revenueView->chart());
     if (!barChart)
         return;
 
+    PaymentRepository repo(DatabaseManager::instance().getDatabase());
+    const auto revenues = repo.revenueByMonth(6);
+
     QString signature;
     QStringList categories;
     QList<double> totals;
-    if (query.exec("SELECT to_char(periodyear || '-' || LPAD(periodmonth::text, 2, '0'), 'YYYY-MM') AS month, "
-                   "COALESCE(SUM(amount), 0) AS total "
-                   "FROM tblpayments "
-                   "WHERE (periodyear * 12 + periodmonth) >= (EXTRACT(YEAR FROM CURRENT_DATE) * 12 + EXTRACT(MONTH "
-                   "FROM CURRENT_DATE) - 5) "
-                   "GROUP BY periodyear, periodmonth ORDER BY periodyear, periodmonth")) {
-        while (query.next()) {
-            categories << query.value(0).toString();
-            totals << query.value(1).toDouble();
-            signature += query.value(0).toString() + "=" + query.value(1).toString() + ";";
-        }
+    for (const auto& r : revenues) {
+        categories << r.month;
+        totals << r.total;
+        signature += r.month + "=" + QString::number(r.total) + ";";
     }
     if (signature == m_signature.value("bar"))
         return;

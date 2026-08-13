@@ -1,7 +1,8 @@
 #include "dialogs/freedevicesreportdialog.h"
 
 #include "database/databasemanager.h"
-#include "utils/logging.h"
+#include "database/repositories/simcardrepository.h"
+#include "database/repositories/terminalrepository.h"
 #include "utils/reportexporter.h"
 
 #include <QFileDialog>
@@ -10,8 +11,6 @@
 #include <QHeaderView>
 #include <QMessageBox>
 #include <QPushButton>
-#include <QSqlError>
-#include <QSqlQuery>
 #include <QSqlQueryModel>
 #include <QTableView>
 #include <QVBoxLayout>
@@ -28,14 +27,8 @@ FreeDevicesReportDialog::FreeDevicesReportDialog(QWidget* parent) : QDialog(pare
     auto* termModel = new QSqlQueryModel(termGroupBox);
     m_termView = new QTableView(termGroupBox);
 
-    QString termQuery = "SELECT t.serialnumber, m.modelname, "
-                        "COALESCE(s.simnumber, 'SIM не назначена') AS simstatus "
-                        "FROM tblterminals t "
-                        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-                        "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid "
-                        "WHERE t.status = 0 "
-                        "ORDER BY t.serialnumber";
-    termModel->setQuery(termQuery, DatabaseManager::instance().getDatabase());
+    TerminalRepository terminals(DatabaseManager::instance().getDatabase());
+    terminals.populateFreeTerminals(termModel);
     m_termView->setModel(termModel);
     m_termView->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_termView->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -51,15 +44,8 @@ FreeDevicesReportDialog::FreeDevicesReportDialog(QWidget* parent) : QDialog(pare
     auto* simModel = new QSqlQueryModel(simGroupBox);
     m_simView = new QTableView(simGroupBox);
 
-    QString simQuery = "SELECT s.simnumber, s.notes, "
-                       "'Не используется' AS status "
-                       "FROM tblsimcards s "
-                       "WHERE s.status = 0 "
-                       "AND s.simcardid NOT IN ("
-                       "    SELECT t.currentsimcardid FROM tblterminals t WHERE t.currentsimcardid IS NOT NULL"
-                       ") "
-                       "ORDER BY s.simnumber";
-    simModel->setQuery(simQuery, DatabaseManager::instance().getDatabase());
+    SimCardRepository sims(DatabaseManager::instance().getDatabase());
+    sims.populateFreeSimCards(simModel);
     m_simView->setModel(simModel);
     m_simView->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_simView->setSelectionMode(QAbstractItemView::SingleSelection);

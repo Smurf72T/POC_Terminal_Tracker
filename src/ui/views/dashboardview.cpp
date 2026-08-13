@@ -3,12 +3,15 @@
 #include "views/chartpanel.h"
 
 #include "database/databasemanager.h"
+#include "database/repositories/clientrepository.h"
+#include "database/repositories/documentrepository.h"
+#include "database/repositories/simcardrepository.h"
+#include "database/repositories/terminalrepository.h"
 
 #include <QDateTime>
 #include <QHeaderView>
 #include <QLabel>
 #include <QModelIndex>
-#include <QSqlQuery>
 #include <QSqlQueryModel>
 #include <QTableView>
 #include <QTimer>
@@ -125,44 +128,23 @@ void DashboardView::onTopClientDoubleClicked(const QModelIndex& index)
 
 void DashboardView::loadCounters()
 {
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
+    TerminalRepository terminals(db);
+    SimCardRepository sims(db);
+    ClientRepository clients(db);
 
-    if (query.exec("SELECT COUNT(*) FROM tblterminals") && query.next()) {
-        updateCounterWidget(m_ui->labelValueTotal, m_ui->labelNameTotal, query.value(0).toString(), "Всего терминалов",
-                            "#3498db");
-    }
-
-    if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 0") && query.next()) {
-        updateCounterWidget(m_ui->labelValueFree, m_ui->labelNameFree, query.value(0).toString(), "Свободно терминалов",
-                            "#2ecc71");
-    }
-
-    if (query.exec("SELECT COUNT(*) FROM tblterminals WHERE status = 1") && query.next()) {
-        updateCounterWidget(m_ui->labelValueRented, m_ui->labelNameRented, query.value(0).toString(), "В аренде",
-                            "#e74c3c");
-    }
-
-    if (query.exec("SELECT COUNT(*) FROM tblsimcards") && query.next()) {
-        updateCounterWidget(m_ui->labelValueTotalSIM, m_ui->labelNameTotalSIM, query.value(0).toString(),
-                            "Всего SIM-карт", "#9b59b6");
-    }
-
-    if (query.exec("SELECT COUNT(*) FROM tblsimcards s "
-                   "WHERE s.status = 0 "
-                   "OR EXISTS ("
-                   "    SELECT 1 FROM tblterminals t "
-                   "    WHERE t.currentsimcardid = s.simcardid "
-                   "    AND t.status = 0"
-                   ")") &&
-        query.next()) {
-        updateCounterWidget(m_ui->labelValueFreeSIM, m_ui->labelNameFreeSIM, query.value(0).toString(), "Свободно SIM",
-                            "#1abc9c");
-    }
-
-    if (query.exec("SELECT COUNT(*) FROM tblclients") && query.next()) {
-        updateCounterWidget(m_ui->labelValueClients, m_ui->labelNameClients, query.value(0).toString(), "Клиентов",
-                            "#f39c12");
-    }
+    updateCounterWidget(m_ui->labelValueTotal, m_ui->labelNameTotal, QString::number(terminals.countAll()),
+                        "Всего терминалов", "#3498db");
+    updateCounterWidget(m_ui->labelValueFree, m_ui->labelNameFree, QString::number(terminals.countByStatus(0)),
+                        "Свободно терминалов", "#2ecc71");
+    updateCounterWidget(m_ui->labelValueRented, m_ui->labelNameRented, QString::number(terminals.countByStatus(1)),
+                        "В аренде", "#e74c3c");
+    updateCounterWidget(m_ui->labelValueTotalSIM, m_ui->labelNameTotalSIM, QString::number(sims.countAll()),
+                        "Всего SIM-карт", "#9b59b6");
+    updateCounterWidget(m_ui->labelValueFreeSIM, m_ui->labelNameFreeSIM, QString::number(sims.countFree()),
+                        "Свободно SIM", "#1abc9c");
+    updateCounterWidget(m_ui->labelValueClients, m_ui->labelNameClients, QString::number(clients.countAll()),
+                        "Клиентов", "#f39c12");
 }
 
 void DashboardView::updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel, const QString& value,
@@ -180,33 +162,15 @@ void DashboardView::updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel, c
 
 void DashboardView::loadTopClients()
 {
-    QString queryStr = "SELECT c.clientid, c.clientname AS \"Клиент\", "
-                       "COUNT(t.terminalid) AS \"Терминалов в аренде\" "
-                       "FROM tblclients c "
-                       "JOIN tblrentaldocs r ON c.clientid = r.clientid "
-                       "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
-                       "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
-                       "GROUP BY c.clientid, c.clientname "
-                       "ORDER BY COUNT(t.terminalid) DESC";
-
-    m_topClientsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    ClientRepository clients(DatabaseManager::instance().getDatabase());
+    clients.populateRentalStatistics(m_topClientsModel);
     m_ui->tableViewTopClients->hideColumn(0);
 }
 
 void DashboardView::loadRecentDocuments()
 {
-    QString queryStr = "SELECT 1 AS doctype, receiptdocid AS docid, docnumber AS \"Номер\", docdate AS \"Дата\", "
-                       "'Поступление' AS \"Тип\" FROM tblreceiptdocs "
-                       "UNION ALL "
-                       "SELECT 2, rentaldocid, docnumber, docdate, 'Аренда' FROM tblrentaldocs "
-                       "UNION ALL "
-                       "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
-                       "UNION ALL "
-                       "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
-                       "ORDER BY \"Дата\" DESC "
-                       "LIMIT 15";
-
-    m_recentDocsModel->setQuery(queryStr, DatabaseManager::instance().getDatabase());
+    DocumentRepository documents(DatabaseManager::instance().getDatabase());
+    documents.populateRecentDocuments(m_recentDocsModel);
     m_ui->tableViewRecentDocs->hideColumn(0);
     m_ui->tableViewRecentDocs->hideColumn(1);
 }
