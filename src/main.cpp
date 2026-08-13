@@ -276,15 +276,20 @@ int main(int argc, char* argv[])
         }
     }
 
-    MainWindow w;
-    w.setWindowTitle(QString("POC Terminal Tracker — %1").arg(loginDialog.getUsername()));
-    w.show();
+    // MainWindow и все её QSqlQueryModel должны быть разрушены ДО закрытия
+    // соединения с БД: иначе Qt/CQPSQL пишет "Unable to free statement: connection
+    // pointer is NULL" при освобождении statement-ов моделей на закрытом соединении.
+    int rc = 0;
+    {
+        MainWindow w;
+        w.setWindowTitle(QString("POC Terminal Tracker — %1").arg(loginDialog.getUsername()));
+        w.show();
+        rc = a.exec();
+    }
 
-    // Graceful shutdown: закрываем соединение с БД после завершения цикла событий
-    QObject::connect(&a, &QCoreApplication::aboutToQuit, []() {
-        qCInfo(logApp) << "Приложение завершает работу, закрываем соединение с БД";
-        DatabaseManager::instance().close();
-    });
+    // UI-объекты разрушены — теперь можно безопасно закрыть соединение с БД.
+    qCInfo(logApp) << "Приложение завершает работу, закрываем соединение с БД";
+    DatabaseManager::instance().close();
 
-    return a.exec();
+    return rc;
 }

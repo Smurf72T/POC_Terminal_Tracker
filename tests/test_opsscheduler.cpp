@@ -71,7 +71,7 @@ void TestOpsScheduler::backupResultMetatypeRegistered()
     // BackupResult передаётся через сигнал между потоками (queued). Если тип не
     // зарегистрирован — Qt дропает аргумент и бэкап "зависает" (m_backupInProgress).
     QVERIFY(QMetaType::isRegistered(qMetaTypeId<BackupManager::BackupResult>()));
-    QVERIFY(QMetaType::type("BackupManager::BackupResult") != QMetaType::UnknownType);
+    QVERIFY(QMetaType::fromName("BackupManager::BackupResult").id() != QMetaType::UnknownType);
 }
 
 QTEST_GUILESS_MAIN(TestOpsScheduler)
