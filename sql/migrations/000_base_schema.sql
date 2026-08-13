@@ -40,7 +40,10 @@ CREATE TABLE IF NOT EXISTS tblsimcards (
 );
 
 -- Справочник POC-терминалов
--- status: 0 — свободен, 1 — в аренде, 2 — в ремонте/списан
+-- status: 0 — свободен, 1 — в аренде, 2 — в ремонте, 3 — списан, 4 — утерян.
+--   CHECK в исходной схеме ограничен 0..2; полный словарь 0..4 вводит
+--   миграция 006_terminal_status_check.sql. Единый C++-источник имён:
+--   src/utils/terminal_status.h (TerminalStatus).
 CREATE TABLE IF NOT EXISTS tblterminals (
     terminalid SERIAL PRIMARY KEY,
     serialnumber VARCHAR(50) NOT NULL UNIQUE,

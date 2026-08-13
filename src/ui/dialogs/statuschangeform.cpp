@@ -2,6 +2,7 @@
 #include "ui_statuschangeform.h"
 #include "database/databasemanager.h"
 #include "utils/logging.h"
+#include "utils/terminal_status.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -96,20 +97,7 @@ bool StatusChangeForm::expectStatus(int status) const
 
 QString StatusChangeForm::statusText(int status) const
 {
-    switch (status) {
-        case 0:
-            return "Свободен";
-        case 1:
-            return "В аренде";
-        case 2:
-            return "В ремонте";
-        case 3:
-            return "Списан";
-        case 4:
-            return "Утерян";
-        default:
-            return "Прочее";
-    }
+    return TerminalStatus::name(status);
 }
 
 void StatusChangeForm::loadRepairDocs()
@@ -143,9 +131,9 @@ void StatusChangeForm::loadTerminalsFromRepairDoc(int repairDocId)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("SELECT t.terminalid, t.serialnumber, "
                   "COALESCE(m.modelname, '—') AS modelname, "
-                  "COALESCE(t.imei1, '') AS imei1, "
-                  "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' "
-                  "WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
+                  "COALESCE(t.imei1, '') AS imei1, " +
+                  TerminalStatus::sqlCaseExpression("t.status") +
+                  " AS status, "
                   "t.was_repaired "
                   "FROM tblstatuschangedetails scd "
                   "JOIN tblterminals t ON scd.terminalid = t.terminalid "
@@ -197,9 +185,9 @@ void StatusChangeForm::loadTerminals()
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("SELECT t.terminalid, t.serialnumber, "
                   "COALESCE(m.modelname, '—') AS modelname, "
-                  "COALESCE(t.imei1, '') AS imei1, "
-                  "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' "
-                  "WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
+                  "COALESCE(t.imei1, '') AS imei1, " +
+                  TerminalStatus::sqlCaseExpression("t.status") +
+                  " AS status, "
                   "t.was_repaired "
                   "FROM tblterminals t "
                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "

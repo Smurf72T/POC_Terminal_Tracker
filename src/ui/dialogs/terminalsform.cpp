@@ -1,6 +1,7 @@
 #include "terminalsform.h"
 #include "ui_terminalsform.h"
 #include "database/databasemanager.h"
+#include "utils/terminal_status.h"
 #include "utils/validator.h"
 #include <QMessageBox>
 #include <QSqlError>
@@ -121,9 +122,9 @@ void TerminalsForm::loadModel(const QString& filter)
 
     QString queryStr = "SELECT t.terminalid, t.serialnumber, "
                        "COALESCE(m.modelname, 'Неизвестная') AS modelname, "
-                       "t.imei1, t.imei2, "
-                       "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 "
-                       "THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
+                       "t.imei1, t.imei2, " +
+                       TerminalStatus::sqlCaseExpression("t.status") +
+                       " AS status, "
                        "COALESCE(s.simnumber, 'SIM не назначена') AS simnumber, "
                        "t.purchasedate, t.notes, "
                        "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS was_repaired, "

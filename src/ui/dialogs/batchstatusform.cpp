@@ -1,6 +1,7 @@
 #include "batchstatusform.h"
 #include "ui_batchstatusform.h"
 #include "database/databasemanager.h"
+#include "utils/terminal_status.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -53,9 +54,9 @@ void BatchStatusForm::loadTerminals(int currentStatus)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("SELECT t.terminalid AS \"ID\", "
                   "t.serialnumber AS \"Серийный номер\", "
-                  "COALESCE(m.modelname, '—') AS \"Модель\", "
-                  "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN "
-                  "'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS \"Статус\" "
+                  "COALESCE(m.modelname, '—') AS \"Модель\", " +
+                  TerminalStatus::sqlCaseExpression("t.status") +
+                  " AS \"Статус\" "
                   "FROM tblterminals t "
                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                   "WHERE t.status = :status AND t.is_deactivated = FALSE "
@@ -96,9 +97,7 @@ void BatchStatusForm::on_btnApply_clicked()
         return;
     }
 
-    static const char* const kStatusNames[] = {"Свободен", "В аренде", "В ремонте", "Списан", "Утерян"};
-    QString statusText = (newStatus >= 0 && newStatus <= 4) ? QString::fromUtf8(kStatusNames[newStatus])
-                                                            : QString::fromUtf8("Статус %1").arg(newStatus);
+    QString statusText = TerminalStatus::name(newStatus);
 
     QMessageBox::StandardButton reply = QMessageBox::question(
         this, "Подтверждение", QString("Изменить статус %1 терминалов на «%2»?").arg(selected.size()).arg(statusText),

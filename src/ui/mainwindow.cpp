@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "database/databasemanager.h"
 #include "utils/logging.h"
+#include "utils/terminal_status.h"
 #include "ops/backupmanager.h"
 #include "ops/backupworker.h"
 #include "ops/opslog.h"
@@ -345,8 +346,8 @@ void MainWindow::updateCharts()
     if (pieChart) {
         QString signature;
         QPieSeries* pieSeries = nullptr;
-        if (query.exec("SELECT CASE status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN "
-                       "3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END, COUNT(*) FROM tblterminals GROUP BY "
+        if (query.exec("SELECT " + TerminalStatus::sqlCaseExpression("status") +
+                       ", COUNT(*) FROM tblterminals GROUP BY "
                        "status ORDER BY status")) {
             while (query.next()) {
                 signature += query.value(0).toString() + "=" + query.value(1).toString() + ";";
@@ -356,8 +357,8 @@ void MainWindow::updateCharts()
             m_chartsSignature["pie"] = signature;
             pieChart->removeAllSeries();
             pieSeries = new QPieSeries();
-            if (query.exec("SELECT CASE status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' "
-                           "WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END, COUNT(*) FROM tblterminals "
+            if (query.exec("SELECT " + TerminalStatus::sqlCaseExpression("status") +
+                           ", COUNT(*) FROM tblterminals "
                            "GROUP BY status ORDER BY status")) {
                 while (query.next())
                     pieSeries->append(query.value(0).toString(), query.value(1).toInt());
