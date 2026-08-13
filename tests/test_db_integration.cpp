@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMap>
@@ -731,6 +732,11 @@ void TestDbIntegration::test_backup_and_opslog()
     // Roundtrip: восстановление зашифрованного бэкапа в СВЕЖУЮ пустую БД.
     // (Восстановление поверх рабочей БД не поддерживается: pg_dump --clean
     //  не удаляет таблицы с внешнеключевыми зависимостями.)
+    // Восстановление выполняется внешней утилитой psql — если её нет в PATH,
+    // пропускаем roundtrip-часть вместо падения (локально, без PostgreSQL).
+    if (QStandardPaths::findExecutable("psql").isEmpty()) {
+        QSKIP("psql не найден в PATH — roundtrip-проверка восстановления пропущена");
+    }
     const QString restoreDbName = "pocbase_test_restore";
     QSqlQuery termR(m_adminDb);
     termR.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
