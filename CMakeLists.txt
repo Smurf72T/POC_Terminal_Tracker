@@ -73,6 +73,7 @@ set(SOURCES
         src/ui/dialogs/reportsform.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
+        src/utils/registration_ratelimiter.cpp
         src/utils/logging.cpp
         src/utils/circuitbreaker.cpp
         src/ops/backupmanager.cpp
@@ -113,6 +114,7 @@ set(HEADERS
         src/ui/dialogs/reportsform.h
         src/utils/reportexporter.h
         src/utils/validator.h
+        src/utils/registration_ratelimiter.h
         src/utils/logging.h
         src/utils/circuitbreaker.h
         src/utils/password_utils.h
@@ -240,6 +242,11 @@ if(BUILD_TESTS)
     target_link_libraries(test_validator PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_validator COMMAND test_validator)
 
+    add_executable(test_loginform tests/test_loginform.cpp src/utils/registration_ratelimiter.cpp)
+    target_include_directories(test_loginform PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_loginform PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME test_loginform COMMAND test_loginform)
+
     add_executable(test_update_utils tests/test_update_utils.cpp)
     target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(test_update_utils PRIVATE Qt6::Test Qt6::Core)
@@ -323,7 +330,7 @@ if(BUILD_TESTS)
     endif()
 
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
-    foreach(_test test_password_utils test_validator test_update_utils test_updatemanager
+    foreach(_test test_password_utils test_validator test_loginform test_update_utils test_updatemanager
             test_opsscheduler test_db_integration test_concurrency
             test_ui_components test_connectionpool test_circuitbreaker test_reportexporter)
         foreach(_qt_dll Qt6Test.dll Qt6Core.dll Qt6Gui.dll Qt6Widgets.dll Qt6Sql.dll Qt6PrintSupport.dll)

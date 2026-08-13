@@ -10,7 +10,6 @@
 #include <QDateTime>
 #include <QApplication>
 #include <QDebug>
-#include <algorithm>
 
 LoginForm::LoginForm(QWidget* parent) : QDialog(parent), ui(new Ui::LoginForm)
 {
@@ -186,26 +185,7 @@ void LoginForm::on_btnCancel_clicked()
 
 bool LoginForm::registrationAllowed(QString* blockMessage)
 {
-    const qint64 current = QDateTime::currentMSecsSinceEpoch();
-
-    // Выбрасываем устаревшие попытки за пределами окна.
-    m_registerAttempts.erase(std::remove_if(m_registerAttempts.begin(), m_registerAttempts.end(),
-                                            [current](qint64 t) { return current - t > kRateLimitWindowMs; }),
-                             m_registerAttempts.end());
-
-    if (m_registerAttempts.size() >= kMaxRegistrations) {
-        if (blockMessage) {
-            const qint64 oldest = m_registerAttempts.first();
-            const int minutes = static_cast<int>((kRateLimitWindowMs - (current - oldest)) / 60000) + 1;
-            *blockMessage = QString("Слишком много попыток регистрации (максимум %1 за %2 мин). "
-                                    "Подождите ~%3 мин.")
-                                .arg(kMaxRegistrations)
-                                .arg(kRateLimitWindowMs / 60000)
-                                .arg(minutes);
-        }
-        return false;
-    }
-    return true;
+    return m_registrationLimiter.isAllowed(QDateTime::currentMSecsSinceEpoch(), blockMessage);
 }
 
 void LoginForm::on_btnRegister_clicked()
@@ -260,7 +240,7 @@ void LoginForm::on_btnRegister_clicked()
 
     if (query.exec()) {
         // Учитываем успешную заявку в rate-limit.
-        m_registerAttempts.append(QDateTime::currentMSecsSinceEpoch());
+        m_registrationLimiter.recordSuccess(QDateTime::currentMSecsSinceEpoch());
         QMessageBox::information(this, "Успех",
                                  "Заявка на регистрацию '" + username.trimmed() +
                                      "' отправлена.\n"
