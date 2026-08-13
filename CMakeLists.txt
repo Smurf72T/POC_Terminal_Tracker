@@ -301,7 +301,7 @@ if(BUILD_TESTS)
     add_test(NAME test_reportexporter COMMAND test_reportexporter)
 
     if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers")
-        foreach(_sql_driver_pair "test_db_integration;qsqlpsql.dll" "test_concurrency;qsqlpsql.dll" "test_connectionpool;qsqlite.dll")
+        foreach(_sql_driver_pair "test_db_integration;qsqlpsql.dll" "test_concurrency;qsqlpsql.dll" "test_connectionpool;qsqlite.dll" "test_validator;qsqlite.dll")
             list(GET _sql_driver_pair 0 _test)
             list(GET _sql_driver_pair 1 _driver)
             if(EXISTS "${CMAKE_PREFIX_PATH}/plugins/sqldrivers/${_driver}")

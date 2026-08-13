@@ -93,6 +93,33 @@ private slots:
         QVERIFY(!Validator::validateINNChecksum("770708389325"));
     }
 
+    void testUniqueSerial()
+    {
+        // Тестовая БД (stub, in-memory SQLite) содержит серийники SN-ALREADY-0001/0002.
+        // Уникальный сериал → true.
+        QVERIFY(Validator::checkUniqueSerial("SN-NEW-0003"));
+        QVERIFY(Validator::checkUniqueSerial("SN-ALREADY-0001", 1)); // исключая сам терминал с этим сериалом
+        // Дубль → false.
+        QVERIFY(!Validator::checkUniqueSerial("SN-ALREADY-0001"));
+        QVERIFY(!Validator::checkUniqueSerial(" SN-ALREADY-0002 ")); // с пробелами, сравнение после trim
+    }
+
+    void testDuplicateIMEI()
+    {
+        // Тестовая БД содержит imei1=111111111111111 (терминал 1) и imei2=222222222222222 (там же).
+        // checkDuplicateIMEI() возвращает TRUE, если IMEI уже занят (дубликат найден).
+        QVERIFY(Validator::checkDuplicateIMEI("111111111111111")); // imei1 терминала 1
+        QVERIFY(Validator::checkDuplicateIMEI("333333333333333")); // imei1 второго терминала
+        QVERIFY(Validator::checkDuplicateIMEI("222222222222222")); // imei2 терминала 1
+        // Исключая сам терминал → дубликатов больше нет.
+        QVERIFY(!Validator::checkDuplicateIMEI("111111111111111", 1));
+        // Свободный IMEI → не дубликат.
+        QVERIFY(!Validator::checkDuplicateIMEI("999999999999999"));
+        // Пустой / нулевой IMEI → false (не дубликат).
+        QVERIFY(!Validator::checkDuplicateIMEI(""));
+        QVERIFY(!Validator::checkDuplicateIMEI("000000000000000"));
+    }
+
     void testCreateValidators()
     {
         QRegularExpression imeiRe = Validator::createIMEIValidator();

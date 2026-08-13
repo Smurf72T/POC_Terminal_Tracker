@@ -19,7 +19,26 @@ public:
     QStringList pendingMigrations() override { return {}; }
     const QSqlDatabase& getDatabase() const override
     {
-        static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "stub");
+        static QSqlDatabase db = []() {
+            QSqlDatabase d = QSqlDatabase::addDatabase("QSQLITE", "stub");
+            d.setDatabaseName(":memory:");
+            if (!d.open())
+                return d;
+            QSqlQuery q(d);
+            q.exec("CREATE TABLE tblterminals (terminalid INTEGER PRIMARY KEY AUTOINCREMENT, "
+                   "serialnumber TEXT UNIQUE, imei1 TEXT, imei2 TEXT)");
+            q.prepare("INSERT INTO tblterminals (serialnumber, imei1, imei2) VALUES (?, ?, ?)");
+            q.addBindValue("SN-ALREADY-0001");
+            q.addBindValue("111111111111111");
+            q.addBindValue("222222222222222");
+            q.exec();
+            q.prepare("INSERT INTO tblterminals (serialnumber, imei1, imei2) VALUES (?, ?, ?)");
+            q.addBindValue("SN-ALREADY-0002");
+            q.addBindValue("333333333333333");
+            q.addBindValue(QString());
+            q.exec();
+            return d;
+        }();
         return db;
     }
     QJsonObject configObject() const override { return {}; }
