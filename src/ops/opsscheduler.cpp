@@ -95,6 +95,14 @@ void OpsScheduler::start()
                    << (m_backupIntervalSec / 3600) << "ч, retention" << m_retentionCount;
     qCInfo(logApp) << "OpsScheduler: проверка целостности" << (m_integrityEnabled ? "включена" : "выключена")
                    << ", интервал" << (m_integrityIntervalSec / 3600) << "ч";
+
+    // Автобэкап без passphrase сохраняет резервную копию незашифрованной —
+    // предупреждаем сразу, а не в момент первого дампа.
+    if (m_backupEnabled && m_backupPassphrase.isEmpty()) {
+        qCWarning(logApp) << "OpsScheduler: автобэкап включён, но backup.passphrase пуст —"
+                          << "резервные копии не будут шифроваться. Задайте passphrase в config.json.";
+        OpsLog::instance().warning("Автобэкап без passphrase: резервные копии не шифруются (config backup.passphrase).");
+    }
 }
 
 bool OpsScheduler::backupEnabled() const

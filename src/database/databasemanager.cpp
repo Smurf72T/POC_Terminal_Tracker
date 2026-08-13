@@ -145,8 +145,12 @@ bool DatabaseManager::openConnection()
             break;
         }
     }
-    if (!loadedEnvPath.isEmpty())
+    if (!loadedEnvPath.isEmpty()) {
+        qCInfo(logApp) << "DatabaseManager: данные подключаются из .env:" << loadedEnvPath;
         warnOnInsecureEnvPermissions(loadedEnvPath);
+    } else {
+        qCInfo(logApp) << "DatabaseManager: .env не найден — используются значения из config.json";
+    }
 
     QJsonObject dbConfig = m_config["database"].toObject();
 
