@@ -11,12 +11,11 @@ class QTimer;
 class QThread;
 class BackupWorker;
 
-class OpsScheduler : public QObject
-{
+class OpsScheduler : public QObject {
     Q_OBJECT
 
 public:
-    explicit OpsScheduler(const QJsonObject &config, QObject *parent = nullptr);
+    explicit OpsScheduler(const QJsonObject& config, QObject* parent = nullptr);
     ~OpsScheduler() override;
 
     void start();
@@ -35,24 +34,24 @@ public slots:
     void runIntegrityCheck();
 
 signals:
-    void backupFinished(bool ok, const QString &filePath, const QString &message);
-    void integrityFinished(bool ok, const QString &summary);
-    void backupRequested(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
+    void backupFinished(bool ok, const QString& filePath, const QString& message);
+    void integrityFinished(bool ok, const QString& summary);
+    void backupRequested(const QString& filePath, const QString& connectionPassword, const QString& passphrase);
 
 private slots:
     void checkSchedule();
-    void onBackupWorkerFinished(const BackupManager::BackupResult &result);
+    void onBackupWorkerFinished(const BackupManager::BackupResult& result);
 
 private:
     void runScheduledBackup();
     void ensureBackupWorker();
     void enforceRetention();
-    void readConfig(const QJsonObject &config);
+    void readConfig(const QJsonObject& config);
     void rescheduleTimer();
 
-    QTimer *m_timer = nullptr;
-    QThread *m_backupThread = nullptr;
-    BackupWorker *m_backupWorker = nullptr;
+    QTimer* m_timer = nullptr;
+    QThread* m_backupThread = nullptr;
+    BackupWorker* m_backupWorker = nullptr;
     bool m_backupInProgress = false;
 
     bool m_backupEnabled = false;

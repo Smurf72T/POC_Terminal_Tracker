@@ -7,23 +7,22 @@
 #include <QPushButton>
 #include <QComboBox>
 
-class UserManagementForm : public QDialog
-{
+class UserManagementForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit UserManagementForm(QWidget *parent = nullptr);
+    explicit UserManagementForm(QWidget* parent = nullptr);
 
 private slots:
-    void onRoleChanged(int row, int userId, const QString &newRole);
+    void onRoleChanged(int row, int userId, const QString& newRole);
     void onToggleActive(int row, int userId, bool currentlyActive);
-    void onResetPassword(int userId, const QString &username);
+    void onResetPassword(int userId, const QString& username);
     void refreshTable();
 
 private:
-    QTableView *tableView;
-    QSqlQueryModel *model;
-    QPushButton *btnRefresh;
+    QTableView* tableView;
+    QSqlQueryModel* model;
+    QPushButton* btnRefresh;
 
     void setupUI();
     void loadUsers();

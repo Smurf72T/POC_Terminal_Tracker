@@ -20,7 +20,7 @@
 #include "ops/backupmanager.h"
 
 namespace Ui {
-    class MainWindow;
+class MainWindow;
 }
 
 class QThread;
@@ -30,12 +30,11 @@ class UpdateManager;
 
 class BackupWorker;
 
-class MainWindow : public QMainWindow
-{
+class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
 
 private slots:
@@ -70,23 +69,23 @@ private slots:
     void onActionReports_triggered();
     void onActionUserManagement_triggered();
     void onDatabaseDataChanged();
-    void onRecentDocDoubleClicked(const QModelIndex &index);
-    void onTopClientDoubleClicked(const QModelIndex &index);
+    void onRecentDocDoubleClicked(const QModelIndex& index);
+    void onTopClientDoubleClicked(const QModelIndex& index);
 
 private:
-    Ui::MainWindow *ui;
-    QSqlQueryModel *topClientsModel;
-    QSqlQueryModel *recentDocsModel;
-    QTimer *refreshTimer;
+    Ui::MainWindow* ui;
+    QSqlQueryModel* topClientsModel;
+    QSqlQueryModel* recentDocsModel;
+    QTimer* refreshTimer;
     bool m_darkTheme = true;
-    QChartView *chartStatusView = nullptr;
-    QChartView *chartRevenueView = nullptr;
-    OpsScheduler *m_opsScheduler = nullptr;
-    UpdateManager *m_updater = nullptr;
-    QLabel *m_backupStatusLabel = nullptr;
+    QChartView* chartStatusView = nullptr;
+    QChartView* chartRevenueView = nullptr;
+    OpsScheduler* m_opsScheduler = nullptr;
+    UpdateManager* m_updater = nullptr;
+    QLabel* m_backupStatusLabel = nullptr;
 
-    QThread *m_backupThread = nullptr;
-    BackupWorker *m_backupWorker = nullptr;
+    QThread* m_backupThread = nullptr;
+    BackupWorker* m_backupWorker = nullptr;
     bool m_backupBusy = false;
 
     QMap<QString, QString> m_chartsSignature;
@@ -98,10 +97,11 @@ private:
     void loadCounters();
     void loadTopClients();
     void loadRecentDocuments();
-    void updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel, const QString& value, const QString& label, const QString& color);
-    void openForm(QWidget *form);
+    void updateCounterWidget(QLabel* valueLabel, QLabel* nameLabel, const QString& value, const QString& label,
+                             const QString& color);
+    void openForm(QWidget* form);
     void openFreeDevicesReport();
-    void openClientRentalReport(int clientId, const QString &clientName);
+    void openClientRentalReport(int clientId, const QString& clientName);
     void openBulkImport();
     void performBackup();
     void performRestore();
@@ -110,12 +110,12 @@ private:
     void showGlobalSearch();
 
 signals:
-    void backupRequested(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
-    void restoreRequested(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
+    void backupRequested(const QString& filePath, const QString& connectionPassword, const QString& passphrase);
+    void restoreRequested(const QString& filePath, const QString& connectionPassword, const QString& passphrase);
 
 private slots:
-    void onManualBackupFinished(const BackupManager::BackupResult &result);
-    void onManualRestoreFinished(bool ok, const QString &filePath, const QString &error);
+    void onManualBackupFinished(const BackupManager::BackupResult& result);
+    void onManualRestoreFinished(bool ok, const QString& filePath, const QString& error);
 };
 
 #endif // MAINWINDOW_H

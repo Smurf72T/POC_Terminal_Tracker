@@ -1,8 +1,7 @@
 #include <QtTest>
 #include "update/version.h"
 
-class TestUpdateUtils : public QObject
-{
+class TestUpdateUtils : public QObject {
     Q_OBJECT
 
 private slots:

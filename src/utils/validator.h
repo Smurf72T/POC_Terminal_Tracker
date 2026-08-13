@@ -7,12 +7,11 @@
 #include <QSqlQuery>
 #include <QSqlError>
 
-class Validator : public QObject
-{
+class Validator : public QObject {
     Q_OBJECT
 
 public:
-    explicit Validator(QObject *parent = nullptr);
+    explicit Validator(QObject* parent = nullptr);
 
     static bool validateIMEI(const QString& imei);
     static bool validateINN(const QString& inn);

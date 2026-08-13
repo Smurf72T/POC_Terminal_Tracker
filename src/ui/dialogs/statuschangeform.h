@@ -7,15 +7,14 @@
 #include <QSet>
 
 namespace Ui {
-    class StatusChangeForm;
+class StatusChangeForm;
 }
 
-class StatusChangeForm : public QDialog
-{
+class StatusChangeForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit StatusChangeForm(QWidget *parent = nullptr);
+    explicit StatusChangeForm(QWidget* parent = nullptr);
     ~StatusChangeForm();
 
     void loadForEdit(int docId);
@@ -29,8 +28,8 @@ private slots:
     void on_btnClose_clicked();
 
 private:
-    Ui::StatusChangeForm *ui;
-    QStandardItemModel *rowsModel;
+    Ui::StatusChangeForm* ui;
+    QStandardItemModel* rowsModel;
     bool m_editMode = false;
     int m_editDocId = 0;
     // Снимок состава и прежних статусов терминалов документа для корректного

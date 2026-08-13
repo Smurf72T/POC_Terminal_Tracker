@@ -8,38 +8,37 @@
 #include <QStringList>
 #include <functional>
 
-class StubDatabaseManager : public IDatabaseManager
-{
+class StubDatabaseManager : public IDatabaseManager {
 public:
-    bool initialize(const QString &) override { return true; }
+    bool initialize(const QString&) override { return true; }
     bool isConnected() const override { return false; }
     void close() override {}
     void listenForDataChanges() override {}
 
-    bool runMigrations(const QString &) override { return true; }
+    bool runMigrations(const QString&) override { return true; }
     QStringList pendingMigrations() override { return {}; }
-    const QSqlDatabase &getDatabase() const override
+    const QSqlDatabase& getDatabase() const override
     {
         static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "stub");
         return db;
     }
     QJsonObject configObject() const override { return {}; }
-    QSqlQuery executeQuery(const QString &, bool) override { return QSqlQuery(getDatabase()); }
-    bool executeTransaction(const std::function<bool(QSqlDatabase &)> &) override { return true; }
-    QString generateDocNumber(const QString &) override { return "DOC-2026-000001"; }
-    void logAction(const QString &, const QString &, int, const QString &, const QString &, const QString &) override {}
+    QSqlQuery executeQuery(const QString&, bool) override { return QSqlQuery(getDatabase()); }
+    bool executeTransaction(const std::function<bool(QSqlDatabase&)>&) override { return true; }
+    QString generateDocNumber(const QString&) override { return "DOC-2026-000001"; }
+    void logAction(const QString&, const QString&, int, const QString&, const QString&, const QString&) override {}
 
     void notifyDataChanged() override {}
-    void setCurrentUser(const QString &) override {}
-    void setAuditUsername(const QString &) override {}
-    void setSessionRole(const QString &) override {}
+    void setCurrentUser(const QString&) override {}
+    void setAuditUsername(const QString&) override {}
+    void setSessionRole(const QString&) override {}
     QString getCurrentUser() const override { return "test"; }
-    void setCurrentUserRole(const QString &) override {}
+    void setCurrentUserRole(const QString&) override {}
     QString getCurrentUserRole() const override { return "admin"; }
     bool isCurrentUserAdmin() const override { return true; }
 };
 
-IDatabaseManager &databaseManager()
+IDatabaseManager& databaseManager()
 {
     static StubDatabaseManager inst;
     return inst;

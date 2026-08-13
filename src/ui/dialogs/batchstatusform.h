@@ -5,15 +5,14 @@
 #include <QSqlQueryModel>
 
 namespace Ui {
-    class BatchStatusForm;
+class BatchStatusForm;
 }
 
-class BatchStatusForm : public QDialog
-{
+class BatchStatusForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit BatchStatusForm(QWidget *parent = nullptr);
+    explicit BatchStatusForm(QWidget* parent = nullptr);
     ~BatchStatusForm();
 
 private slots:
@@ -24,8 +23,8 @@ private slots:
     void on_comboBoxCurrentStatus_currentIndexChanged(int index);
 
 private:
-    Ui::BatchStatusForm *ui;
-    QSqlQueryModel *model;
+    Ui::BatchStatusForm* ui;
+    QSqlQueryModel* model;
 
     void loadStatuses();
     void loadTerminals(int currentStatus);

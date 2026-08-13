@@ -17,7 +17,7 @@ BackupWorker::BackupWorker()
     qRegisterMetaType<BackupManager::BackupResult>();
 }
 
-void BackupWorker::setConnectionParams(const ConnectionParams &params)
+void BackupWorker::setConnectionParams(const ConnectionParams& params)
 {
     m_params = params;
 }
@@ -35,16 +35,14 @@ void BackupWorker::requestCancel()
 QSqlDatabase BackupWorker::openConnection()
 {
     if (!m_pool) {
-        m_pool = new ConnectionPool(
-            [this]() { return createRawConnection(); }, 1);
+        m_pool = new ConnectionPool([this]() { return createRawConnection(); }, 1);
     }
     return m_pool->acquire();
 }
 
 QSqlDatabase BackupWorker::createRawConnection()
 {
-    QString name = QString("backup_worker_%1")
-                       .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    QString name = QString("backup_worker_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", name);
     db.setHostName(m_params.host);
     db.setPort(m_params.port);
@@ -57,13 +55,12 @@ QSqlDatabase BackupWorker::createRawConnection()
     db.setConnectOptions(options);
 
     if (!db.open()) {
-        OpsLog::instance().error(QString("BackupWorker: не удалось открыть соединение: %1")
-                                     .arg(db.lastError().text()));
+        OpsLog::instance().error(QString("BackupWorker: не удалось открыть соединение: %1").arg(db.lastError().text()));
     }
     return db;
 }
 
-void BackupWorker::createBackup(const QString &filePath, const QString &connectionPassword, const QString &passphrase)
+void BackupWorker::createBackup(const QString& filePath, const QString& connectionPassword, const QString& passphrase)
 {
     QSqlDatabase db = openConnection();
     BackupManager::BackupResult result;
@@ -79,7 +76,7 @@ void BackupWorker::createBackup(const QString &filePath, const QString &connecti
     emit backupFinished(result);
 }
 
-void BackupWorker::restore(const QString &filePath, const QString &connectionPassword, const QString &passphrase)
+void BackupWorker::restore(const QString& filePath, const QString& connectionPassword, const QString& passphrase)
 {
     QString error;
     bool ok = false;
@@ -95,13 +92,13 @@ void BackupWorker::restore(const QString &filePath, const QString &connectionPas
     emit restoreFinished(ok, filePath, error);
 }
 
-BackupWorker *createBackupWorker(QThread *&thread)
+BackupWorker* createBackupWorker(QThread*& thread)
 {
     if (thread)
         return nullptr;
 
     thread = new QThread;
-    BackupWorker *worker = new BackupWorker;
+    BackupWorker* worker = new BackupWorker;
 
     // Параметры соединения снимаем в главном потоке до moveToThread():
     // внутри рабочего потока используется собственное соединение.

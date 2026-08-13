@@ -31,12 +31,12 @@ struct IntegrityIssue {
     QString details;
 };
 
-bool countProblem(QSqlDatabase &db, const QString &label, const QString &sql, IntegrityIssue &issue)
+bool countProblem(QSqlDatabase& db, const QString& label, const QString& sql, IntegrityIssue& issue)
 {
     QSqlQuery q(db);
     if (!q.exec(sql)) {
-        OpsLog::instance().warning(QString("Проверка целостности: не удалось выполнить запрос «%1»: %2")
-                                       .arg(label, q.lastError().text()));
+        OpsLog::instance().warning(
+            QString("Проверка целостности: не удалось выполнить запрос «%1»: %2").arg(label, q.lastError().text()));
         return false;
     }
 
@@ -61,8 +61,7 @@ bool countProblem(QSqlDatabase &db, const QString &label, const QString &sql, In
 
 } // namespace
 
-OpsScheduler::OpsScheduler(const QJsonObject &config, QObject *parent)
-    : QObject(parent)
+OpsScheduler::OpsScheduler(const QJsonObject& config, QObject* parent) : QObject(parent)
 {
     readConfig(config);
     m_lastBackupAt = QDateTime::currentDateTime();
@@ -92,8 +91,8 @@ OpsScheduler::~OpsScheduler()
 void OpsScheduler::start()
 {
     m_timer->start(kSchedulerInitialTickMs);
-    qCInfo(logApp) << "OpsScheduler: бэкапы" << (m_backupEnabled ? "включены" : "выключены")
-                   << ", интервал" << (m_backupIntervalSec / 3600) << "ч, retention" << m_retentionCount;
+    qCInfo(logApp) << "OpsScheduler: бэкапы" << (m_backupEnabled ? "включены" : "выключены") << ", интервал"
+                   << (m_backupIntervalSec / 3600) << "ч, retention" << m_retentionCount;
     qCInfo(logApp) << "OpsScheduler: проверка целостности" << (m_integrityEnabled ? "включена" : "выключена")
                    << ", интервал" << (m_integrityIntervalSec / 3600) << "ч";
 }
@@ -138,7 +137,7 @@ void OpsScheduler::resetIntegrityCheck()
     m_lastIntegrityAt = QDateTime::currentDateTime();
 }
 
-void OpsScheduler::readConfig(const QJsonObject &config)
+void OpsScheduler::readConfig(const QJsonObject& config)
 {
     QJsonObject backup = config["backup"].toObject();
     m_backupEnabled = backup["enabled"].toBool(false);
@@ -185,16 +184,15 @@ void OpsScheduler::rescheduleTimer()
     qint64 nextInMs = kSchedulerMaxTickMs;
 
     if (m_backupEnabled && !m_backupInProgress) {
-        qint64 backupInMs = m_lastBackupAt.addSecs(m_backupIntervalSec).toMSecsSinceEpoch()
-                          - now.toMSecsSinceEpoch();
+        qint64 backupInMs = m_lastBackupAt.addSecs(m_backupIntervalSec).toMSecsSinceEpoch() - now.toMSecsSinceEpoch();
         nextInMs = qMin(nextInMs, qMax<qint64>(kSchedulerMinTickMs, backupInMs));
     }
 
     if (m_integrityEnabled) {
-        qint64 integrityInMs = m_lastIntegrityAt.isNull()
-            ? kSchedulerMinTickMs
-            : m_lastIntegrityAt.addSecs(m_integrityIntervalSec).toMSecsSinceEpoch()
-              - now.toMSecsSinceEpoch();
+        qint64 integrityInMs =
+            m_lastIntegrityAt.isNull()
+                ? kSchedulerMinTickMs
+                : m_lastIntegrityAt.addSecs(m_integrityIntervalSec).toMSecsSinceEpoch() - now.toMSecsSinceEpoch();
         nextInMs = qMin(nextInMs, qMax<qint64>(kSchedulerMinTickMs, integrityInMs));
     }
 
@@ -207,8 +205,7 @@ void OpsScheduler::ensureBackupWorker()
     if (!m_backupWorker)
         return;
 
-    connect(this, &OpsScheduler::backupRequested, m_backupWorker, &BackupWorker::createBackup,
-            Qt::QueuedConnection);
+    connect(this, &OpsScheduler::backupRequested, m_backupWorker, &BackupWorker::createBackup, Qt::QueuedConnection);
     connect(m_backupWorker, &BackupWorker::backupFinished, this, &OpsScheduler::onBackupWorkerFinished);
 }
 
@@ -239,7 +236,7 @@ void OpsScheduler::runScheduledBackup()
     emit backupRequested(filePath, connectionPassword, m_backupPassphrase);
 }
 
-void OpsScheduler::onBackupWorkerFinished(const BackupManager::BackupResult &result)
+void OpsScheduler::onBackupWorkerFinished(const BackupManager::BackupResult& result)
 {
     m_backupInProgress = false;
 
@@ -309,14 +306,12 @@ void OpsScheduler::runIntegrityCheck()
     QString summary;
     bool ok = true;
     int total = 0;
-    for (const IntegrityIssue &issue : issues) {
+    for (const IntegrityIssue& issue : issues) {
         if (issue.count > 0) {
             ok = false;
             total += issue.count;
-            summary += QString("\n  • %1 — %2 шт. (примеры: %3)")
-                           .arg(issue.description)
-                           .arg(issue.count)
-                           .arg(issue.details);
+            summary +=
+                QString("\n  • %1 — %2 шт. (примеры: %3)").arg(issue.description).arg(issue.count).arg(issue.details);
             OpsLog::instance().warning(QString("Найдено несоответствие: %1 — %2 шт. (примеры: %3)")
                                            .arg(issue.description)
                                            .arg(issue.count)
@@ -328,7 +323,7 @@ void OpsScheduler::runIntegrityCheck()
         summary = "Целостность БД: замечаний нет";
         OpsLog::instance().info(summary);
     } else {
-        summary = QString("Целостность БД: обнаружено %1 несоответствий") .arg(total) + summary;
+        summary = QString("Целостность БД: обнаружено %1 несоответствий").arg(total) + summary;
         OpsLog::instance().error(summary);
     }
 

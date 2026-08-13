@@ -5,8 +5,7 @@
 #include "ops/opsscheduler.h"
 #include "ops/backupmanager.h"
 
-class TestOpsScheduler : public QObject
-{
+class TestOpsScheduler : public QObject {
     Q_OBJECT
 
 private slots:
@@ -15,9 +14,8 @@ private slots:
     void backupResultMetatypeRegistered();
 };
 
-static QJsonObject makeConfig(bool backupEnabled = false, int backupHours = 24,
-                              bool integrityEnabled = false, int integrityHours = 24,
-                              const QString &backupDir = QString(), int retention = 14)
+static QJsonObject makeConfig(bool backupEnabled = false, int backupHours = 24, bool integrityEnabled = false,
+                              int integrityHours = 24, const QString& backupDir = QString(), int retention = 14)
 {
     QJsonObject backup;
     backup["enabled"] = backupEnabled;

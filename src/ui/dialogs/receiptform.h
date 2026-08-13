@@ -6,15 +6,14 @@
 #include <QPair>
 
 namespace Ui {
-    class ReceiptForm;
+class ReceiptForm;
 }
 
-class ReceiptForm : public QDialog
-{
+class ReceiptForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit ReceiptForm(QWidget *parent = nullptr);
+    explicit ReceiptForm(QWidget* parent = nullptr);
     ~ReceiptForm();
     void loadForEdit(int docId);
 
@@ -26,11 +25,11 @@ private slots:
     void on_btnClose_clicked();
 
 protected:
-    bool eventFilter(QObject *obj, QEvent *event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
-    Ui::ReceiptForm *ui;
-    QStandardItemModel *rowsModel;
+    Ui::ReceiptForm* ui;
+    QStandardItemModel* rowsModel;
 
     void loadModelsToDelegate();
 

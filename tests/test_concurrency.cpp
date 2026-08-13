@@ -27,8 +27,7 @@
 
 static const qint64 kMigrationLockKey = 0x504F434D494752; // "POCMIGR" (как в приложении)
 
-class TestConcurrency : public QObject
-{
+class TestConcurrency : public QObject {
     Q_OBJECT
 
 private slots:
@@ -52,16 +51,16 @@ private:
     QString m_lastError;
 
     bool applyMigrations();
-    bool execOnTest(const QString &sql, QString *err = nullptr);
-    QSqlQuery queryOnTest(const QString &sql, QString *err = nullptr);
-    int countOnTest(const QString &sql);
-    int seedTerminal(const QString &serial, int status);
-    int seedSim(const QString &number);
-    int seedUser(const QString &username);
+    bool execOnTest(const QString& sql, QString* err = nullptr);
+    QSqlQuery queryOnTest(const QString& sql, QString* err = nullptr);
+    int countOnTest(const QString& sql);
+    int seedTerminal(const QString& serial, int status);
+    int seedSim(const QString& number);
+    int seedUser(const QString& username);
     void resetTerminal(int terminalId, int simId);
 };
 
-static QMap<QString, QString> loadEnvFile(const QString &filePath)
+static QMap<QString, QString> loadEnvFile(const QString& filePath)
 {
     QMap<QString, QString> env;
     QFile file(filePath);
@@ -80,8 +79,8 @@ static QMap<QString, QString> loadEnvFile(const QString &filePath)
     return env;
 }
 
-static QString envValue(const QMap<QString, QString> &env, const QJsonObject &cfg,
-                        const QString &envKey, const QString &cfgKey, const QString &def)
+static QString envValue(const QMap<QString, QString>& env, const QJsonObject& cfg, const QString& envKey,
+                        const QString& cfgKey, const QString& def)
 {
     if (qEnvironmentVariableIsSet(envKey.toUtf8().constData()))
         return qEnvironmentVariable(envKey.toUtf8().constData());
@@ -92,9 +91,8 @@ static QString envValue(const QMap<QString, QString> &env, const QJsonObject &cf
     return def;
 }
 
-static bool openConnection(QSqlDatabase &db, const QString &dbName,
-                           const QMap<QString, QString> &env, const QJsonObject &cfg,
-                           QString *err)
+static bool openConnection(QSqlDatabase& db, const QString& dbName, const QMap<QString, QString>& env,
+                           const QJsonObject& cfg, QString* err)
 {
     db.setHostName(envValue(env, cfg, "POC_DB_HOST", "host", "localhost"));
     db.setPort(envValue(env, cfg, "POC_DB_PORT", "port", "5432").toInt());
@@ -118,11 +116,9 @@ struct RentalAttempt {
     QString error;
 };
 
-static void rentWorker(const QString &connName, const QString &dbName,
-                       const QMap<QString, QString> &env, const QJsonObject &cfg,
-                       std::atomic<bool> *startGate, std::atomic<int> *successCount,
-                       std::mutex *errorMutex, QString *firstError,
-                       int terminalId, int simId)
+static void rentWorker(const QString& connName, const QString& dbName, const QMap<QString, QString>& env,
+                       const QJsonObject& cfg, std::atomic<bool>* startGate, std::atomic<int>* successCount,
+                       std::mutex* errorMutex, QString* firstError, int terminalId, int simId)
 {
     QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", connName);
     QString err;
@@ -195,9 +191,8 @@ struct BatchAttempt {
     QString error;
 };
 
-static void batchWorker(const QString &connName, const QString &dbName,
-                        const QMap<QString, QString> &env, const QJsonObject &cfg,
-                        std::atomic<bool> *startGate, std::atomic<int> *successCount,
+static void batchWorker(const QString& connName, const QString& dbName, const QMap<QString, QString>& env,
+                        const QJsonObject& cfg, std::atomic<bool>* startGate, std::atomic<int>* successCount,
                         int terminalId, int expectedStatus, int newStatus)
 {
     QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", connName);
@@ -241,10 +236,9 @@ struct RateLimitResult {
     int maxAttempts = 0;
 };
 
-static void rateLimitWorker(const QString &connName, const QString &dbName,
-                            const QMap<QString, QString> &env, const QJsonObject &cfg,
-                            std::atomic<bool> *startGate, RateLimitResult *out,
-                            const QString &username)
+static void rateLimitWorker(const QString& connName, const QString& dbName, const QMap<QString, QString>& env,
+                            const QJsonObject& cfg, std::atomic<bool>* startGate, RateLimitResult* out,
+                            const QString& username)
 {
     QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", connName);
     if (!openConnection(db, dbName, env, cfg, nullptr)) {
@@ -282,7 +276,7 @@ static void rateLimitWorker(const QString &connName, const QString &dbName,
 }
 
 // ---------- worker: применение миграций под advisory lock (как runMigrations) ----------
-static bool applyPendingWithLock(QSqlDatabase &db, const QString &migrationsDir)
+static bool applyPendingWithLock(QSqlDatabase& db, const QString& migrationsDir)
 {
     QSqlQuery lockQ(db);
     lockQ.prepare("SELECT pg_advisory_lock(:key)");
@@ -308,7 +302,7 @@ static bool applyPendingWithLock(QSqlDatabase &db, const QString &migrationsDir)
         pending.sort();
     }
 
-    for (const QString &filePath : pending) {
+    for (const QString& filePath : pending) {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             ok = false;
@@ -344,10 +338,9 @@ static bool applyPendingWithLock(QSqlDatabase &db, const QString &migrationsDir)
     return ok;
 }
 
-static void migrationWorker(const QString &connName, const QString &dbName,
-                            const QMap<QString, QString> &env, const QJsonObject &cfg,
-                            std::atomic<bool> *startGate, const QString &migrationsDir,
-                            std::atomic<int> *okCount)
+static void migrationWorker(const QString& connName, const QString& dbName, const QMap<QString, QString>& env,
+                            const QJsonObject& cfg, std::atomic<bool>* startGate, const QString& migrationsDir,
+                            std::atomic<int>* okCount)
 {
     QSqlDatabase db = QSqlDatabase::addDatabase("QPSQL", connName);
     if (!openConnection(db, dbName, env, cfg, nullptr)) {
@@ -370,13 +363,9 @@ static void migrationWorker(const QString &connName, const QString &dbName,
 void TestConcurrency::initTestCase()
 {
     QString appDir = QCoreApplication::applicationDirPath();
-    QStringList envCandidates = {
-        appDir + "/.env",
-        appDir + "/../.env",
-        appDir + "/config/.env",
-        appDir + "/../../.env"
-    };
-    for (const QString &candidate : envCandidates) {
+    QStringList envCandidates = {appDir + "/.env", appDir + "/../.env", appDir + "/config/.env",
+                                 appDir + "/../../.env"};
+    for (const QString& candidate : envCandidates) {
         m_env = loadEnvFile(candidate);
         if (!m_env.isEmpty())
             break;
@@ -401,18 +390,17 @@ void TestConcurrency::initTestCase()
 
     QSqlQuery term(m_adminDb);
     term.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                      "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(m_testDbName));
+                      "WHERE datname = '%1' AND pid <> pg_backend_pid()")
+                  .arg(m_testDbName));
 
     QSqlQuery drop(m_adminDb);
     if (!drop.exec(QString("DROP DATABASE IF EXISTS %1").arg(m_testDbName))) {
-        QSKIP(QString("Не удалось сбросить тестовую БД %1: %2")
-                  .arg(m_testDbName, drop.lastError().text()).toUtf8());
+        QSKIP(QString("Не удалось сбросить тестовую БД %1: %2").arg(m_testDbName, drop.lastError().text()).toUtf8());
     }
 
     QSqlQuery create(m_adminDb);
     if (!create.exec(QString("CREATE DATABASE %1 ENCODING 'UTF8'").arg(m_testDbName))) {
-        QSKIP(QString("Нет прав на создание тестовой БД %1: %2")
-                  .arg(m_testDbName, create.lastError().text()).toUtf8());
+        QSKIP(QString("Нет прав на создание тестовой БД %1: %2").arg(m_testDbName, create.lastError().text()).toUtf8());
     }
 
     m_testDb = QSqlDatabase::addDatabase("QPSQL", "concurrencyMainConnection");
@@ -449,11 +437,11 @@ void TestConcurrency::cleanupTestCase()
     if (m_adminDb.isOpen()) {
         QSqlQuery term(m_adminDb);
         term.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                          "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(m_testDbName));
+                          "WHERE datname = '%1' AND pid <> pg_backend_pid()")
+                      .arg(m_testDbName));
         QSqlQuery drop(m_adminDb);
         if (!drop.exec(QString("DROP DATABASE IF EXISTS %1").arg(m_testDbName)))
-            qWarning() << "Не удалось удалить тестовую БД" << m_testDbName << ":"
-                       << drop.lastError().text();
+            qWarning() << "Не удалось удалить тестовую БД" << m_testDbName << ":" << drop.lastError().text();
         m_adminDb.close();
     }
     QSqlDatabase::removeDatabase("concurrencyAdminConnection");
@@ -463,12 +451,9 @@ bool TestConcurrency::applyMigrations()
 {
     QString migrationsDir;
     QString appDir = QCoreApplication::applicationDirPath();
-    QStringList candidates = {
-        appDir + "/sql/migrations/",
-        appDir + "/../sql/migrations/",
-        appDir + "/../../sql/migrations/"
-    };
-    for (const QString &c : candidates) {
+    QStringList candidates = {appDir + "/sql/migrations/", appDir + "/../sql/migrations/",
+                              appDir + "/../../sql/migrations/"};
+    for (const QString& c : candidates) {
         QDir d(c);
         if (d.exists()) {
             migrationsDir = d.absolutePath();
@@ -479,11 +464,10 @@ bool TestConcurrency::applyMigrations()
         return false;
 
     QSqlQuery schemaQ(m_testDb);
-    if (!schemaQ.exec(
-            "CREATE TABLE IF NOT EXISTS schema_migrations ("
-            "  version VARCHAR(255) PRIMARY KEY,"
-            "  applied_at TIMESTAMP DEFAULT NOW()"
-            ")")) {
+    if (!schemaQ.exec("CREATE TABLE IF NOT EXISTS schema_migrations ("
+                      "  version VARCHAR(255) PRIMARY KEY,"
+                      "  applied_at TIMESTAMP DEFAULT NOW()"
+                      ")")) {
         return false;
     }
 
@@ -495,7 +479,7 @@ bool TestConcurrency::applyMigrations()
     }
     pending.sort();
 
-    for (const QString &filePath : pending) {
+    for (const QString& filePath : pending) {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
             return false;
@@ -506,8 +490,7 @@ bool TestConcurrency::applyMigrations()
             return false;
         QSqlQuery q(m_testDb);
         if (!q.exec(sql)) {
-            qWarning() << "Ошибка в миграции" << QFileInfo(filePath).fileName()
-                       << ":" << q.lastError().text();
+            qWarning() << "Ошибка в миграции" << QFileInfo(filePath).fileName() << ":" << q.lastError().text();
             m_testDb.rollback();
             return false;
         }
@@ -522,7 +505,7 @@ bool TestConcurrency::applyMigrations()
     return true;
 }
 
-bool TestConcurrency::execOnTest(const QString &sql, QString *err)
+bool TestConcurrency::execOnTest(const QString& sql, QString* err)
 {
     QSqlQuery q(m_testDb);
     bool ok = q.exec(sql);
@@ -531,7 +514,7 @@ bool TestConcurrency::execOnTest(const QString &sql, QString *err)
     return ok;
 }
 
-QSqlQuery TestConcurrency::queryOnTest(const QString &sql, QString *err)
+QSqlQuery TestConcurrency::queryOnTest(const QString& sql, QString* err)
 {
     QSqlQuery q(m_testDb);
     q.exec(sql);
@@ -540,7 +523,7 @@ QSqlQuery TestConcurrency::queryOnTest(const QString &sql, QString *err)
     return q;
 }
 
-int TestConcurrency::countOnTest(const QString &sql)
+int TestConcurrency::countOnTest(const QString& sql)
 {
     QSqlQuery q = queryOnTest(sql);
     if (!q.next())
@@ -548,7 +531,7 @@ int TestConcurrency::countOnTest(const QString &sql)
     return q.value(0).toInt();
 }
 
-int TestConcurrency::seedTerminal(const QString &serial, int status)
+int TestConcurrency::seedTerminal(const QString& serial, int status)
 {
     QSqlQuery q(m_testDb);
     q.prepare("INSERT INTO tblterminals (serialnumber, modelid, status) "
@@ -563,7 +546,7 @@ int TestConcurrency::seedTerminal(const QString &serial, int status)
     return q.value(0).toInt();
 }
 
-int TestConcurrency::seedSim(const QString &number)
+int TestConcurrency::seedSim(const QString& number)
 {
     QSqlQuery q(m_testDb);
     q.prepare("INSERT INTO tblsimcards (simnumber) VALUES (:n) RETURNING simcardid");
@@ -575,7 +558,7 @@ int TestConcurrency::seedSim(const QString &number)
     return q.value(0).toInt();
 }
 
-int TestConcurrency::seedUser(const QString &username)
+int TestConcurrency::seedUser(const QString& username)
 {
     QSqlQuery q(m_testDb);
     q.prepare("INSERT INTO tbl_users (username, role, is_active) "
@@ -638,7 +621,7 @@ void TestConcurrency::test_concurrent_doc_numbers()
     }
 
     startGate.store(true);
-    for (auto &th : threads)
+    for (auto& th : threads)
         th.join();
 
     QCOMPARE(allNumbers.size(), qsizetype(threadCount * numbersPerThread));
@@ -660,25 +643,22 @@ void TestConcurrency::test_concurrent_sim_assignment()
     std::vector<std::thread> threads;
     for (int i = 0; i < threadCount; ++i) {
         threads.emplace_back([&, i]() {
-            rentWorker("simConn" + QString::number(i), m_testDbName, m_env, m_dbConfig,
-                       &startGate, &successCount, &errorMutex, &firstError,
-                       terminalId, simId);
+            rentWorker("simConn" + QString::number(i), m_testDbName, m_env, m_dbConfig, &startGate, &successCount,
+                       &errorMutex, &firstError, terminalId, simId);
         });
     }
 
     startGate.store(true);
-    for (auto &th : threads)
+    for (auto& th : threads)
         th.join();
 
     QCOMPARE(successCount.load(), 1);
     QVERIFY2(!firstError.isEmpty(), qPrintable("ожидались конкурентные отказы"));
 
-    QCOMPARE(countOnTest("SELECT status FROM tblterminals WHERE terminalid = " +
-                         QString::number(terminalId)), 1);
-    QCOMPARE(countOnTest("SELECT currentsimcardid FROM tblterminals WHERE terminalid = " +
-                         QString::number(terminalId)), simId);
-    QCOMPARE(countOnTest("SELECT status FROM tblsimcards WHERE simcardid = " +
-                         QString::number(simId)), 1);
+    QCOMPARE(countOnTest("SELECT status FROM tblterminals WHERE terminalid = " + QString::number(terminalId)), 1);
+    QCOMPARE(countOnTest("SELECT currentsimcardid FROM tblterminals WHERE terminalid = " + QString::number(terminalId)),
+             simId);
+    QCOMPARE(countOnTest("SELECT status FROM tblsimcards WHERE simcardid = " + QString::number(simId)), 1);
 
     resetTerminal(terminalId, simId);
 }
@@ -705,14 +685,13 @@ void TestConcurrency::test_concurrent_rental_load()
     std::vector<std::thread> threads;
     for (int i = 0; i < threadCount; ++i) {
         threads.emplace_back([&, i]() {
-            rentWorker("loadConn" + QString::number(i), m_testDbName, m_env, m_dbConfig,
-                       &startGate, &successCount, &errorMutex, &firstError,
-                       terminalIds[i], simIds[i]);
+            rentWorker("loadConn" + QString::number(i), m_testDbName, m_env, m_dbConfig, &startGate, &successCount,
+                       &errorMutex, &firstError, terminalIds[i], simIds[i]);
         });
     }
 
     startGate.store(true);
-    for (auto &th : threads)
+    for (auto& th : threads)
         th.join();
 
     QCOMPARE(successCount.load(), threadCount);
@@ -721,7 +700,8 @@ void TestConcurrency::test_concurrent_rental_load()
     QCOMPARE(countOnTest("SELECT count(*) FROM tblterminals WHERE status = 1"), threadCount);
     QCOMPARE(countOnTest("SELECT count(*) FROM tblsimcards WHERE status = 1"), threadCount);
     QCOMPARE(countOnTest("SELECT count(DISTINCT currentsimcardid) FROM tblterminals "
-                         "WHERE currentsimcardid IS NOT NULL"), threadCount);
+                         "WHERE currentsimcardid IS NOT NULL"),
+             threadCount);
 }
 
 void TestConcurrency::test_concurrent_batch_vs_rental()
@@ -739,13 +719,11 @@ void TestConcurrency::test_concurrent_batch_vs_rental()
         QString firstError;
 
         std::thread t1([&]() {
-            rentWorker("raceRentConn", m_testDbName, m_env, m_dbConfig,
-                       &startGate, &rentSuccess, &errorMutex, &firstError,
-                       terminalId, simId);
+            rentWorker("raceRentConn", m_testDbName, m_env, m_dbConfig, &startGate, &rentSuccess, &errorMutex,
+                       &firstError, terminalId, simId);
         });
         std::thread t2([&]() {
-            batchWorker("raceBatchConn", m_testDbName, m_env, m_dbConfig,
-                        &startGate, &batchSuccess, terminalId, 0, 1);
+            batchWorker("raceBatchConn", m_testDbName, m_env, m_dbConfig, &startGate, &batchSuccess, terminalId, 0, 1);
         });
 
         startGate.store(true);
@@ -756,12 +734,10 @@ void TestConcurrency::test_concurrent_batch_vs_rental()
 
         // Согласованность финального состояния: терминал всегда «в аренде» (статус 1),
         // при этом либо аренда (SIM привязана и занята), либо массовая смена (SIM свободна)
-        QCOMPARE(countOnTest("SELECT status FROM tblterminals WHERE terminalid = " +
-                             QString::number(terminalId)), 1);
-        int simStatus = countOnTest("SELECT status FROM tblsimcards WHERE simcardid = " +
-                                    QString::number(simId));
-        int currentSim = countOnTest("SELECT currentsimcardid FROM tblterminals WHERE terminalid = " +
-                                     QString::number(terminalId));
+        QCOMPARE(countOnTest("SELECT status FROM tblterminals WHERE terminalid = " + QString::number(terminalId)), 1);
+        int simStatus = countOnTest("SELECT status FROM tblsimcards WHERE simcardid = " + QString::number(simId));
+        int currentSim =
+            countOnTest("SELECT currentsimcardid FROM tblterminals WHERE terminalid = " + QString::number(terminalId));
         if (rentSuccess.load() == 1) {
             QCOMPARE(currentSim, simId);
             QCOMPARE(simStatus, 1);
@@ -785,18 +761,18 @@ void TestConcurrency::test_concurrent_rate_limit()
     std::vector<std::thread> threads;
     for (int i = 0; i < threadCount; ++i) {
         threads.emplace_back([&, i]() {
-            rateLimitWorker("rateConn" + QString::number(i), m_testDbName, m_env, m_dbConfig,
-                            &startGate, &results[i], username);
+            rateLimitWorker("rateConn" + QString::number(i), m_testDbName, m_env, m_dbConfig, &startGate, &results[i],
+                            username);
         });
     }
 
     startGate.store(true);
-    for (auto &th : threads)
+    for (auto& th : threads)
         th.join();
 
     int totalReturned = 0;
     int maxAttempts = 0;
-    for (const RateLimitResult &r : results) {
+    for (const RateLimitResult& r : results) {
         totalReturned += r.rowsReturned;
         maxAttempts = qMax(maxAttempts, r.maxAttempts);
     }
@@ -805,25 +781,23 @@ void TestConcurrency::test_concurrent_rate_limit()
     QCOMPARE(totalReturned, 5);
     QCOMPARE(maxAttempts, 5);
 
-    QCOMPARE(countOnTest("SELECT failed_login_attempts FROM tbl_users WHERE username = '" +
-                         username + "'"), 5);
-    QCOMPARE(countOnTest("SELECT count(*) FROM tbl_users WHERE username = '" + username +
-                         "' AND locked_until IS NOT NULL"), 1);
+    QCOMPARE(countOnTest("SELECT failed_login_attempts FROM tbl_users WHERE username = '" + username + "'"), 5);
+    QCOMPARE(
+        countOnTest("SELECT count(*) FROM tbl_users WHERE username = '" + username + "' AND locked_until IS NOT NULL"),
+        1);
 
     execOnTest("UPDATE tbl_users SET failed_login_attempts = 0, locked_until = NULL "
-               "WHERE username = '" + username + "'");
+               "WHERE username = '" +
+               username + "'");
 }
 
 void TestConcurrency::test_concurrent_migrations()
 {
     QString migrationsDir;
     QString appDir = QCoreApplication::applicationDirPath();
-    QStringList candidates = {
-        appDir + "/sql/migrations/",
-        appDir + "/../sql/migrations/",
-        appDir + "/../../sql/migrations/"
-    };
-    for (const QString &c : candidates) {
+    QStringList candidates = {appDir + "/sql/migrations/", appDir + "/../sql/migrations/",
+                              appDir + "/../../sql/migrations/"};
+    for (const QString& c : candidates) {
         QDir d(c);
         if (d.exists()) {
             migrationsDir = d.absolutePath();
@@ -842,14 +816,10 @@ void TestConcurrency::test_concurrent_migrations()
     std::atomic<bool> startGate(false);
     std::atomic<int> okCount(0);
 
-    std::thread t1([&]() {
-        migrationWorker("migConn1", m_testDbName, m_env, m_dbConfig,
-                        &startGate, migrationsDir, &okCount);
-    });
-    std::thread t2([&]() {
-        migrationWorker("migConn2", m_testDbName, m_env, m_dbConfig,
-                        &startGate, migrationsDir, &okCount);
-    });
+    std::thread t1(
+        [&]() { migrationWorker("migConn1", m_testDbName, m_env, m_dbConfig, &startGate, migrationsDir, &okCount); });
+    std::thread t2(
+        [&]() { migrationWorker("migConn2", m_testDbName, m_env, m_dbConfig, &startGate, migrationsDir, &okCount); });
 
     startGate.store(true);
     t1.join();
@@ -860,7 +830,8 @@ void TestConcurrency::test_concurrent_migrations()
 
     // Триггер уведомлений на месте и функция определена
     QCOMPARE(countOnTest("SELECT count(*) FROM pg_trigger "
-                         "WHERE tgname = 'trg_data_change_notify_tblterminals'"), 1);
+                         "WHERE tgname = 'trg_data_change_notify_tblterminals'"),
+             1);
     QCOMPARE(countOnTest("SELECT count(*) FROM pg_proc WHERE proname = 'notify_data_changed'"), 1);
 }
 

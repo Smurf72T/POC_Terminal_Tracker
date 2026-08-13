@@ -5,15 +5,14 @@
 #include <QSqlQueryModel>
 
 namespace Ui {
-    class ExpiryNotificationsForm;
+class ExpiryNotificationsForm;
 }
 
-class ExpiryNotificationsForm : public QDialog
-{
+class ExpiryNotificationsForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit ExpiryNotificationsForm(QWidget *parent = nullptr);
+    explicit ExpiryNotificationsForm(QWidget* parent = nullptr);
     ~ExpiryNotificationsForm();
 
 private slots:
@@ -22,9 +21,9 @@ private slots:
     void on_btnClose_clicked();
 
 private:
-    Ui::ExpiryNotificationsForm *ui;
-    QSqlQueryModel *overdueModel;
-    QSqlQueryModel *unpaidModel;
+    Ui::ExpiryNotificationsForm* ui;
+    QSqlQueryModel* overdueModel;
+    QSqlQueryModel* unpaidModel;
 
     void loadOverdueRentals();
     void loadUnpaidPeriods();

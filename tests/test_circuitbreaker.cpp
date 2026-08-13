@@ -1,8 +1,7 @@
 #include <QtTest>
 #include "utils/circuitbreaker.h"
 
-class TestCircuitBreaker : public QObject
-{
+class TestCircuitBreaker : public QObject {
     Q_OBJECT
 
 private slots:

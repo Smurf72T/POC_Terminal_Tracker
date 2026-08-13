@@ -17,9 +17,7 @@
 #include <QPrinter>
 #include <QPrintDialog>
 
-RentalForm::RentalForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::RentalForm)
+RentalForm::RentalForm(QWidget* parent) : QDialog(parent), ui(new Ui::RentalForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Передача в аренду");
@@ -44,11 +42,7 @@ RentalForm::RentalForm(QWidget *parent) :
     loadFreeSIMsToDelegate();
 
     // Подключаем сигнал изменения данных
-    connect(rowsModel, &QStandardItemModel::dataChanged,
-            this, &RentalForm::onTableViewDataChanged);
-
-
-
+    connect(rowsModel, &QStandardItemModel::dataChanged, this, &RentalForm::onTableViewDataChanged);
 }
 
 RentalForm::~RentalForm()
@@ -79,7 +73,8 @@ void RentalForm::loadFreeTerminalsToDelegate()
     // Загрузим только свободные терминалы
     QList<QPair<int, QString>> terminals;
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 AND is_deactivated = FALSE ORDER BY serialnumber")) {
+    if (!query.exec("SELECT terminalid, serialnumber FROM tblterminals WHERE status = 0 AND is_deactivated = FALSE "
+                    "ORDER BY serialnumber")) {
         qCWarning(logSQL) << "Failed to load free terminals:" << query.lastError().text();
         return;
     }
@@ -99,17 +94,15 @@ void RentalForm::loadFreeSIMsToDelegate()
     // ИСПРАВЛЕНО: Загружаем SIM-карты, которые:
     // 1. status = 0 (свободны), ИЛИ
     // 2. status = 1 (в аренде), но привязаны к терминалу со статусом 0 (возвращены)
-    if (!query.exec(
-        "SELECT s.simcardid, s.simnumber "
-        "FROM tblsimcards s "
-        "WHERE s.status = 0 "
-        "OR EXISTS (" 
-        "    SELECT 1 FROM tblterminals t "
-        "    WHERE t.currentsimcardid = s.simcardid "
-        "    AND t.status = 0"
-        ")"
-        "ORDER BY s.simnumber"
-    )) {
+    if (!query.exec("SELECT s.simcardid, s.simnumber "
+                    "FROM tblsimcards s "
+                    "WHERE s.status = 0 "
+                    "OR EXISTS ("
+                    "    SELECT 1 FROM tblterminals t "
+                    "    WHERE t.currentsimcardid = s.simcardid "
+                    "    AND t.status = 0"
+                    ")"
+                    "ORDER BY s.simnumber")) {
         qCWarning(logSQL) << "Failed to load free SIMs:" << query.lastError().text();
         return;
     }
@@ -170,7 +163,7 @@ void RentalForm::loadForEdit(int docId)
             int row = rowsModel->rowCount();
             rowsModel->insertRow(row);
 
-            QStandardItem *terminalItem = new QStandardItem();
+            QStandardItem* terminalItem = new QStandardItem();
             terminalItem->setData(termId, Qt::UserRole);
 
             QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
@@ -182,7 +175,7 @@ void RentalForm::loadForEdit(int docId)
                 terminalItem->setData("", Qt::DisplayRole);
             }
 
-            QStandardItem *simItem = new QStandardItem();
+            QStandardItem* simItem = new QStandardItem();
             simItem->setData(simId, Qt::UserRole);
 
             if (simId > 0) {
@@ -198,7 +191,7 @@ void RentalForm::loadForEdit(int docId)
                 simItem->setData("", Qt::DisplayRole);
             }
 
-            QStandardItem *commentItem = new QStandardItem(comment);
+            QStandardItem* commentItem = new QStandardItem(comment);
 
             rowsModel->setItem(row, 0, terminalItem);
             rowsModel->setItem(row, 1, simItem);
@@ -215,15 +208,15 @@ void RentalForm::on_btnAddRow_clicked()
     rowsModel->insertRow(row);
 
     // Создаем элементы с пустым текстом и ID = 0
-    QStandardItem *terminalItem = new QStandardItem();
-    terminalItem->setData(0, Qt::UserRole); // ID терминала
+    QStandardItem* terminalItem = new QStandardItem();
+    terminalItem->setData(0, Qt::UserRole);     // ID терминала
     terminalItem->setData("", Qt::DisplayRole); // Текст для отображения
 
-    QStandardItem *simItem = new QStandardItem();
-    simItem->setData(0, Qt::UserRole); // ID SIM
+    QStandardItem* simItem = new QStandardItem();
+    simItem->setData(0, Qt::UserRole);     // ID SIM
     simItem->setData("", Qt::DisplayRole); // Текст для отображения
 
-    QStandardItem *commentItem = new QStandardItem("");
+    QStandardItem* commentItem = new QStandardItem("");
 
     rowsModel->setItem(row, 0, terminalItem);
     rowsModel->setItem(row, 1, simItem);
@@ -262,7 +255,8 @@ void RentalForm::on_btnPost_clicked()
     int docId;
 
     if (m_editMode) {
-        query.prepare("UPDATE tblrentaldocs SET docdate = :date, clientid = :client, comments = :comm WHERE rentaldocid = :id");
+        query.prepare(
+            "UPDATE tblrentaldocs SET docdate = :date, clientid = :client, comments = :comm WHERE rentaldocid = :id");
         query.bindValue(":id", m_editDocId);
         query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":client", clientId);
@@ -281,7 +275,8 @@ void RentalForm::on_btnPost_clicked()
         deleteQuery.bindValue(":id", docId);
         if (!deleteQuery.exec()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить старые строки: " + deleteQuery.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД",
+                                  "Не удалось удалить старые строки: " + deleteQuery.lastError().text());
             return;
         }
     } else {
@@ -323,8 +318,7 @@ void RentalForm::on_btnPost_clicked()
 
         if (terminalId <= 0) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Строка %1: выберите терминал.").arg(i + 1));
+            QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите терминал.").arg(i + 1));
             return;
         }
 
@@ -336,7 +330,8 @@ void RentalForm::on_btnPost_clicked()
         if (simId == 0 && !simNumber.isEmpty()) {
             if (simNumber.length() > 19) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка",
+                QMessageBox::critical(
+                    this, "Ошибка",
                     QString("Номер SIM-карты «%1» слишком длинный (макс. 19 символов).").arg(simNumber));
                 return;
             }
@@ -348,8 +343,7 @@ void RentalForm::on_btnPost_clicked()
                 simId = findSim.value(0).toInt();
                 if (findSim.value(1).toInt() != 0) {
                     db.rollback();
-                    QMessageBox::critical(this, "Ошибка",
-                        QString("SIM-карта %1 уже занята!").arg(simNumber));
+                    QMessageBox::critical(this, "Ошибка", QString("SIM-карта %1 уже занята!").arg(simNumber));
                     return;
                 }
             } else {
@@ -359,13 +353,14 @@ void RentalForm::on_btnPost_clicked()
                 if (!insertSim.exec() || !insertSim.next()) {
                     db.rollback();
                     QMessageBox::critical(this, "Ошибка БД",
-                        QString("Не удалось создать SIM-карту %1: %2")
-                            .arg(simNumber).arg(insertSim.lastError().text()));
+                                          QString("Не удалось создать SIM-карту %1: %2")
+                                              .arg(simNumber)
+                                              .arg(insertSim.lastError().text()));
                     return;
                 }
                 simId = insertSim.value(0).toInt();
-                DatabaseManager::instance().logAction("INSERT", "tblsimcards", simId,
-                    QString(), QString(), QString("simnumber=%1").arg(simNumber));
+                DatabaseManager::instance().logAction("INSERT", "tblsimcards", simId, QString(), QString(),
+                                                      QString("simnumber=%1").arg(simNumber));
                 rowsModel->setData(rowsModel->index(i, 1), simId, Qt::UserRole);
             }
         }
@@ -377,7 +372,8 @@ void RentalForm::on_btnPost_clicked()
 
         if (!checkQuery.exec() || !checkQuery.next()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
+            QMessageBox::critical(
+                this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже сдан в аренду.").arg(terminalId));
             return;
         }
@@ -387,14 +383,13 @@ void RentalForm::on_btnPost_clicked()
             // Новый терминал в документе: должен быть свободен
             if (status != 0) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка",
-                    QString("Терминал %1 больше не свободен!").arg(terminalId));
+                QMessageBox::critical(this, "Ошибка", QString("Терминал %1 больше не свободен!").arg(terminalId));
                 return;
             }
         } else if (status != 1) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Терминал %1 уже не числится в аренде по этому документу.").arg(terminalId));
+                                  QString("Терминал %1 уже не числится в аренде по этому документу.").arg(terminalId));
             return;
         }
 
@@ -408,8 +403,9 @@ void RentalForm::on_btnPost_clicked()
             if (!freeOld.exec()) {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка БД",
-                    QString("Не удалось освободить SIM-карту %1: %2")
-                        .arg(originalSimId).arg(freeOld.lastError().text()));
+                                      QString("Не удалось освободить SIM-карту %1: %2")
+                                          .arg(originalSimId)
+                                          .arg(freeOld.lastError().text()));
                 return;
             }
         }
@@ -421,8 +417,7 @@ void RentalForm::on_btnPost_clicked()
             simLock.bindValue(":id", simId);
             if (!simLock.exec() || !simLock.next()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка",
-                    QString("SIM-карта %1 уже занята другим терминалом!").arg(simId));
+                QMessageBox::critical(this, "Ошибка", QString("SIM-карта %1 уже занята другим терминалом!").arg(simId));
                 return;
             }
 
@@ -431,7 +426,8 @@ void RentalForm::on_btnPost_clicked()
             simQuery.bindValue(":id", simId);
             if (!simQuery.exec()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД",
+                QMessageBox::critical(
+                    this, "Ошибка БД",
                     QString("Не удалось обновить SIM-карту %1: %2").arg(simId).arg(simQuery.lastError().text()));
                 return;
             }
@@ -445,7 +441,8 @@ void RentalForm::on_btnPost_clicked()
             updateQuery.bindValue(":simid", simId > 0 ? QVariant(simId) : QVariant());
             if (!updateQuery.exec()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД",
+                QMessageBox::critical(
+                    this, "Ошибка БД",
                     QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
                 return;
             }
@@ -457,7 +454,8 @@ void RentalForm::on_btnPost_clicked()
             updateQuery.bindValue(":simid", simId > 0 ? QVariant(simId) : QVariant());
             if (!updateQuery.exec()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД",
+                QMessageBox::critical(
+                    this, "Ошибка БД",
                     QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
                 return;
             }
@@ -492,7 +490,8 @@ void RentalForm::on_btnPost_clicked()
                 continue;
 
             QSqlQuery lockQuery(db);
-            lockQuery.prepare("SELECT status, currentsimcardid FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+            lockQuery.prepare(
+                "SELECT status, currentsimcardid FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
             lockQuery.bindValue(":id", tid);
             if (!lockQuery.exec() || !lockQuery.next())
                 continue;
@@ -508,7 +507,8 @@ void RentalForm::on_btnPost_clicked()
                 freeSim.bindValue(":id", tSim);
                 if (!freeSim.exec()) {
                     db.rollback();
-                    QMessageBox::critical(this, "Ошибка БД",
+                    QMessageBox::critical(
+                        this, "Ошибка БД",
                         QString("Не удалось освободить SIM-карту %1: %2").arg(tSim).arg(freeSim.lastError().text()));
                     return;
                 }
@@ -519,7 +519,8 @@ void RentalForm::on_btnPost_clicked()
             upd.bindValue(":id", tid);
             if (!upd.exec()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД",
+                QMessageBox::critical(
+                    this, "Ошибка БД",
                     QString("Не удалось освободить терминал %1: %2").arg(tid).arg(upd.lastError().text()));
                 return;
             }
@@ -539,7 +540,7 @@ void RentalForm::on_btnPost_clicked()
     }
 }
 
-void RentalForm::onTableViewDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight)
+void RentalForm::onTableViewDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
     // Когда данные изменились, обновляем отображение
     Q_UNUSED(bottomRight);
@@ -570,11 +571,12 @@ void RentalForm::on_btnPrintAct_clicked()
 
     if (!isPosted) {
         QMessageBox::StandardButton btn = QMessageBox::warning(this, "Внимание",
-            "Акт будет распечатан до проведения документа. "
-            "После проведения данные могут измениться.\n\n"
-            "Распечатать как черновик?",
-            QMessageBox::Yes | QMessageBox::No);
-        if (btn != QMessageBox::Yes) return;
+                                                               "Акт будет распечатан до проведения документа. "
+                                                               "После проведения данные могут измениться.\n\n"
+                                                               "Распечатать как черновик?",
+                                                               QMessageBox::Yes | QMessageBox::No);
+        if (btn != QMessageBox::Yes)
+            return;
     }
 
     // Получаем данные клиента
@@ -605,10 +607,13 @@ void RentalForm::on_btnPrintAct_clicked()
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
     html += "<p><b>Арендодатель:</b> ООО «POC Terminal»</p>";
     html += "<p><b>Арендатор:</b> " + clientName.toHtmlEscaped();
-    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
-    if (!clientAddress.isEmpty()) html += ", адрес: " + clientAddress.toHtmlEscaped();
+    if (!clientInn.isEmpty())
+        html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
+    if (!clientAddress.isEmpty())
+        html += ", адрес: " + clientAddress.toHtmlEscaped();
     html += "</p>";
-    html += "<p>Настоящий акт составлен о том, что Арендодатель передал, а Арендатор принял следующие POC-терминалы:</p>";
+    html +=
+        "<p>Настоящий акт составлен о том, что Арендодатель передал, а Арендатор принял следующие POC-терминалы:</p>";
 
     html += "<table><tr><th>№</th><th>Серийный номер</th><th>IMEI 1</th><th>SIM-карта</th></tr>";
 
@@ -618,7 +623,8 @@ void RentalForm::on_btnPrintAct_clicked()
         int termId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
         int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
 
-        if (termId == 0) continue;
+        if (termId == 0)
+            continue;
 
         // Получаем серийный номер и IMEI
         QSqlQuery termQuery(DatabaseManager::instance().getDatabase());
@@ -641,10 +647,16 @@ void RentalForm::on_btnPrintAct_clicked()
             }
         }
 
-        html += "<tr><td>" + QString::number(num++) + "</td>"
-                "<td>" + serial.toHtmlEscaped() + "</td>"
-                "<td>" + imei.toHtmlEscaped() + "</td>"
-                "<td>" + simNumber.toHtmlEscaped() + "</td></tr>";
+        html += "<tr><td>" + QString::number(num++) +
+                "</td>"
+                "<td>" +
+                serial.toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                imei.toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                simNumber.toHtmlEscaped() + "</td></tr>";
     }
     html += "</table>";
 

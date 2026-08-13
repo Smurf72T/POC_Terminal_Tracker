@@ -1,11 +1,9 @@
 #include "circuitbreaker.h"
 
-CircuitBreaker::CircuitBreaker(int failureThreshold, int cooldownMs, int halfOpenTries)
-    : m_failureThreshold(qMax(1, failureThreshold)),
-      m_cooldownMs(qMax(1, cooldownMs)),
-      m_halfOpenTries(qMax(1, halfOpenTries))
-{
-}
+CircuitBreaker::CircuitBreaker(int failureThreshold, int cooldownMs, int halfOpenTries) :
+    m_failureThreshold(qMax(1, failureThreshold)), m_cooldownMs(qMax(1, cooldownMs)),
+    m_halfOpenTries(qMax(1, halfOpenTries))
+{}
 
 bool CircuitBreaker::isAllowed()
 {

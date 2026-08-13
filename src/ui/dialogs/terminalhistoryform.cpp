@@ -9,12 +9,8 @@
 #include <QDateTime>
 #include <QFileDialog>
 
-TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::TerminalHistoryForm),
-    receiptModel(nullptr),
-    rentalModel(nullptr),
-    returnModel(nullptr),
+TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, QWidget* parent) :
+    QDialog(parent), ui(new Ui::TerminalHistoryForm), receiptModel(nullptr), rentalModel(nullptr), returnModel(nullptr),
     paymentModel(nullptr)
 {
     ui->setupUi(this);
@@ -29,67 +25,63 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
 
     receiptModel = new QSqlQueryModel(this);
     QSqlQuery receiptQuery(db);
-    receiptQuery.prepare(
-        "SELECT rd.receiptdocid, rd.docnumber, rd.docdate, t.serialnumber, m.modelname "
-        "FROM tblreceiptdocs rd "
-        "JOIN tblreceiptdetails rdet ON rd.receiptdocid = rdet.receiptdocid "
-        "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
-        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-        "WHERE t.terminalid = :tid "
-        "ORDER BY rd.docdate DESC"
-    );
+    receiptQuery.prepare("SELECT rd.receiptdocid, rd.docnumber, rd.docdate, t.serialnumber, m.modelname "
+                         "FROM tblreceiptdocs rd "
+                         "JOIN tblreceiptdetails rdet ON rd.receiptdocid = rdet.receiptdocid "
+                         "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
+                         "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                         "WHERE t.terminalid = :tid "
+                         "ORDER BY rd.docdate DESC");
     receiptQuery.bindValue(":tid", terminalId);
-    if (!receiptQuery.exec()) loadErrors << "Приходы: " + receiptQuery.lastError().text();
+    if (!receiptQuery.exec())
+        loadErrors << "Приходы: " + receiptQuery.lastError().text();
     receiptModel->setQuery(std::move(receiptQuery));
 
     rentalModel = new QSqlQueryModel(this);
     QSqlQuery rentalQuery(db);
-    rentalQuery.prepare(
-        "SELECT rdo.rentaldocid, rdo.docnumber, rdo.docdate, t.serialnumber, c.clientname, "
-        "s.simnumber "
-        "FROM tblrentaldocs rdo "
-        "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
-        "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
-        "LEFT JOIN tblclients c ON rdo.clientid = c.clientid "
-        "LEFT JOIN tblsimcards s ON rdet.simcardid = s.simcardid "
-        "WHERE t.terminalid = :tid "
-        "ORDER BY rdo.docdate DESC"
-    );
+    rentalQuery.prepare("SELECT rdo.rentaldocid, rdo.docnumber, rdo.docdate, t.serialnumber, c.clientname, "
+                        "s.simnumber "
+                        "FROM tblrentaldocs rdo "
+                        "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
+                        "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
+                        "LEFT JOIN tblclients c ON rdo.clientid = c.clientid "
+                        "LEFT JOIN tblsimcards s ON rdet.simcardid = s.simcardid "
+                        "WHERE t.terminalid = :tid "
+                        "ORDER BY rdo.docdate DESC");
     rentalQuery.bindValue(":tid", terminalId);
-    if (!rentalQuery.exec()) loadErrors << "Аренда: " + rentalQuery.lastError().text();
+    if (!rentalQuery.exec())
+        loadErrors << "Аренда: " + rentalQuery.lastError().text();
     rentalModel->setQuery(std::move(rentalQuery));
 
     returnModel = new QSqlQueryModel(this);
     QSqlQuery returnQuery(db);
-    returnQuery.prepare(
-        "SELECT ret.returndocid, ret.docnumber, ret.docdate, t.serialnumber, c.clientname "
-        "FROM tblreturndocs ret "
-        "JOIN tblreturndetails rdet ON ret.returndocid = rdet.returndocid "
-        "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
-        "LEFT JOIN tblclients c ON ret.clientid = c.clientid "
-        "WHERE t.terminalid = :tid "
-        "ORDER BY ret.docdate DESC"
-    );
+    returnQuery.prepare("SELECT ret.returndocid, ret.docnumber, ret.docdate, t.serialnumber, c.clientname "
+                        "FROM tblreturndocs ret "
+                        "JOIN tblreturndetails rdet ON ret.returndocid = rdet.returndocid "
+                        "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
+                        "LEFT JOIN tblclients c ON ret.clientid = c.clientid "
+                        "WHERE t.terminalid = :tid "
+                        "ORDER BY ret.docdate DESC");
     returnQuery.bindValue(":tid", terminalId);
-    if (!returnQuery.exec()) loadErrors << "Возвраты: " + returnQuery.lastError().text();
+    if (!returnQuery.exec())
+        loadErrors << "Возвраты: " + returnQuery.lastError().text();
     returnModel->setQuery(std::move(returnQuery));
 
     paymentModel = new QSqlQueryModel(this);
     QSqlQuery paymentQuery(db);
-    paymentQuery.prepare(
-        "SELECT p.paymentid, "
-        "('ОП-' || p.paymentid::text) AS docnumber, "
-        "p.paymentdate, c.clientname, rdo.docnumber AS rent_doc "
-        "FROM tblpayments p "
-        "JOIN tblpayment_rental_links prl ON p.paymentid = prl.paymentid "
-        "JOIN tblrentaldocs rdo ON prl.rentaldocid = rdo.rentaldocid "
-        "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
-        "JOIN tblclients c ON rdo.clientid = c.clientid "
-        "WHERE rdet.terminalid = :tid "
-        "ORDER BY p.paymentdate DESC"
-    );
+    paymentQuery.prepare("SELECT p.paymentid, "
+                         "('ОП-' || p.paymentid::text) AS docnumber, "
+                         "p.paymentdate, c.clientname, rdo.docnumber AS rent_doc "
+                         "FROM tblpayments p "
+                         "JOIN tblpayment_rental_links prl ON p.paymentid = prl.paymentid "
+                         "JOIN tblrentaldocs rdo ON prl.rentaldocid = rdo.rentaldocid "
+                         "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
+                         "JOIN tblclients c ON rdo.clientid = c.clientid "
+                         "WHERE rdet.terminalid = :tid "
+                         "ORDER BY p.paymentdate DESC");
     paymentQuery.bindValue(":tid", terminalId);
-    if (!paymentQuery.exec()) loadErrors << "Оплаты: " + paymentQuery.lastError().text();
+    if (!paymentQuery.exec())
+        loadErrors << "Оплаты: " + paymentQuery.lastError().text();
     paymentModel->setQuery(std::move(paymentQuery));
 
     receiptModel->setHeaderData(0, Qt::Horizontal, "ID");
@@ -142,8 +134,8 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
     ui->tableViewPayment->setColumnWidth(3, 250);
     ui->tableViewPayment->setColumnWidth(4, 200);
 
-    int totalDocs = receiptModel->rowCount() + rentalModel->rowCount() +
-                    returnModel->rowCount() + paymentModel->rowCount();
+    int totalDocs =
+        receiptModel->rowCount() + rentalModel->rowCount() + returnModel->rowCount() + paymentModel->rowCount();
     if (totalDocs == 0) {
         ui->lblTerminalInfo->setText(ui->lblTerminalInfo->text() + "\nИстория документов отсутствует");
         ui->lblTerminalInfo->setStyleSheet("color: gray;");
@@ -151,7 +143,7 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
 
     if (!loadErrors.isEmpty()) {
         QMessageBox::warning(this, "Ошибка загрузки истории",
-            "Не удалось загрузить часть данных:\n" + loadErrors.join("\n"));
+                             "Не удалось загрузить часть данных:\n" + loadErrors.join("\n"));
     }
 }
 
@@ -165,25 +157,34 @@ void TerminalHistoryForm::on_btnExportExcel_clicked()
     int currentIndex = ui->tabWidget->currentIndex();
     QString tabTitle = ui->tabWidget->tabText(currentIndex);
 
-    QSqlQueryModel *currentModel = nullptr;
+    QSqlQueryModel* currentModel = nullptr;
     switch (currentIndex) {
-    case 0: currentModel = receiptModel; break;
-    case 1: currentModel = rentalModel; break;
-    case 2: currentModel = returnModel; break;
-    case 3: currentModel = paymentModel; break;
-    default: return;
+        case 0:
+            currentModel = receiptModel;
+            break;
+        case 1:
+            currentModel = rentalModel;
+            break;
+        case 2:
+            currentModel = returnModel;
+            break;
+        case 3:
+            currentModel = paymentModel;
+            break;
+        default:
+            return;
     }
 
-    QString filePath = QFileDialog::getSaveFileName(this,
-        QString("Экспорт истории терминала — %1").arg(tabTitle),
+    QString filePath = QFileDialog::getSaveFileName(
+        this, QString("Экспорт истории терминала — %1").arg(tabTitle),
         QString("terminal_history_%1.xlsx").arg(QDateTime::currentDateTime().toString("yyyyMMdd")),
         "Excel (*.xlsx);;Все файлы (*)");
 
-    if (filePath.isEmpty()) return;
+    if (filePath.isEmpty())
+        return;
 
     if (ReportExporter::exportModelToExcel(currentModel, tabTitle, filePath)) {
-        QMessageBox::information(this, "Успех",
-            QString("Данные экспортированы в:\n%1").arg(filePath));
+        QMessageBox::information(this, "Успех", QString("Данные экспортированы в:\n%1").arg(filePath));
     }
 }
 
@@ -191,4 +192,3 @@ void TerminalHistoryForm::on_btnClose_clicked()
 {
     close();
 }
-

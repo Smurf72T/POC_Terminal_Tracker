@@ -4,20 +4,19 @@
 #include <QString>
 #include <QMutex>
 
-class OpsLog
-{
+class OpsLog {
 public:
     enum Level { Info, Warning, Error };
 
     static OpsLog& instance();
 
-    void setLogDirectory(const QString &directory);
+    void setLogDirectory(const QString& directory);
     QString logFilePath() const;
 
-    void log(Level level, const QString &message);
-    void info(const QString &message);
-    void warning(const QString &message);
-    void error(const QString &message);
+    void log(Level level, const QString& message);
+    void info(const QString& message);
+    void warning(const QString& message);
+    void error(const QString& message);
 
 private:
     OpsLog() = default;
@@ -26,7 +25,7 @@ private:
     OpsLog& operator=(const OpsLog&) = delete;
 
     QString resolveLogDirectory() const;
-    void rotateIfNeeded(const QString &filePath);
+    void rotateIfNeeded(const QString& filePath);
 
     QString m_logDirectory;
     mutable QMutex m_mutex;

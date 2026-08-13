@@ -10,16 +10,13 @@
 #include <QEvent>
 #include <QMouseEvent>
 
-class CheckBoxDelegate : public QStyledItemDelegate
-{
+class CheckBoxDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
 public:
-    explicit CheckBoxDelegate(QObject *parent = nullptr)
-        : QStyledItemDelegate(parent) {}
+    explicit CheckBoxDelegate(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
 
-    void paint(QPainter *painter, const QStyleOptionViewItem &option,
-               const QModelIndex &index) const override
+    void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override
     {
         bool checked = index.data(Qt::DisplayRole).toBool();
 
@@ -37,19 +34,17 @@ public:
         QApplication::style()->drawControl(QStyle::CE_CheckBox, &checkBoxStyle, painter);
     }
 
-    QSize sizeHint(const QStyleOptionViewItem &option,
-                   const QModelIndex &index) const override
+    QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override
     {
         Q_UNUSED(index);
         return QSize(20, option.rect.height());
     }
 
-    bool editorEvent(QEvent *event, QAbstractItemModel *model,
-                     const QStyleOptionViewItem &option,
-                     const QModelIndex &index) override
+    bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option,
+                     const QModelIndex& index) override
     {
         if (event->type() == QEvent::MouseButtonRelease) {
-            QMouseEvent *mouseEvent = static_cast<QMouseEvent*>(event);
+            QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
             QRect checkBoxRect = option.rect;
             checkBoxRect.setWidth(20);
             checkBoxRect.moveCenter(option.rect.center());

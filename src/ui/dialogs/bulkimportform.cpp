@@ -16,9 +16,7 @@
 #include <xlsxdocument.h>
 #include <xlsxworksheet.h>
 
-BulkImportForm::BulkImportForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::BulkImportForm)
+BulkImportForm::BulkImportForm(QWidget* parent) : QDialog(parent), ui(new Ui::BulkImportForm)
 {
     ui->setupUi(this);
     setWindowTitle("Массовое поступление терминалов");
@@ -32,11 +30,10 @@ BulkImportForm::~BulkImportForm()
 
 void BulkImportForm::on_btnSelectFile_clicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(this,
-        "Выберите файл Excel", "",
-        "Excel файлы (*.xlsx)");
+    QString filePath = QFileDialog::getOpenFileName(this, "Выберите файл Excel", "", "Excel файлы (*.xlsx)");
 
-    if (filePath.isEmpty()) return;
+    if (filePath.isEmpty())
+        return;
 
     selectedFilePath = filePath;
     ui->lblFileInfo->setText(QString("Файл: %1").arg(filePath));
@@ -46,13 +43,12 @@ void BulkImportForm::on_btnSelectFile_clicked()
 
 void BulkImportForm::on_btnExportTemplate_clicked()
 {
-    QString defaultName = QString("template_import_%1.xlsx")
-        .arg(QDateTime::currentDateTime().toString("yyyyMMdd"));
+    QString defaultName = QString("template_import_%1.xlsx").arg(QDateTime::currentDateTime().toString("yyyyMMdd"));
 
-    QString filePath = QFileDialog::getSaveFileName(this,
-        "Скачать шаблон", defaultName, "Excel (*.xlsx)");
+    QString filePath = QFileDialog::getSaveFileName(this, "Скачать шаблон", defaultName, "Excel (*.xlsx)");
 
-    if (filePath.isEmpty()) return;
+    if (filePath.isEmpty())
+        return;
 
     QXlsx::Document document;
 
@@ -86,13 +82,13 @@ void BulkImportForm::on_btnExportTemplate_clicked()
 
     if (document.saveAs(filePath)) {
         QMessageBox::information(this, "Успех",
-            QString("Шаблон сохранён:\n%1\n\nЗаполните колонки:\n"
-                    "1. Серийный номер (обязательно, минимум 3 символа)\n"
-                    "2. IMEI 1 (обязательно, 15 цифр)\n"
-                    "3. IMEI 2 (15 цифр или пусто)\n"
-                    "4. Модель (название из справочника)\n"
-                    "5. Примечание (необязательно)\n")
-            .arg(filePath));
+                                 QString("Шаблон сохранён:\n%1\n\nЗаполните колонки:\n"
+                                         "1. Серийный номер (обязательно, минимум 3 символа)\n"
+                                         "2. IMEI 1 (обязательно, 15 цифр)\n"
+                                         "3. IMEI 2 (15 цифр или пусто)\n"
+                                         "4. Модель (название из справочника)\n"
+                                         "5. Примечание (необязательно)\n")
+                                     .arg(filePath));
     } else {
         QMessageBox::critical(this, "Ошибка", "Не удалось создать шаблон.");
     }
@@ -124,7 +120,7 @@ void BulkImportForm::loadPreview()
     QApplication::processEvents();
 
     QXlsx::Document document(selectedFilePath);
-    QXlsx::Worksheet *worksheet = document.currentWorksheet();
+    QXlsx::Worksheet* worksheet = document.currentWorksheet();
     if (!worksheet) {
         QMessageBox::critical(this, "Ошибка", "Не удалось прочитать лист документа.");
         return;
@@ -139,7 +135,7 @@ void BulkImportForm::loadPreview()
         return;
     }
 
-    QStandardItemModel *stdModel = new QStandardItemModel(this);
+    QStandardItemModel* stdModel = new QStandardItemModel(this);
     stdModel->setHorizontalHeaderItem(0, new QStandardItem("Серийный номер"));
     stdModel->setHorizontalHeaderItem(1, new QStandardItem("IMEI 1"));
     stdModel->setHorizontalHeaderItem(2, new QStandardItem("IMEI 2"));
@@ -171,7 +167,7 @@ bool BulkImportForm::importData()
     // Импортируем из исходного файла, а не из preview-модели
     // (preview показывает только первые 50 строк)
     QXlsx::Document document(selectedFilePath);
-    QXlsx::Worksheet *worksheet = document.currentWorksheet();
+    QXlsx::Worksheet* worksheet = document.currentWorksheet();
     if (!worksheet) {
         QMessageBox::critical(this, "Ошибка", "Не удалось прочитать лист документа.");
         return false;
@@ -180,20 +176,21 @@ bool BulkImportForm::importData()
     QXlsx::CellRange range = worksheet->dimension();
     int maxRows = range.rowCount();
     if (maxRows < 2) {
-        QMessageBox::warning(this, "Внимание",
-            "Файл слишком короткий (нужна хотя бы строка данных после заголовков).");
+        QMessageBox::warning(this, "Внимание", "Файл слишком короткий (нужна хотя бы строка данных после заголовков).");
         return false;
     }
     int dataRows = maxRows - 1;
 
     QMessageBox::StandardButton reply = QMessageBox::question(this, "Подтверждение",
-        QString("Импортировать %1 терминалов?\n\n"
-                "Убедитесь, что все модели указаны корректно.").arg(dataRows),
-        QMessageBox::Yes | QMessageBox::No);
+                                                              QString("Импортировать %1 терминалов?\n\n"
+                                                                      "Убедитесь, что все модели указаны корректно.")
+                                                                  .arg(dataRows),
+                                                              QMessageBox::Yes | QMessageBox::No);
 
-    if (reply != QMessageBox::Yes) return false;
+    if (reply != QMessageBox::Yes)
+        return false;
 
-    auto &dbMgr = DatabaseManager::instance();
+    auto& dbMgr = DatabaseManager::instance();
     QSqlDatabase db = dbMgr.getDatabase();
 
     bool success = db.transaction();
@@ -266,10 +263,8 @@ bool BulkImportForm::importData()
             continue;
         }
 
-        query.prepare(
-            "INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status, notes) "
-            "VALUES (:sn, :mid, :imei1, :imei2, 0, :notes) RETURNING terminalid"
-        );
+        query.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status, notes) "
+                      "VALUES (:sn, :mid, :imei1, :imei2, 0, :notes) RETURNING terminalid");
         query.bindValue(":sn", serial);
         query.bindValue(":mid", modelId);
         query.bindValue(":imei1", imei1);
@@ -281,9 +276,8 @@ bool BulkImportForm::importData()
             imported++;
             existingSerials.insert(serial);
 
-            dbMgr.logAction("ADD", "tblterminals", terminalId,
-                dbMgr.getCurrentUser(), "{}",
-                QString("serial=%1, imei1=%2").arg(serial).arg(imei1));
+            dbMgr.logAction("ADD", "tblterminals", terminalId, dbMgr.getCurrentUser(), "{}",
+                            QString("serial=%1, imei1=%2").arg(serial).arg(imei1));
         } else {
             failed++;
             errors.append(QString("Строка %1: %2").arg(row).arg(query.lastError().text()));
@@ -306,7 +300,8 @@ bool BulkImportForm::importData()
     return true;
 }
 
-void BulkImportForm::showImportResult(bool success, int totalRows, int importedRows, int failedRows, const QString &errorMsg)
+void BulkImportForm::showImportResult(bool success, int totalRows, int importedRows, int failedRows,
+                                      const QString& errorMsg)
 {
     QString msg;
     if (failedRows == 0 && success) {
@@ -314,14 +309,17 @@ void BulkImportForm::showImportResult(bool success, int totalRows, int importedR
                       "Всего строк: %1\n"
                       "Импортировано: %2\n"
                       "Ошибок: 0")
-                  .arg(totalRows).arg(importedRows);
+                  .arg(totalRows)
+                  .arg(importedRows);
         QMessageBox::information(this, "Успех", msg);
     } else {
         msg = QString("Импорт завершён с ошибками.\n\n"
                       "Всего строк: %1\n"
                       "Импортировано: %2\n"
                       "Ошибок: %3")
-                  .arg(totalRows).arg(importedRows).arg(failedRows);
+                  .arg(totalRows)
+                  .arg(importedRows)
+                  .arg(failedRows);
 
         if (!errorMsg.isEmpty()) {
             msg += QString("\n\nОшибки:\n%1").arg(errorMsg.left(1000));

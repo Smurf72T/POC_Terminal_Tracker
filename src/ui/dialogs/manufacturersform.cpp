@@ -13,9 +13,7 @@
 #include <QLineEdit>
 #include <QDateTime>
 
-ManufacturersForm::ManufacturersForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::ManufacturersForm)
+ManufacturersForm::ManufacturersForm(QWidget* parent) : QDialog(parent), ui(new Ui::ManufacturersForm)
 {
     ui->setupUi(this);
     setWindowTitle("Справочник производителей");
@@ -32,22 +30,22 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
     model = new SubmitErrorTableModel(this, db);
     model->setTable("tblmanufacturers");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
-    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this, [this](const QString &error) {
-        QMessageBox::warning(this, "Ошибка сохранения",
-            "Не удалось сохранить изменение:\n" + error);
-    });
-    
+    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this,
+            [this](const QString& error) {
+                QMessageBox::warning(this, "Ошибка сохранения", "Не удалось сохранить изменение:\n" + error);
+            });
+
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка загрузки данных",
-            "Не удалось загрузить данные:\n" + model->lastError().text() +
-            "\n\nПроверьте соединение с базой данных.");
+                              "Не удалось загрузить данные:\n" + model->lastError().text() +
+                                  "\n\nПроверьте соединение с базой данных.");
         ui->tableView->setEnabled(false);
         ui->btnAdd->setEnabled(false);
         ui->btnDelete->setEnabled(false);
         ui->lineEditSearch->setEnabled(false);
         return;
     }
-    
+
     int rowCount = model->rowCount();
 
     // Настройка сортировки
@@ -83,15 +81,12 @@ ManufacturersForm::ManufacturersForm(QWidget *parent) :
             f.setValue("%" + escaped + "%");
             QString likeVal = DatabaseManager::instance().getDatabase().driver()->formatValue(f);
 
-            QString filter = QString("manufacturername LIKE %1 ESCAPE '\\'")
-                                .arg(likeVal);
+            QString filter = QString("manufacturername LIKE %1 ESCAPE '\\'").arg(likeVal);
             model->setFilter(filter);
         }
         model->select();
     });
-    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
-        searchTimer->start();
-    });
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() { searchTimer->start(); });
 }
 
 ManufacturersForm::~ManufacturersForm()
@@ -102,8 +97,7 @@ ManufacturersForm::~ManufacturersForm()
 void ManufacturersForm::on_btnAdd_clicked()
 {
     // Генерируем уникальное временное имя
-    QString tempName = QString("Новый производитель %1")
-        .arg(QDateTime::currentMSecsSinceEpoch() % 10000);
+    QString tempName = QString("Новый производитель %1").arg(QDateTime::currentMSecsSinceEpoch() % 10000);
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("INSERT INTO tblmanufacturers (ManufacturerName) VALUES (:name) RETURNING ManufacturerID");
@@ -143,8 +137,7 @@ void ManufacturersForm::on_btnAdd_clicked()
             }
         }
     } else {
-        QMessageBox::critical(this, "Ошибка добавления",
-            "Не удалось добавить запись:\n" + query.lastError().text());
+        QMessageBox::critical(this, "Ошибка добавления", "Не удалось добавить запись:\n" + query.lastError().text());
     }
 }
 
@@ -156,8 +149,7 @@ void ManufacturersForm::on_btnDelete_clicked()
         QString name = model->data(model->index(row, 1)).toString();
 
         QMessageBox::StandardButton reply = QMessageBox::question(
-            this, "Подтверждение удаления",
-            QString("Вы действительно хотите удалить производителя \"%1\"?").arg(name),
+            this, "Подтверждение удаления", QString("Вы действительно хотите удалить производителя \"%1\"?").arg(name),
             QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
@@ -168,15 +160,15 @@ void ManufacturersForm::on_btnDelete_clicked()
             if (query.exec()) {
                 if (!model->select()) {
                     QMessageBox::critical(this, "Ошибка БД",
-                        "Запись удалена, но не удалось обновить таблицу: " + model->lastError().text() +
-                        "\n\nПопробуйте перезапустить форму.");
+                                          "Запись удалена, но не удалось обновить таблицу: " +
+                                              model->lastError().text() + "\n\nПопробуйте перезапустить форму.");
                     ui->tableView->setEnabled(false);
                 } else {
                     QMessageBox::information(this, "Успех", "Запись удалена.");
                 }
             } else {
                 QMessageBox::warning(this, "Ошибка удаления",
-                    "Не удалось удалить запись:\n" + query.lastError().text());
+                                     "Не удалось удалить запись:\n" + query.lastError().text());
             }
         }
     } else {

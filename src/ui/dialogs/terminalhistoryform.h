@@ -5,15 +5,14 @@
 #include <QSqlQueryModel>
 
 namespace Ui {
-    class TerminalHistoryForm;
+class TerminalHistoryForm;
 }
 
-class TerminalHistoryForm : public QDialog
-{
+class TerminalHistoryForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit TerminalHistoryForm(int terminalId, QString serialNumber, QWidget *parent = nullptr);
+    explicit TerminalHistoryForm(int terminalId, QString serialNumber, QWidget* parent = nullptr);
     ~TerminalHistoryForm();
 
 private slots:
@@ -21,14 +20,14 @@ private slots:
     void on_btnClose_clicked();
 
 private:
-    Ui::TerminalHistoryForm *ui;
-    QSqlQueryModel *receiptModel;
-    QSqlQueryModel *rentalModel;
-    QSqlQueryModel *returnModel;
-    QSqlQueryModel *paymentModel;
+    Ui::TerminalHistoryForm* ui;
+    QSqlQueryModel* receiptModel;
+    QSqlQueryModel* rentalModel;
+    QSqlQueryModel* returnModel;
+    QSqlQueryModel* paymentModel;
 
-    void loadHistory(int terminalId, const QString &serialNumber);
-    QString getSaveFilePath(const QString &title, const QString &filter);
+    void loadHistory(int terminalId, const QString& serialNumber);
+    QString getSaveFilePath(const QString& title, const QString& filter);
 };
 
 #endif // TERMINALHISTORYFORM_H

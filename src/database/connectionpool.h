@@ -17,8 +17,7 @@
 // Пул снижает нагрузку на PostgreSQL: вместо открытия нового соединения на каждую
 // операцию (costly handshake + аутентификация) соединение переиспользуется в том же
 // потоке. Типичное применение — длительный worker-поток (например, BackupWorker).
-class ConnectionPool
-{
+class ConnectionPool {
 public:
     // Фабрика создаёт НОВОЕ открытое соединение с уникальным connectionName.
     using ConnectionFactory = std::function<QSqlDatabase()>;
@@ -32,7 +31,7 @@ public:
 
     // Возвращает соединение в пул (вызывать из того же потока, что и acquire).
     // db обнуляется; соединение НЕ закрывается — оно переиспользуется.
-    void release(QSqlDatabase &db);
+    void release(QSqlDatabase& db);
 
     // Количество свободных соединений во всех потоках (для тестов/диагностики).
     int idleCount() const;

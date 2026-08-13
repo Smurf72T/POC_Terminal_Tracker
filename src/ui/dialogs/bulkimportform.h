@@ -5,15 +5,14 @@
 #include <QSqlQueryModel>
 
 namespace Ui {
-    class BulkImportForm;
+class BulkImportForm;
 }
 
-class BulkImportForm : public QDialog
-{
+class BulkImportForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit BulkImportForm(QWidget *parent = nullptr);
+    explicit BulkImportForm(QWidget* parent = nullptr);
     ~BulkImportForm();
 
 private slots:
@@ -23,12 +22,12 @@ private slots:
     void on_btnExportTemplate_clicked();
 
 private:
-    Ui::BulkImportForm *ui;
+    Ui::BulkImportForm* ui;
     QString selectedFilePath;
 
     void loadPreview();
     bool importData();
-    void showImportResult(bool success, int totalRows, int importedRows, int failedRows, const QString &errorMsg);
+    void showImportResult(bool success, int totalRows, int importedRows, int failedRows, const QString& errorMsg);
 };
 
 #endif // BULKIMPORTFORM_H

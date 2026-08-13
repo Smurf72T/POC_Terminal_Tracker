@@ -14,9 +14,7 @@
 #include <QPrintDialog>
 #include <QTextDocument>
 
-PaymentForm::PaymentForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::PaymentForm)
+PaymentForm::PaymentForm(QWidget* parent) : QDialog(parent), ui(new Ui::PaymentForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Отметка оплаты за аренду");
@@ -55,7 +53,7 @@ void PaymentForm::loadClients()
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname");
-    
+
     while (query.next()) {
         ui->comboBoxClient->addItem(query.value(1).toString(), query.value(0).toInt());
     }
@@ -110,7 +108,7 @@ void PaymentForm::loadForEdit(int paymentId)
     linkQuery.bindValue(":id", paymentId);
     if (!linkQuery.exec()) {
         QMessageBox::warning(this, "Ошибка БД",
-            "Не удалось загрузить привязанные документы аренды:\n" + linkQuery.lastError().text());
+                             "Не удалось загрузить привязанные документы аренды:\n" + linkQuery.lastError().text());
         return;
     }
 
@@ -135,10 +133,8 @@ void PaymentForm::loadForEdit(int paymentId)
 void PaymentForm::loadMonths()
 {
     ui->comboBoxMonth->clear();
-    QStringList monthNames = {
-        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
-    };
+    QStringList monthNames = {"Январь", "Февраль", "Март",     "Апрель",  "Май",    "Июнь",
+                              "Июль",   "Август",  "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
     for (int i = 0; i < 12; ++i) {
         ui->comboBoxMonth->addItem(monthNames[i], i + 1);
     }
@@ -162,7 +158,8 @@ void PaymentForm::loadRentalDocsForClient(int clientId)
     }
     model->removeRows(0, model->rowCount());
 
-    if (clientId == 0) return;
+    if (clientId == 0)
+        return;
 
     if (!DatabaseManager::instance().isConnected()) {
         qCWarning(logApp) << "База данных не подключена";
@@ -180,15 +177,14 @@ void PaymentForm::loadRentalDocsForClient(int clientId)
     }
 
     while (query.next()) {
-        QString displayText = QString("%1 от %2")
-            .arg(query.value(1).toString())
-            .arg(query.value(2).toDateTime().toString("dd.MM.yyyy"));
-        
+        QString displayText =
+            QString("%1 от %2").arg(query.value(1).toString()).arg(query.value(2).toDateTime().toString("dd.MM.yyyy"));
+
         QStandardItem* item = new QStandardItem(displayText);
         item->setData(query.value(0).toInt(), Qt::UserRole);
         item->setCheckable(true);
         item->setCheckState(Qt::Unchecked);
-        
+
         model->appendRow(item);
     }
 }
@@ -208,7 +204,7 @@ bool PaymentForm::checkExistingPayment(int clientId, int month, int year)
     query.bindValue(":cid", clientId);
     query.bindValue(":month", month);
     query.bindValue(":year", year);
-    
+
     return (query.exec() && query.next());
 }
 
@@ -218,7 +214,7 @@ void PaymentForm::on_btnSave_clicked()
     int month = ui->comboBoxMonth->currentData().toInt();
     int year = ui->spinBoxYear->value();
     double amount = ui->doubleSpinBoxAmount->value();
-    
+
     if (clientId == 0) {
         QMessageBox::warning(this, "Внимание", "Выберите клиента!");
         return;
@@ -252,8 +248,8 @@ void PaymentForm::on_btnSave_clicked()
         // Режим редактирования — UPDATE существующего платежа
         QSqlQuery updateQuery(db);
         updateQuery.prepare("UPDATE tblpayments SET clientid = :cid, paymentdate = :date, "
-                           "periodmonth = :month, periodyear = :year, amount = :amount, comment = :comment "
-                           "WHERE paymentid = :id");
+                            "periodmonth = :month, periodyear = :year, amount = :amount, comment = :comment "
+                            "WHERE paymentid = :id");
         updateQuery.bindValue(":cid", clientId);
         updateQuery.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         updateQuery.bindValue(":month", month);
@@ -285,22 +281,23 @@ void PaymentForm::on_btnSave_clicked()
                 QString("Оплата за %1 %2 года уже существует. Заменить её (включая привязанные документы)?")
                     .arg(ui->comboBoxMonth->currentText(), QString::number(year)),
                 QMessageBox::Yes | QMessageBox::No);
-            
+
             if (reply != QMessageBox::Yes) {
                 db.rollback();
                 return;
             }
-            
+
             QSqlQuery deleteQuery(db);
             deleteQuery.prepare("DELETE FROM tblpayments "
                                 "WHERE clientid = :cid AND periodmonth = :month AND periodyear = :year");
             deleteQuery.bindValue(":cid", clientId);
             deleteQuery.bindValue(":month", month);
             deleteQuery.bindValue(":year", year);
-            
+
             if (!deleteQuery.exec()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить старую запись: " + deleteQuery.lastError().text());
+                QMessageBox::critical(this, "Ошибка БД",
+                                      "Не удалось удалить старую запись: " + deleteQuery.lastError().text());
                 return;
             }
         }
@@ -328,7 +325,7 @@ void PaymentForm::on_btnSave_clicked()
         linkQuery.prepare("INSERT INTO tblpayment_rental_links (paymentid, rentaldocid) VALUES (:pid, :rid)");
         linkQuery.bindValue(":pid", paymentId);
         linkQuery.bindValue(":rid", rentalId);
-        
+
         if (!linkQuery.exec()) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать связь: " + linkQuery.lastError().text());
@@ -343,7 +340,7 @@ void PaymentForm::on_btnSave_clicked()
     } else {
         // Логирование действия
         DatabaseManager::instance().logAction("POST", "tblpayments", paymentId);
-        
+
         QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();
@@ -367,7 +364,7 @@ void PaymentForm::on_btnPrint_clicked()
         clientInn = query.value(1).toString();
     }
 
-    QStringList monthNames = {"", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    QStringList monthNames = {"",     "Январь", "Февраль",  "Март",    "Апрель", "Май",    "Июнь",
                               "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"};
     int month = ui->comboBoxMonth->currentIndex();
     int year = ui->spinBoxYear->value();
@@ -383,10 +380,12 @@ void PaymentForm::on_btnPrint_clicked()
     html += "<p><b>Платёж №</b> " + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + "</p>";
     html += "<p><b>Дата:</b> " + ui->dateEdit->date().toString("dd.MM.yyyy") + "</p>";
     html += "<p><b>Плательщик:</b> " + clientName.toHtmlEscaped();
-    if (!clientInn.isEmpty()) html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
+    if (!clientInn.isEmpty())
+        html += " (ИНН: " + clientInn.toHtmlEscaped() + ")";
     html += "</p>";
     html += "<p><b>Получатель:</b> ООО «POC Terminal»</p>";
-    html += "<p><b>Период оплаты:</b> " + monthNames.value(month).toHtmlEscaped() + " " + QString::number(year) + "</p>";
+    html +=
+        "<p><b>Период оплаты:</b> " + monthNames.value(month).toHtmlEscaped() + " " + QString::number(year) + "</p>";
     html += "<hr>";
     html += "<p style='font-size: 16px;'><b>Сумма:</b> " + QString::number(amount, 'f', 2) + " руб.</p>";
     html += "<p style='font-size: 13px; color: #555;'>Сумма прописью: ...</p>";

@@ -10,20 +10,15 @@
 #include <QFileInfo>
 #include <QDebug>
 
-ReportExporter::ReportExporter(QObject *parent) : QObject(parent) {}
+ReportExporter::ReportExporter(QObject* parent) : QObject(parent) {}
 
-QString ReportExporter::getSaveFilePath(QWidget* parent,
-                                         const QString& title,
-                                         const QString& filter)
+QString ReportExporter::getSaveFilePath(QWidget* parent, const QString& title, const QString& filter)
 {
-    return QFileDialog::getSaveFileName(parent, title,
-        QDir::homePath(), filter);
+    return QFileDialog::getSaveFileName(parent, title, QDir::homePath(), filter);
 }
 
-bool ReportExporter::exportModelToExcel(QSqlQueryModel* model,
-                                         const QString& title,
-                                         const QString& filePath,
-                                         QWidget* parent)
+bool ReportExporter::exportModelToExcel(QSqlQueryModel* model, const QString& title, const QString& filePath,
+                                        QWidget* parent)
 {
     if (!model || model->rowCount() == 0) {
         QMessageBox::warning(parent, "Экспорт", "Нет данных для экспорта!");
@@ -72,9 +67,7 @@ bool ReportExporter::exportModelToExcel(QSqlQueryModel* model,
     return xlsx.saveAs(filePath);
 }
 
-bool ReportExporter::exportHtmlToPdf(const QString& html,
-                                      const QString& filePath,
-                                      QWidget* parent)
+bool ReportExporter::exportHtmlToPdf(const QString& html, const QString& filePath, QWidget* parent)
 {
     QTextDocument doc;
     doc.setHtml(html);

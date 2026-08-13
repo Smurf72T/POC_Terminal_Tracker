@@ -1,0 +1,48 @@
+# Правила форматирования POC Terminal Tracker.
+# Стиль — по конвенциям Qt: отступ 4 пробела, фигурная скобка функции/класса —
+# на новой строке, а после управляющих конструкций — на той же строке.
+# Qt не является встроенным чек-пресетом clang-format (доступны LLVM, Google,
+# Chromium, Mozilla, WebKit, Microsoft, GNU), поэтому за основу берём LLVM
+# и явно задаём нужные отличия.
+
+BasedOnStyle: LLVM
+
+UseTab: Never
+TabWidth: 4
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 120
+
+AccessModifierOffset: -4
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+# Скобки функций — на новой строке (как в Qt), управляющих конструкций — inline.
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: Never
+  AfterFunction: true
+  AfterNamespace: false
+  AfterClass: false
+  AfterStruct: false
+  AfterEnum: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  SplitEmptyFunction: false
+
+IndentCaseLabels: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AlwaysBreakTemplateDeclarations: Yes
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+BreakConstructorInitializers: AfterColon
+ConstructorInitializerIndentWidth: 4
+SpaceAfterTemplateKeyword: false
+
+# Порядок инклудов в проекте выдержан вручную — не переставляем.
+SortIncludes: Never
+IncludeBlocks: Preserve

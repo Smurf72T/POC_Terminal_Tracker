@@ -7,6 +7,54 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    name: Lint (clang-format + clang-tidy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install LLVM tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy
+          # clang-format версионируем через pip (Ubuntu 24.04 apt даёт v18,
+          # а локальная разметка кода делалась v22 — при расхождении проверка падала бы).
+          python3 -m pip install --user --quiet 'clang-format==22.1.8'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          clang-format --version
+          clang-tidy --version
+
+      - name: Install Qt 6 (apt, для clang-tidy compile-commands)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y qt6-base-dev libqt6sql6-psql libqt6sql6-sqlite
+          sudo apt-get install -y qt6-charts-dev || sudo apt-get install -y libqt6charts6-dev
+          sudo apt-get install -y libpq-dev
+          test -f /usr/lib/x86_64-linux-gnu/cmake/Qt6/Qt6Config.cmake
+
+      - name: Configure (compile_commands for clang-tidy)
+        run: |
+          set -o pipefail
+          cmake -S . -B build -DCMAKE_PREFIX_PATH=/usr/lib/x86_64-linux-gnu/cmake \
+            -DBUILD_TESTS=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>&1 | tee configure.log
+          exit ${PIPESTATUS[0]}
+
+      - name: clang-format (dry-run)
+        run: |
+          clang-format --dry-run -Werror $(git ls-files 'src/**/*.cpp' 'src/**/*.h' 'tests/**/*.cpp' 'tests/**/*.h')
+
+      - name: clang-tidy (src/*.cpp по compile_commands)
+        # run-clang-tidy применяет .clang-tidy к исходникам из compile_commands.json.
+        # Диагностики исходников вне src/ (test-файлы, main.cpp) не требуются.
+        run: |
+          run-clang-tidy -p build -header-filter='.*/src/.*' -quiet $(git ls-files 'src/**/*.cpp')
+
   build-test:
     name: Build and test (Ubuntu)
     runs-on: ubuntu-latest

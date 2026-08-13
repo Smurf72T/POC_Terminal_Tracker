@@ -2,8 +2,7 @@
 #include <QString>
 #include "utils/password_utils.h"
 
-class TestPasswordUtils : public QObject
-{
+class TestPasswordUtils : public QObject {
     Q_OBJECT
 
 private slots:
@@ -37,8 +36,7 @@ private slots:
     void testBackwardCompatibilityOldFormat()
     {
         QString password = "MyOldPass1";
-        QString hash = QString(QCryptographicHash::hash(
-            password.toUtf8(), QCryptographicHash::Sha256).toHex());
+        QString hash = QString(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256).toHex());
         QCOMPARE(hash.length(), 64);
         QVERIFY(checkPassword(password, hash));
     }
@@ -47,8 +45,8 @@ private slots:
     {
         QString password = "SaltedPass1";
         QString salt = "0123456789abcdef";
-        QString hash = salt + QString(QCryptographicHash::hash(
-            (salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
+        QString hash =
+            salt + QString(QCryptographicHash::hash((salt + password).toUtf8(), QCryptographicHash::Sha256).toHex());
         QCOMPARE(hash.length(), 80);
         QVERIFY(checkPassword(password, hash));
     }

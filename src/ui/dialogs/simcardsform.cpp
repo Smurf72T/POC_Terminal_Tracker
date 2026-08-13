@@ -17,30 +17,27 @@
 // Делегат для отображения статуса SIM-карты текстом вместо цифр.
 // Наследует ReadOnlyDelegate: inline-редактирование статуса запрещено
 // (статус меняется только через документы аренды/возврата).
-class SimStatusDelegate : public ReadOnlyDelegate
-{
+class SimStatusDelegate : public ReadOnlyDelegate {
 public:
-    explicit SimStatusDelegate(QObject *parent = nullptr)
-        : ReadOnlyDelegate(parent) {}
+    explicit SimStatusDelegate(QObject* parent = nullptr) : ReadOnlyDelegate(parent) {}
 
-    QString displayText(const QVariant &value, const QLocale &) const override
+    QString displayText(const QVariant& value, const QLocale&) const override
     {
         bool ok;
         int status = value.toInt(&ok);
         if (ok) {
             switch (status) {
-                case 0: return QString::fromUtf8("Свободна");
-                case 1: return QString::fromUtf8("Установлена");
+                case 0:
+                    return QString::fromUtf8("Свободна");
+                case 1:
+                    return QString::fromUtf8("Установлена");
             }
         }
         return value.toString();
     }
 };
 
-
-SIMCardsForm::SIMCardsForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::SIMCardsForm)
+SIMCardsForm::SIMCardsForm(QWidget* parent) : QDialog(parent), ui(new Ui::SIMCardsForm)
 {
     ui->setupUi(this);
     setWindowTitle("Справочник SIM-карт");
@@ -50,15 +47,15 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
     model = new SubmitErrorTableModel(this, DatabaseManager::instance().getDatabase());
     model->setTable("tblsimcards");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
-    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this, [this](const QString &error) {
-        QMessageBox::warning(this, "Ошибка сохранения",
-            "Не удалось сохранить изменение:\n" + error);
-    });
+    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this,
+            [this](const QString& error) {
+                QMessageBox::warning(this, "Ошибка сохранения", "Не удалось сохранить изменение:\n" + error);
+            });
 
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка БД",
-            "Не удалось загрузить SIM-карты: " + model->lastError().text() +
-            "\n\nПроверьте соединение с базой данных.");
+                              "Не удалось загрузить SIM-карты: " + model->lastError().text() +
+                                  "\n\nПроверьте соединение с базой данных.");
         ui->tableView->setEnabled(false);
         ui->btnAdd->setEnabled(false);
         ui->btnDelete->setEnabled(false);
@@ -120,15 +117,12 @@ SIMCardsForm::SIMCardsForm(QWidget *parent) :
             f.setValue("%" + escaped + "%");
             QString likeVal = DatabaseManager::instance().getDatabase().driver()->formatValue(f);
 
-            QString filter = QString("simnumber LIKE %1 ESCAPE '\\'")
-                                .arg(likeVal);
+            QString filter = QString("simnumber LIKE %1 ESCAPE '\\'").arg(likeVal);
             model->setFilter(filter);
         }
         model->select();
     });
-    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
-        searchTimer->start();
-    });
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() { searchTimer->start(); });
 }
 
 SIMCardsForm::~SIMCardsForm()
@@ -140,9 +134,8 @@ void SIMCardsForm::on_btnAdd_clicked()
 {
     // Генерируем уникальный временный номер SIM (макс. 19 символов)
     static int addCounter = 0;
-    QString tempNumber = QString("TMP%1%2")
-        .arg(QDateTime::currentMSecsSinceEpoch())
-        .arg(addCounter++, 3, 10, QChar('0'));
+    QString tempNumber =
+        QString("TMP%1%2").arg(QDateTime::currentMSecsSinceEpoch()).arg(addCounter++, 3, 10, QChar('0'));
 
     // Вставляем НАПРЯМУЮ в таблицу tblsimcards (не в VIEW!)
     QSqlQuery query(DatabaseManager::instance().getDatabase());
@@ -155,8 +148,8 @@ void SIMCardsForm::on_btnAdd_clicked()
         // Обновляем модель из таблицы
         if (!model->select()) {
             QMessageBox::critical(this, "Ошибка БД",
-                "Запись создана, но не удалось обновить таблицу: " + model->lastError().text() +
-                "\n\nПопробуйте перезапустить форму.");
+                                  "Запись создана, но не удалось обновить таблицу: " + model->lastError().text() +
+                                      "\n\nПопробуйте перезапустить форму.");
             ui->tableView->setEnabled(false);
             return;
         }
@@ -185,8 +178,7 @@ void SIMCardsForm::on_btnAdd_clicked()
             }
         }
     } else {
-        QMessageBox::critical(this, "Ошибка добавления",
-            "Не удалось добавить SIM-карту:\n" + query.lastError().text());
+        QMessageBox::critical(this, "Ошибка добавления", "Не удалось добавить SIM-карту:\n" + query.lastError().text());
     }
 }
 
@@ -201,15 +193,13 @@ void SIMCardsForm::on_btnDelete_clicked()
         // Проверяем, не установлена ли SIM-карта в терминал
         if (status == 1) {
             QMessageBox::warning(this, "Ошибка удаления",
-                "Нельзя удалить SIM-карту, которая установлена в терминал!\n"
-                "Сначала извлеките SIM-карту из терминала.");
+                                 "Нельзя удалить SIM-карту, которая установлена в терминал!\n"
+                                 "Сначала извлеките SIM-карту из терминала.");
             return;
         }
 
         QMessageBox::StandardButton reply = QMessageBox::question(
-            this, "Удаление",
-            QString("Удалить SIM-карту %1?").arg(number),
-            QMessageBox::Yes | QMessageBox::No);
+            this, "Удаление", QString("Удалить SIM-карту %1?").arg(number), QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
             // Удаляем НАПРЯМУЮ из таблицы tblsimcards
@@ -222,7 +212,7 @@ void SIMCardsForm::on_btnDelete_clicked()
                 QMessageBox::information(this, "Успех", "SIM-карта удалена.");
             } else {
                 QMessageBox::warning(this, "Ошибка удаления",
-                    "Не удалось удалить SIM-карту:\n" + query.lastError().text());
+                                     "Не удалось удалить SIM-карту:\n" + query.lastError().text());
             }
         }
     } else {
@@ -235,13 +225,14 @@ void SIMCardsForm::on_btnClose_clicked()
     close();
 }
 
-bool SIMCardsForm::eventFilter(QObject *obj, QEvent *event)
+bool SIMCardsForm::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == ui->tableView && event->type() == QEvent::KeyPress) {
-        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
         if (keyEvent->key() == Qt::Key_F9) {
             int row = ui->tableView->currentIndex().row();
-            if (row < 0) return true;
+            if (row < 0)
+                return true;
 
             QString simNumber = model->data(model->index(row, 1)).toString();
             QString notes = model->data(model->index(row, 3)).toString();
@@ -262,9 +253,7 @@ bool SIMCardsForm::eventFilter(QObject *obj, QEvent *event)
                         QModelIndex idx = model->index(r, 1);
                         ui->tableView->selectRow(r);
                         ui->tableView->setCurrentIndex(idx);
-                        QTimer::singleShot(100, [this, idx]() {
-                            ui->tableView->edit(idx);
-                        });
+                        QTimer::singleShot(100, [this, idx]() { ui->tableView->edit(idx); });
                         break;
                     }
                 }
@@ -275,7 +264,7 @@ bool SIMCardsForm::eventFilter(QObject *obj, QEvent *event)
     return QDialog::eventFilter(obj, event);
 }
 
-void SIMCardsForm::closeEvent(QCloseEvent *event)
+void SIMCardsForm::closeEvent(QCloseEvent* event)
 {
     if (model->isDirty()) {
         model->submitAll();

@@ -19,10 +19,9 @@ QSqlDatabase makeSqliteConnection()
     }
     return db;
 }
-}
+} // namespace
 
-class TestConnectionPool : public QObject
-{
+class TestConnectionPool : public QObject {
     Q_OBJECT
 
 private slots:

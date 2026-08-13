@@ -5,15 +5,14 @@
 #include <QSqlQueryModel>
 
 namespace Ui {
-    class AuditLogForm;
+class AuditLogForm;
 }
 
-class AuditLogForm : public QDialog
-{
+class AuditLogForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit AuditLogForm(QWidget *parent = nullptr);
+    explicit AuditLogForm(QWidget* parent = nullptr);
     ~AuditLogForm();
 
 private slots:
@@ -22,8 +21,8 @@ private slots:
     void on_btnClose_clicked();
 
 private:
-    Ui::AuditLogForm *ui;
-    QSqlQueryModel *model;
+    Ui::AuditLogForm* ui;
+    QSqlQueryModel* model;
 
     void loadFilterValues();
     void applyFilter();

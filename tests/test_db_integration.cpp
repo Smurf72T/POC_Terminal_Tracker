@@ -14,8 +14,7 @@
 #include "ops/backupmanager.h"
 #include "ops/opslog.h"
 
-class TestDbIntegration : public QObject
-{
+class TestDbIntegration : public QObject {
     Q_OBJECT
 
 private slots:
@@ -40,14 +39,14 @@ private:
     QJsonObject m_dbConfig;
 
     bool applyMigrations();
-    bool execSql(const QString &sql, QString *err = nullptr);
-    QSqlQuery querySql(const QString &sql, QString *err = nullptr);
-    int countRows(const QString &sql, QString *err = nullptr);
-    QString generateNumber(const QString &docType, bool *ok = nullptr);
-    void setAppValue(const QString &key, const QString &value);
+    bool execSql(const QString& sql, QString* err = nullptr);
+    QSqlQuery querySql(const QString& sql, QString* err = nullptr);
+    int countRows(const QString& sql, QString* err = nullptr);
+    QString generateNumber(const QString& docType, bool* ok = nullptr);
+    void setAppValue(const QString& key, const QString& value);
 };
 
-static QMap<QString, QString> loadEnvFile(const QString &filePath)
+static QMap<QString, QString> loadEnvFile(const QString& filePath)
 {
     QMap<QString, QString> env;
     QFile file(filePath);
@@ -66,8 +65,8 @@ static QMap<QString, QString> loadEnvFile(const QString &filePath)
     return env;
 }
 
-static QString envValue(const QMap<QString, QString> &env, const QJsonObject &cfg,
-                        const QString &envKey, const QString &cfgKey, const QString &def)
+static QString envValue(const QMap<QString, QString>& env, const QJsonObject& cfg, const QString& envKey,
+                        const QString& cfgKey, const QString& def)
 {
     if (qEnvironmentVariableIsSet(envKey.toUtf8().constData()))
         return qEnvironmentVariable(envKey.toUtf8().constData());
@@ -78,8 +77,8 @@ static QString envValue(const QMap<QString, QString> &env, const QJsonObject &cf
     return def;
 }
 
-static bool openConnection(QSqlDatabase &db, const QString &dbName, const QMap<QString, QString> &env,
-                           const QJsonObject &cfg, QString *err)
+static bool openConnection(QSqlDatabase& db, const QString& dbName, const QMap<QString, QString>& env,
+                           const QJsonObject& cfg, QString* err)
 {
     db.setHostName(envValue(env, cfg, "POC_DB_HOST", "host", "localhost"));
     db.setPort(envValue(env, cfg, "POC_DB_PORT", "port", "5432").toInt());
@@ -99,13 +98,9 @@ void TestDbIntegration::initTestCase()
 {
     QString appDir = QCoreApplication::applicationDirPath();
 
-    QStringList envCandidates = {
-        appDir + "/.env",
-        appDir + "/../.env",
-        appDir + "/config/.env",
-        appDir + "/../../.env"
-    };
-    for (const QString &candidate : envCandidates) {
+    QStringList envCandidates = {appDir + "/.env", appDir + "/../.env", appDir + "/config/.env",
+                                 appDir + "/../../.env"};
+    for (const QString& candidate : envCandidates) {
         m_env = loadEnvFile(candidate);
         if (!m_env.isEmpty())
             break;
@@ -130,18 +125,17 @@ void TestDbIntegration::initTestCase()
 
     QSqlQuery term(m_adminDb);
     term.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                      "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(m_testDbName));
+                      "WHERE datname = '%1' AND pid <> pg_backend_pid()")
+                  .arg(m_testDbName));
 
     QSqlQuery drop(m_adminDb);
     if (!drop.exec(QString("DROP DATABASE IF EXISTS %1").arg(m_testDbName))) {
-        QSKIP(QString("Не удалось сбросить тестовую БД %1: %2")
-                  .arg(m_testDbName, drop.lastError().text()).toUtf8());
+        QSKIP(QString("Не удалось сбросить тестовую БД %1: %2").arg(m_testDbName, drop.lastError().text()).toUtf8());
     }
 
     QSqlQuery create(m_adminDb);
     if (!create.exec(QString("CREATE DATABASE %1 ENCODING 'UTF8'").arg(m_testDbName))) {
-        QSKIP(QString("Нет прав на создание тестовой БД %1: %2")
-                  .arg(m_testDbName, create.lastError().text()).toUtf8());
+        QSKIP(QString("Нет прав на создание тестовой БД %1: %2").arg(m_testDbName, create.lastError().text()).toUtf8());
     }
 
     m_testDb = QSqlDatabase::addDatabase("QPSQL", "testConnection");
@@ -163,7 +157,8 @@ void TestDbIntegration::cleanupTestCase()
     if (m_adminDb.isOpen()) {
         QSqlQuery term(m_adminDb);
         term.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                          "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(m_testDbName));
+                          "WHERE datname = '%1' AND pid <> pg_backend_pid()")
+                      .arg(m_testDbName));
         QSqlQuery drop(m_adminDb);
         if (!drop.exec(QString("DROP DATABASE IF EXISTS %1").arg(m_testDbName)))
             qWarning() << "Не удалось удалить тестовую БД" << m_testDbName << ":" << drop.lastError().text();
@@ -176,12 +171,9 @@ bool TestDbIntegration::applyMigrations()
 {
     QString migrationsDir;
     QString appDir = QCoreApplication::applicationDirPath();
-    QStringList candidates = {
-        appDir + "/sql/migrations/",
-        appDir + "/../sql/migrations/",
-        appDir + "/../../sql/migrations/"
-    };
-    for (const QString &c : candidates) {
+    QStringList candidates = {appDir + "/sql/migrations/", appDir + "/../sql/migrations/",
+                              appDir + "/../../sql/migrations/"};
+    for (const QString& c : candidates) {
         QDir d(c);
         if (d.exists()) {
             migrationsDir = d.absolutePath();
@@ -192,11 +184,10 @@ bool TestDbIntegration::applyMigrations()
         return false;
 
     QSqlQuery schemaQ(m_testDb);
-    if (!schemaQ.exec(
-            "CREATE TABLE IF NOT EXISTS schema_migrations ("
-            "  version VARCHAR(255) PRIMARY KEY,"
-            "  applied_at TIMESTAMP DEFAULT NOW()"
-            ")")) {
+    if (!schemaQ.exec("CREATE TABLE IF NOT EXISTS schema_migrations ("
+                      "  version VARCHAR(255) PRIMARY KEY,"
+                      "  applied_at TIMESTAMP DEFAULT NOW()"
+                      ")")) {
         return false;
     }
 
@@ -208,7 +199,7 @@ bool TestDbIntegration::applyMigrations()
     }
     pending.sort();
 
-    for (const QString &filePath : pending) {
+    for (const QString& filePath : pending) {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
             return false;
@@ -220,8 +211,7 @@ bool TestDbIntegration::applyMigrations()
 
         QSqlQuery q(m_testDb);
         if (!q.exec(sql)) {
-            qWarning() << "Ошибка в миграции" << QFileInfo(filePath).fileName()
-                       << ":" << q.lastError().text();
+            qWarning() << "Ошибка в миграции" << QFileInfo(filePath).fileName() << ":" << q.lastError().text();
             m_testDb.rollback();
             return false;
         }
@@ -230,8 +220,8 @@ bool TestDbIntegration::applyMigrations()
         rec.prepare("INSERT INTO schema_migrations (version) VALUES (:v)");
         rec.bindValue(":v", QFileInfo(filePath).fileName());
         if (!rec.exec()) {
-            qWarning() << "Не удалось записать версию миграции" << QFileInfo(filePath).fileName()
-                       << ":" << rec.lastError().text();
+            qWarning() << "Не удалось записать версию миграции" << QFileInfo(filePath).fileName() << ":"
+                       << rec.lastError().text();
             m_testDb.rollback();
             return false;
         }
@@ -256,7 +246,7 @@ bool TestDbIntegration::applyMigrations()
     return true;
 }
 
-bool TestDbIntegration::execSql(const QString &sql, QString *err)
+bool TestDbIntegration::execSql(const QString& sql, QString* err)
 {
     QSqlQuery q(m_testDb);
     bool ok = q.exec(sql);
@@ -265,7 +255,7 @@ bool TestDbIntegration::execSql(const QString &sql, QString *err)
     return ok;
 }
 
-QSqlQuery TestDbIntegration::querySql(const QString &sql, QString *err)
+QSqlQuery TestDbIntegration::querySql(const QString& sql, QString* err)
 {
     QSqlQuery q(m_testDb);
     q.exec(sql);
@@ -274,7 +264,7 @@ QSqlQuery TestDbIntegration::querySql(const QString &sql, QString *err)
     return q;
 }
 
-int TestDbIntegration::countRows(const QString &sql, QString *err)
+int TestDbIntegration::countRows(const QString& sql, QString* err)
 {
     QSqlQuery q = querySql(sql, err);
     if (!q.next())
@@ -282,7 +272,7 @@ int TestDbIntegration::countRows(const QString &sql, QString *err)
     return q.value(0).toInt();
 }
 
-QString TestDbIntegration::generateNumber(const QString &docType, bool *ok)
+QString TestDbIntegration::generateNumber(const QString& docType, bool* ok)
 {
     QSqlQuery q(m_testDb);
     q.prepare("SELECT generate_doc_number(:t)");
@@ -297,7 +287,7 @@ QString TestDbIntegration::generateNumber(const QString &docType, bool *ok)
     return q.value(0).toString();
 }
 
-void TestDbIntegration::setAppValue(const QString &key, const QString &value)
+void TestDbIntegration::setAppValue(const QString& key, const QString& value)
 {
     QSqlQuery q(m_testDb);
     q.prepare("SELECT set_config(:key, :value, false)");
@@ -308,20 +298,32 @@ void TestDbIntegration::setAppValue(const QString &key, const QString &value)
 
 void TestDbIntegration::test_schema_objects()
 {
-    const QStringList expectedTables = {
-        "tblclients", "tblmanufacturers", "tblmodels", "tblsimcards", "tblterminals",
-        "tblreceiptdocs", "tblreceiptdetails", "tblrentaldocs", "tblrentaldetails",
-        "tblreturndocs", "tblreturndetails", "tblpayments", "tblpayment_rental_links",
-        "tblsimassignments", "tblstatuschangedocs", "tblstatuschangedetails",
-        "tbl_users", "tbl_audit_log", "schema_migrations"
-    };
+    const QStringList expectedTables = {"tblclients",
+                                        "tblmanufacturers",
+                                        "tblmodels",
+                                        "tblsimcards",
+                                        "tblterminals",
+                                        "tblreceiptdocs",
+                                        "tblreceiptdetails",
+                                        "tblrentaldocs",
+                                        "tblrentaldetails",
+                                        "tblreturndocs",
+                                        "tblreturndetails",
+                                        "tblpayments",
+                                        "tblpayment_rental_links",
+                                        "tblsimassignments",
+                                        "tblstatuschangedocs",
+                                        "tblstatuschangedetails",
+                                        "tbl_users",
+                                        "tbl_audit_log",
+                                        "schema_migrations"};
     QString err;
     QSqlQuery q = querySql("SELECT tablename FROM pg_tables WHERE schemaname = 'public'", &err);
     QVERIFY2(q.lastError().driverText().isEmpty(), qPrintable("pg_tables: " + err));
     QStringList found;
     while (q.next())
         found << q.value(0).toString();
-    for (const QString &t : expectedTables)
+    for (const QString& t : expectedTables)
         QVERIFY2(found.contains(t), qPrintable("Нет таблицы: " + t));
 
     QSqlQuery v = querySql("SELECT viewname FROM pg_views WHERE schemaname = 'public'", &err);
@@ -329,27 +331,26 @@ void TestDbIntegration::test_schema_objects()
     found.clear();
     while (v.next())
         found << v.value(0).toString();
-    for (const QString &name : {QString("vwterminalsfull"), QString("vwcurrentrentals"), QString("vsimcards")})
+    for (const QString& name : {QString("vwterminalsfull"), QString("vwcurrentrentals"), QString("vsimcards")})
         QVERIFY2(found.contains(name), qPrintable("Нет представления: " + name));
 
-    QSqlQuery c = querySql(
-        "SELECT column_name FROM information_schema.columns WHERE table_name = 'tbl_users'", &err);
+    QSqlQuery c = querySql("SELECT column_name FROM information_schema.columns WHERE table_name = 'tbl_users'", &err);
     QVERIFY2(c.lastError().driverText().isEmpty(), qPrintable("columns: " + err));
     found.clear();
     while (c.next())
         found << c.value(0).toString();
-    for (const QString &col : {QString("failed_login_attempts"), QString("locked_until")})
+    for (const QString& col : {QString("failed_login_attempts"), QString("locked_until")})
         QVERIFY2(found.contains(col), qPrintable("Нет колонки: " + col));
 
-    QSqlQuery s = querySql(
-        "SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'", &err);
+    QSqlQuery s =
+        querySql("SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public'", &err);
     QVERIFY2(s.lastError().driverText().isEmpty(), qPrintable("sequences: " + err));
     found.clear();
     while (s.next())
         found << s.value(0).toString();
-    for (const QString &seq : {QString("seq_receipt_doc_number"), QString("seq_rental_doc_number"),
-                               QString("seq_return_doc_number"), QString("seq_payment_doc_number"),
-                               QString("seq_statuschange_doc_number")})
+    for (const QString& seq :
+         {QString("seq_receipt_doc_number"), QString("seq_rental_doc_number"), QString("seq_return_doc_number"),
+          QString("seq_payment_doc_number"), QString("seq_statuschange_doc_number")})
         QVERIFY2(found.contains(seq), qPrintable("Нет последовательности: " + seq));
 
     QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 12);
@@ -357,11 +358,11 @@ void TestDbIntegration::test_schema_objects()
 
 void TestDbIntegration::test_number_generation()
 {
-    struct { QString type; QString prefix; } cases[] = {
-        {"receipt", "ПП-"}, {"rental", "АР-"}, {"return", "ВР-"},
-        {"payment", "ОП-"}, {"statuschange", "ИС-"}
-    };
-    for (const auto &c : cases) {
+    struct {
+        QString type;
+        QString prefix;
+    } cases[] = {{"receipt", "ПП-"}, {"rental", "АР-"}, {"return", "ВР-"}, {"payment", "ОП-"}, {"statuschange", "ИС-"}};
+    for (const auto& c : cases) {
         bool ok = false;
         QString num = generateNumber(c.type, &ok);
         QVERIFY2(ok, qPrintable("Ошибка генерации номера: " + c.type));
@@ -406,24 +407,27 @@ void TestDbIntegration::test_audit_triggers()
     int clientId = insClient.value(0).toInt();
 
     QCOMPARE(countRows("SELECT count(*) FROM tbl_audit_log "
-                       "WHERE table_name = 'tblclients' AND record_id = " + QString::number(clientId) +
-                       " AND action = 'CREATE' AND username = 'tester'"), 1);
+                       "WHERE table_name = 'tblclients' AND record_id = " +
+                       QString::number(clientId) + " AND action = 'CREATE' AND username = 'tester'"),
+             1);
 
     QSqlQuery updClient(m_testDb);
     updClient.prepare("UPDATE tblclients SET clientname = 'Аудит-Клиент-2' WHERE clientid = :id");
     updClient.bindValue(":id", clientId);
     QVERIFY2(updClient.exec(), qPrintable(updClient.lastError().text()));
     QCOMPARE(countRows("SELECT count(*) FROM tbl_audit_log "
-                       "WHERE table_name = 'tblclients' AND record_id = " + QString::number(clientId) +
-                       " AND action = 'UPDATE'"), 1);
+                       "WHERE table_name = 'tblclients' AND record_id = " +
+                       QString::number(clientId) + " AND action = 'UPDATE'"),
+             1);
 
     QSqlQuery delClient(m_testDb);
     delClient.prepare("DELETE FROM tblclients WHERE clientid = :id");
     delClient.bindValue(":id", clientId);
     QVERIFY2(delClient.exec(), qPrintable(delClient.lastError().text()));
     QCOMPARE(countRows("SELECT count(*) FROM tbl_audit_log "
-                       "WHERE table_name = 'tblclients' AND record_id = " + QString::number(clientId) +
-                       " AND action = 'DELETE'"), 1);
+                       "WHERE table_name = 'tblclients' AND record_id = " +
+                       QString::number(clientId) + " AND action = 'DELETE'"),
+             1);
 
     QSqlQuery man(m_testDb);
     man.prepare("INSERT INTO tblmanufacturers (manufacturername) VALUES (:n) RETURNING manufacturerid");
@@ -449,8 +453,9 @@ void TestDbIntegration::test_audit_triggers()
     int termId = term.value(0).toInt();
 
     QCOMPARE(countRows("SELECT count(*) FROM tbl_audit_log "
-                       "WHERE table_name = 'tblterminals' AND record_id = " + QString::number(termId) +
-                       " AND action = 'CREATE' AND username = 'tester'"), 1);
+                       "WHERE table_name = 'tblterminals' AND record_id = " +
+                       QString::number(termId) + " AND action = 'CREATE' AND username = 'tester'"),
+             1);
 }
 
 void TestDbIntegration::test_role_enforcement()
@@ -629,8 +634,7 @@ void TestDbIntegration::test_business_flow()
     rentTerm.bindValue(":t", termId);
     QVERIFY2(rentTerm.exec(), qPrintable(rentTerm.lastError().text()));
 
-    QCOMPARE(countRows("SELECT count(*) FROM vwcurrentrentals WHERE terminalid = " +
-                       QString::number(termId)), 1);
+    QCOMPARE(countRows("SELECT count(*) FROM vwcurrentrentals WHERE terminalid = " + QString::number(termId)), 1);
 
     QString payNum = generateNumber("payment");
     QVERIFY2(payNum.startsWith("ОП-"), qPrintable(payNum));
@@ -674,8 +678,7 @@ void TestDbIntegration::test_business_flow()
     retTerm.bindValue(":t", termId);
     QVERIFY2(retTerm.exec(), qPrintable(retTerm.lastError().text()));
 
-    QCOMPARE(countRows("SELECT count(*) FROM vwcurrentrentals WHERE terminalid = " +
-                       QString::number(termId)), 0);
+    QCOMPARE(countRows("SELECT count(*) FROM vwcurrentrentals WHERE terminalid = " + QString::number(termId)), 0);
 
     QSqlQuery full(m_testDb);
     full.prepare("SELECT terminalstatusname FROM vwterminalsfull WHERE terminalid = :t");
@@ -687,8 +690,8 @@ void TestDbIntegration::test_business_flow()
     int auditCount = countRows("SELECT count(*) FROM tbl_audit_log "
                                "WHERE table_name = 'tblterminals' AND record_id = " +
                                QString::number(termId));
-    QVERIFY2(auditCount >= 3, qPrintable("Аудит терминала: ожидалось >= 3 записей, получено " +
-                                         QString::number(auditCount)));
+    QVERIFY2(auditCount >= 3,
+             qPrintable("Аудит терминала: ожидалось >= 3 записей, получено " + QString::number(auditCount)));
 }
 
 void TestDbIntegration::test_backup_and_opslog()
@@ -700,8 +703,7 @@ void TestDbIntegration::test_backup_and_opslog()
     // Fallback-дамп не зависит от внешних утилит и должен содержать структуру и данные
     QString err;
     QString backupFile = tempDir + "/backup_test.sql";
-    QVERIFY2(BackupManager::createFallbackBackup(m_testDb, backupFile, dbname, &err),
-             qPrintable(err));
+    QVERIFY2(BackupManager::createFallbackBackup(m_testDb, backupFile, dbname, &err), qPrintable(err));
     QVERIFY2(QFileInfo(backupFile).size() > 0, qPrintable("fallback-дамп пустой"));
     QFile f(backupFile);
     QVERIFY(f.open(QIODevice::ReadOnly | QIODevice::Text));
@@ -712,8 +714,8 @@ void TestDbIntegration::test_backup_and_opslog()
 
     // createBackup: pg_dump (если доступен в PATH) либо fallback — в любом случае файл создаётся
     QString backupFull = tempDir + "/backup_full.sql";
-    BackupManager::BackupResult result = BackupManager::createBackup(
-        m_testDb, backupFull, m_testDb.password(), m_testDb.password());
+    BackupManager::BackupResult result =
+        BackupManager::createBackup(m_testDb, backupFull, m_testDb.password(), m_testDb.password());
     QVERIFY2(result.ok, qPrintable(result.error));
     QVERIFY2(result.size > 0, qPrintable("бэкап пустой"));
     QVERIFY2(result.method == "pg_dump" || result.method == "fallback",
@@ -732,7 +734,8 @@ void TestDbIntegration::test_backup_and_opslog()
     const QString restoreDbName = "pocbase_test_restore";
     QSqlQuery termR(m_adminDb);
     termR.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                       "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(restoreDbName));
+                       "WHERE datname = '%1' AND pid <> pg_backend_pid()")
+                   .arg(restoreDbName));
     QSqlQuery dropR(m_adminDb);
     QVERIFY2(dropR.exec(QString("DROP DATABASE IF EXISTS %1").arg(restoreDbName)),
              qPrintable(dropR.lastError().text()));
@@ -745,7 +748,8 @@ void TestDbIntegration::test_backup_and_opslog()
         QString rErr;
         QVERIFY2(openConnection(restoreDb, restoreDbName, m_env, m_dbConfig, &rErr), qPrintable(rErr));
         QString restoreErr;
-        QVERIFY2(BackupManager::restoreDatabase(restoreDb, backupFull, m_testDb.password(), m_testDb.password(), &restoreErr),
+        QVERIFY2(BackupManager::restoreDatabase(restoreDb, backupFull, m_testDb.password(), m_testDb.password(),
+                                                &restoreErr),
                  qPrintable(restoreErr));
         restoreDb.close();
         QSqlDatabase::removeDatabase("restoreConnection");
@@ -770,27 +774,27 @@ void TestDbIntegration::test_backup_and_opslog()
 
     QSqlQuery termR2(m_adminDb);
     termR2.exec(QString("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                        "WHERE datname = '%1' AND pid <> pg_backend_pid()").arg(restoreDbName));
+                        "WHERE datname = '%1' AND pid <> pg_backend_pid()")
+                    .arg(restoreDbName));
     QSqlQuery dropR2(m_adminDb);
     dropR2.exec(QString("DROP DATABASE IF EXISTS %1").arg(restoreDbName));
 
     // Бэкап без пароля — plaintext SQL (обратная совместимость)
     QString backupPlain = tempDir + "/backup_plain.sql";
-    BackupManager::BackupResult plainResult = BackupManager::createBackup(
-        m_testDb, backupPlain, m_testDb.password(), QString());
+    BackupManager::BackupResult plainResult =
+        BackupManager::createBackup(m_testDb, backupPlain, m_testDb.password(), QString());
     QVERIFY2(plainResult.ok, qPrintable(plainResult.error));
     QVERIFY2(!plainResult.encrypted, qPrintable("бэкап без пароля не должен быть зашифрован"));
     QFile pf(backupPlain);
     QVERIFY(pf.open(QIODevice::ReadOnly | QIODevice::Text));
     QString plainContent = QString::fromUtf8(pf.readAll());
     pf.close();
-    QVERIFY2(plainContent.contains("CREATE TABLE"),
-             qPrintable("plain-бэкап не содержит CREATE TABLE"));
+    QVERIFY2(plainContent.contains("CREATE TABLE"), qPrintable("plain-бэкап не содержит CREATE TABLE"));
 
     // Журнал операций: запись должна появиться в ops.log
     OpsLog::instance().setLogDirectory(tempDir);
-    QString msg = "Тестовая запись журнала операций " +
-                  QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
+    QString msg =
+        "Тестовая запись журнала операций " + QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
     OpsLog::instance().info(msg);
     QString logPath = OpsLog::instance().logFilePath();
     QVERIFY2(QFile::exists(logPath), qPrintable("ops.log не создан: " + logPath));

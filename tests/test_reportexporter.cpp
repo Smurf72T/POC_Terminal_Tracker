@@ -9,8 +9,7 @@
 #include "utils/reportexporter.h"
 #include <xlsxdocument.h>
 
-class TestReportExporter : public QObject
-{
+class TestReportExporter : public QObject {
     Q_OBJECT
 
 private:
@@ -78,8 +77,7 @@ private slots:
 
     void testExportNullModel()
     {
-        bool ok = ReportExporter::exportModelToExcel(nullptr, "Отчёт",
-                                                     QDir::temp().filePath("null_report.xlsx"));
+        bool ok = ReportExporter::exportModelToExcel(nullptr, "Отчёт", QDir::temp().filePath("null_report.xlsx"));
         QVERIFY2(!ok, "Экспорт с пустой моделью должен вернуть false");
     }
 };

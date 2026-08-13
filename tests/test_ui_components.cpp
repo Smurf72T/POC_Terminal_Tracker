@@ -8,8 +8,7 @@
 #include "ui/delegates/comboboxmodel.h"
 #include "ui/delegates/readonlydelegate.h"
 
-class TestUiComponents : public QObject
-{
+class TestUiComponents : public QObject {
     Q_OBJECT
 
 private slots:
@@ -36,26 +35,26 @@ void TestUiComponents::checkboxDelegateTogglesOnClick()
     option.rect = QRect(0, 0, 40, 24);
     const QPoint center = option.rect.center();
 
-    QMouseEvent click(QEvent::MouseButtonRelease, QPointF(center), QPointF(center),
-                      Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QMouseEvent click(QEvent::MouseButtonRelease, QPointF(center), QPointF(center), Qt::LeftButton, Qt::NoButton,
+                      Qt::NoModifier);
     QVERIFY(delegate.editorEvent(&click, &model, option, index));
     QCOMPARE(model.data(index, Qt::DisplayRole).toBool(), true);
 
-    QMouseEvent secondClick(QEvent::MouseButtonRelease, QPointF(center), QPointF(center),
-                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QMouseEvent secondClick(QEvent::MouseButtonRelease, QPointF(center), QPointF(center), Qt::LeftButton, Qt::NoButton,
+                            Qt::NoModifier);
     QVERIFY(delegate.editorEvent(&secondClick, &model, option, index));
     QCOMPARE(model.data(index, Qt::DisplayRole).toBool(), false);
 
     // Клик вне чекбокса не должен менять значение
-    QMouseEvent miss(QEvent::MouseButtonRelease, QPointF(39, 12), QPointF(39, 12),
-                     Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QMouseEvent miss(QEvent::MouseButtonRelease, QPointF(39, 12), QPointF(39, 12), Qt::LeftButton, Qt::NoButton,
+                     Qt::NoModifier);
     QVERIFY(!delegate.editorEvent(&miss, &model, option, index));
     QCOMPARE(model.data(index, Qt::DisplayRole).toBool(), false);
 }
 
 void TestUiComponents::comboboxDelegateWritesUserAndDisplayRoles()
 {
-    QList<QPair<int, QString>> items = { {1, "Активен"}, {2, "Списан"} };
+    QList<QPair<int, QString>> items = {{1, "Активен"}, {2, "Списан"}};
     ComboBoxDelegate delegate(items);
 
     QStandardItemModel model;
@@ -64,7 +63,7 @@ void TestUiComponents::comboboxDelegateWritesUserAndDisplayRoles()
     const QModelIndex index = model.index(0, 0);
 
     QComboBox editor;
-    for (const auto &item : items)
+    for (const auto& item : items)
         editor.addItem(item.second, item.first);
     editor.setCurrentIndex(1);
 
@@ -75,7 +74,7 @@ void TestUiComponents::comboboxDelegateWritesUserAndDisplayRoles()
 
 void TestUiComponents::comboboxDelegateInitialisesEditor()
 {
-    QList<QPair<int, QString>> items = { {1, "Активен"}, {2, "Списан"} };
+    QList<QPair<int, QString>> items = {{1, "Активен"}, {2, "Списан"}};
     ComboBoxDelegate delegate(items);
 
     QStandardItemModel model;
@@ -86,9 +85,9 @@ void TestUiComponents::comboboxDelegateInitialisesEditor()
 
     QWidget parent;
     QStyleOptionViewItem option;
-    QWidget *editorWidget = delegate.createEditor(&parent, option, index);
+    QWidget* editorWidget = delegate.createEditor(&parent, option, index);
     QVERIFY(editorWidget != nullptr);
-    QComboBox *editor = qobject_cast<QComboBox*>(editorWidget);
+    QComboBox* editor = qobject_cast<QComboBox*>(editorWidget);
     QVERIFY(editor != nullptr);
 
     delegate.setEditorData(editor, index);
@@ -99,7 +98,7 @@ void TestUiComponents::comboboxDelegateInitialisesEditor()
 
 void TestUiComponents::comboboxModelReturnsDisplayAndUserRoles()
 {
-    QList<QPair<int, QString>> items = { {1, "Один"}, {2, "Два"} };
+    QList<QPair<int, QString>> items = {{1, "Один"}, {2, "Два"}};
     ComboBoxModel model(items);
     QCOMPARE(model.rowCount(), 2);
     QCOMPARE(model.columnCount(), 1);
@@ -115,7 +114,7 @@ void TestUiComponents::readonlyDelegateDoesNotCreateEditor()
     QWidget parent;
     QStyleOptionViewItem option;
     QStandardItemModel model;
-    QWidget *editor = delegate.createEditor(&parent, option, model.index(0, 0));
+    QWidget* editor = delegate.createEditor(&parent, option, model.index(0, 0));
     QVERIFY(editor == nullptr);
 }
 
@@ -132,7 +131,7 @@ void TestUiComponents::checkboxDelegateSizeHint()
 
 void TestUiComponents::editableComboboxWritesNewTextAsZeroId()
 {
-    QList<QPair<int, QString>> items = { {1, "Активен"}, {2, "Списан"} };
+    QList<QPair<int, QString>> items = {{1, "Активен"}, {2, "Списан"}};
     ComboBoxDelegate delegate(items, nullptr, true);
 
     QStandardItemModel model;
@@ -141,7 +140,7 @@ void TestUiComponents::editableComboboxWritesNewTextAsZeroId()
     const QModelIndex index = model.index(0, 0);
 
     QComboBox editor;
-    for (const auto &item : items)
+    for (const auto& item : items)
         editor.addItem(item.second, item.first);
     editor.setEditable(true);
     editor.setInsertPolicy(QComboBox::NoInsert);
@@ -154,7 +153,7 @@ void TestUiComponents::editableComboboxWritesNewTextAsZeroId()
 
 void TestUiComponents::editableComboboxResolvesTextToExistingItem()
 {
-    QList<QPair<int, QString>> items = { {1, "Активен"}, {2, "Списан"} };
+    QList<QPair<int, QString>> items = {{1, "Активен"}, {2, "Списан"}};
     ComboBoxDelegate delegate(items, nullptr, true);
 
     QStandardItemModel model;
@@ -163,7 +162,7 @@ void TestUiComponents::editableComboboxResolvesTextToExistingItem()
     const QModelIndex index = model.index(0, 0);
 
     QComboBox editor;
-    for (const auto &item : items)
+    for (const auto& item : items)
         editor.addItem(item.second, item.first);
     editor.setEditable(true);
     editor.setInsertPolicy(QComboBox::NoInsert);

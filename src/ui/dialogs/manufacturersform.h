@@ -7,15 +7,14 @@
 #include <QTimer>
 
 namespace Ui {
-    class ManufacturersForm;
+class ManufacturersForm;
 }
 
-class ManufacturersForm : public QDialog
-{
+class ManufacturersForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit ManufacturersForm(QWidget *parent = nullptr);
+    explicit ManufacturersForm(QWidget* parent = nullptr);
     ~ManufacturersForm();
 
 private slots:
@@ -24,9 +23,9 @@ private slots:
     void on_btnClose_clicked();
 
 private:
-    Ui::ManufacturersForm *ui;
-    QSqlTableModel *model;
-    QTimer *searchTimer;
+    Ui::ManufacturersForm* ui;
+    QSqlTableModel* model;
+    QTimer* searchTimer;
 };
 
 #endif // MANUFACTURERSFORM_H

@@ -17,8 +17,7 @@ class QThread;
 // QSqlDatabase-соединение открывается внутри рабочего потока — соединение,
 // созданное в главном потоке, использовать в другом потоке нельзя.
 // Соединение берётся из ConnectionPool и переиспользуется между операциями.
-class BackupWorker : public QObject
-{
+class BackupWorker : public QObject {
     Q_OBJECT
 
 public:
@@ -32,7 +31,7 @@ public:
     };
 
     // Должен вызываться до moveToThread().
-    void setConnectionParams(const ConnectionParams &params);
+    void setConnectionParams(const ConnectionParams& params);
 
     // Запрашивает отмену текущей операции (проверяется в длинных циклах
     // createFallbackBackup/restoreDatabase). Потокобезопасно.
@@ -42,19 +41,19 @@ public:
     ~BackupWorker() override;
 
 public slots:
-    void createBackup(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
-    void restore(const QString &filePath, const QString &connectionPassword, const QString &passphrase);
+    void createBackup(const QString& filePath, const QString& connectionPassword, const QString& passphrase);
+    void restore(const QString& filePath, const QString& connectionPassword, const QString& passphrase);
 
 signals:
-    void backupFinished(const BackupManager::BackupResult &result);
-    void restoreFinished(bool ok, const QString &filePath, const QString &error);
+    void backupFinished(const BackupManager::BackupResult& result);
+    void restoreFinished(bool ok, const QString& filePath, const QString& error);
 
 private:
     QSqlDatabase openConnection();
     QSqlDatabase createRawConnection();
 
     ConnectionParams m_params;
-    ConnectionPool *m_pool = nullptr;
+    ConnectionPool* m_pool = nullptr;
     std::atomic<bool> m_cancelRequested{false};
 };
 
@@ -65,6 +64,6 @@ private:
 // Возвращает nullptr, если поток уже создан (ничего не делает повторно).
 // Подключение сигналов выполняется в вызывающем коде — набор сигналов у
 // потребителей различается (MainWindow и OpsScheduler).
-BackupWorker *createBackupWorker(QThread *&thread);
+BackupWorker* createBackupWorker(QThread*& thread);
 
 #endif // BACKUPWORKER_H

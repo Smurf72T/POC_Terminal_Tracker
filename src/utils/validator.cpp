@@ -13,9 +13,7 @@ QRegularExpression& Validator::innRegex()
     return re;
 }
 
-Validator::Validator(QObject *parent) : QObject(parent)
-{
-}
+Validator::Validator(QObject* parent) : QObject(parent) {}
 
 bool Validator::validateIMEI(const QString& imei)
 {
@@ -26,7 +24,8 @@ bool Validator::validateIMEI(const QString& imei)
 
 bool Validator::validateINN(const QString& inn)
 {
-    if (!innRegex().match(inn).hasMatch()) return false;
+    if (!innRegex().match(inn).hasMatch())
+        return false;
     return validateINNChecksum(inn);
 }
 
@@ -63,15 +62,18 @@ bool Validator::checkUniqueSerial(const QString& serial, int excludeTerminalId)
 
 bool Validator::checkLuhn(const QString& number)
 {
-    if (number.isEmpty()) return false;
+    if (number.isEmpty())
+        return false;
     int sum = 0;
     bool alternate = false;
     for (int i = number.length() - 1; i >= 0; --i) {
         int digit = number[i].digitValue();
-        if (digit < 0) return false;
+        if (digit < 0)
+            return false;
         if (alternate) {
             digit *= 2;
-            if (digit > 9) digit -= 9;
+            if (digit > 9)
+                digit -= 9;
         }
         sum += digit;
         alternate = !alternate;
@@ -97,7 +99,8 @@ bool Validator::validateINNChecksum(const QString& inn)
             sum1 += inn[i].digitValue() * weights12[i];
         }
         int check1 = (sum1 % 11) % 10;
-        if (check1 != inn[10].digitValue()) return false;
+        if (check1 != inn[10].digitValue())
+            return false;
 
         int weights12b[] = {3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8};
         int sum2 = 0;
@@ -112,7 +115,8 @@ bool Validator::validateINNChecksum(const QString& inn)
 
 bool Validator::checkDuplicateIMEI(const QString& imei, int excludeTerminalId)
 {
-    if (imei.isEmpty() || imei == "000000000000000") return false;
+    if (imei.isEmpty() || imei == "000000000000000")
+        return false;
 
     QSqlQuery query(databaseManager().getDatabase());
     if (excludeTerminalId >= 0) {
@@ -126,8 +130,10 @@ bool Validator::checkDuplicateIMEI(const QString& imei, int excludeTerminalId)
         query.bindValue(":imei", imei);
     }
 
-    if (!query.exec()) return true;
-    if (query.next()) return query.value(0).toInt() > 0;
+    if (!query.exec())
+        return true;
+    if (query.next())
+        return query.value(0).toInt() > 0;
     return true;
 }
 

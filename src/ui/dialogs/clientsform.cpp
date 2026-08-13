@@ -13,9 +13,7 @@
 #include <QSqlField>
 #include <QSqlDriver>
 
-ClientsForm::ClientsForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::ClientsForm)
+ClientsForm::ClientsForm(QWidget* parent) : QDialog(parent), ui(new Ui::ClientsForm)
 {
     ui->setupUi(this);
     setWindowTitle("Справочник клиентов");
@@ -24,15 +22,15 @@ ClientsForm::ClientsForm(QWidget *parent) :
     model = new SubmitErrorTableModel(this, DatabaseManager::instance().getDatabase());
     model->setTable("tblclients");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
-    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this, [this](const QString &error) {
-        QMessageBox::warning(this, "Ошибка сохранения",
-            "Не удалось сохранить изменение:\n" + error);
-    });
+    connect(static_cast<SubmitErrorTableModel*>(model), &SubmitErrorTableModel::submitFailed, this,
+            [this](const QString& error) {
+                QMessageBox::warning(this, "Ошибка сохранения", "Не удалось сохранить изменение:\n" + error);
+            });
 
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка БД",
-            "Не удалось загрузить клиентов: " + model->lastError().text() +
-            "\n\nПроверьте соединение с базой данных.");
+                              "Не удалось загрузить клиентов: " + model->lastError().text() +
+                                  "\n\nПроверьте соединение с базой данных.");
         ui->tableView->setEnabled(false);
         ui->btnAdd->setEnabled(false);
         ui->btnDelete->setEnabled(false);
@@ -61,13 +59,13 @@ ClientsForm::ClientsForm(QWidget *parent) :
     ui->tableView->setColumnWidth(3, 200);
 
     // Валидация ИНН при изменении данных
-    connect(model, &QSqlTableModel::dataChanged, this, [this](const QModelIndex &topLeft, const QModelIndex &) {
+    connect(model, &QSqlTableModel::dataChanged, this, [this](const QModelIndex& topLeft, const QModelIndex&) {
         if (topLeft.column() == 2) {
             QString inn = topLeft.data().toString();
             if (!inn.isEmpty() && !Validator::validateINN(inn)) {
                 QMessageBox::warning(this, "Неверный ИНН",
-                    "ИНН должен быть 10 или 12 цифр с корректной контрольной суммой.\n"
-                    "Значение будет сброшено.");
+                                     "ИНН должен быть 10 или 12 цифр с корректной контрольной суммой.\n"
+                                     "Значение будет сброшено.");
                 model->setData(topLeft, QVariant());
                 model->submitAll();
             }
@@ -92,15 +90,12 @@ ClientsForm::ClientsForm(QWidget *parent) :
             f.setValue("%" + escaped + "%");
             QString likeVal = DatabaseManager::instance().getDatabase().driver()->formatValue(f);
 
-            QString filter = QString("clientname LIKE %1 ESCAPE '\\' OR inn LIKE %1 ESCAPE '\\'")
-                                .arg(likeVal);
+            QString filter = QString("clientname LIKE %1 ESCAPE '\\' OR inn LIKE %1 ESCAPE '\\'").arg(likeVal);
             model->setFilter(filter);
         }
         model->select();
     });
-    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() {
-        searchTimer->start();
-    });
+    connect(ui->lineEditSearch, &QLineEdit::textChanged, this, [this]() { searchTimer->start(); });
 }
 
 ClientsForm::~ClientsForm()
@@ -132,7 +127,8 @@ void ClientsForm::on_btnAdd_clicked()
                         QWidget* editor = ui->tableView->indexWidget(index);
                         if (editor) {
                             QLineEdit* lineEdit = qobject_cast<QLineEdit*>(editor);
-                            if (lineEdit) lineEdit->selectAll();
+                            if (lineEdit)
+                                lineEdit->selectAll();
                         }
                     });
                 });
@@ -152,9 +148,7 @@ void ClientsForm::on_btnDelete_clicked()
         QString name = model->data(model->index(row, 1)).toString();
 
         QMessageBox::StandardButton reply = QMessageBox::question(
-            this, "Удаление",
-            QString("Удалить клиента \"%1\"?").arg(name),
-            QMessageBox::Yes | QMessageBox::No);
+            this, "Удаление", QString("Удалить клиента \"%1\"?").arg(name), QMessageBox::Yes | QMessageBox::No);
 
         if (reply == QMessageBox::Yes) {
             QSqlQuery query(DatabaseManager::instance().getDatabase());
@@ -164,12 +158,14 @@ void ClientsForm::on_btnDelete_clicked()
             if (query.exec()) {
                 if (!model->select()) {
                     QMessageBox::critical(this, "Ошибка БД",
-                        "Данные удалены, но не удалось обновить таблицу: " + model->lastError().text() +
-                        "\n\nПопробуйте перезапустить форму.");
+                                          "Данные удалены, но не удалось обновить таблицу: " +
+                                              model->lastError().text() + "\n\nПопробуйте перезапустить форму.");
                     ui->tableView->setEnabled(false);
                 }
             } else {
-                QMessageBox::warning(this, "Ошибка", "Не удалось удалить. Возможно, есть арендованные терминалы.\n" + query.lastError().text());
+                QMessageBox::warning(this, "Ошибка",
+                                     "Не удалось удалить. Возможно, есть арендованные терминалы.\n" +
+                                         query.lastError().text());
             }
         }
     } else {
@@ -177,7 +173,7 @@ void ClientsForm::on_btnDelete_clicked()
     }
 }
 
-void ClientsForm::on_lineEditSearch_textChanged(const QString &arg1)
+void ClientsForm::on_lineEditSearch_textChanged(const QString& arg1)
 {
     Q_UNUSED(arg1);
     // Логика поиска обрабатывается через debounce timer в конструкторе

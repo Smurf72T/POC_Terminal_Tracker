@@ -8,10 +8,7 @@
 #include <QDate>
 #include <QFileDialog>
 
-AuditLogForm::AuditLogForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::AuditLogForm),
-    model(new QSqlQueryModel(this))
+AuditLogForm::AuditLogForm(QWidget* parent) : QDialog(parent), ui(new Ui::AuditLogForm), model(new QSqlQueryModel(this))
 {
     ui->setupUi(this);
     setWindowTitle("Журнал аудита");
@@ -72,15 +69,14 @@ void AuditLogForm::applyFilter()
     QString action = ui->comboBoxAction->currentData().toString();
     QString tableName = ui->comboBoxTable->currentData().toString();
 
-    QString queryStr =
-        "SELECT audit_log_id AS \"ID\", "
-        "username AS \"Пользователь\", "
-        "action AS \"Действие\", "
-        "table_name AS \"Таблица\", "
-        "record_id AS \"Запись\", "
-        "performed_at AS \"Дата/время\" "
-        "FROM tbl_audit_log "
-        "WHERE performed_at BETWEEN :dateFrom AND :dateTo";
+    QString queryStr = "SELECT audit_log_id AS \"ID\", "
+                       "username AS \"Пользователь\", "
+                       "action AS \"Действие\", "
+                       "table_name AS \"Таблица\", "
+                       "record_id AS \"Запись\", "
+                       "performed_at AS \"Дата/время\" "
+                       "FROM tbl_audit_log "
+                       "WHERE performed_at BETWEEN :dateFrom AND :dateTo";
 
     if (!action.isEmpty()) {
         queryStr += " AND action = :action";
@@ -125,11 +121,10 @@ void AuditLogForm::on_btnFilter_clicked()
 
 void AuditLogForm::on_btnExportExcel_clicked()
 {
-    QString filePath = ReportExporter::getSaveFilePath(
-        this, "Сохранить журнал аудита в Excel",
-        "Excel файлы (*.xlsx)");
+    QString filePath = ReportExporter::getSaveFilePath(this, "Сохранить журнал аудита в Excel", "Excel файлы (*.xlsx)");
 
-    if (filePath.isEmpty()) return;
+    if (filePath.isEmpty())
+        return;
 
     ReportExporter::exportModelToExcel(model, "Журнал аудита", filePath, this);
 }

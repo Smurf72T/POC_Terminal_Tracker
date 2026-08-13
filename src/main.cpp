@@ -29,7 +29,7 @@ static void applyStyle(QApplication& app)
     }
 }
 
-static QString readAppVersion(const QString &configPath)
+static QString readAppVersion(const QString& configPath)
 {
     QFile file(configPath);
     if (!file.open(QIODevice::ReadOnly))
@@ -45,13 +45,9 @@ static QString readAppVersion(const QString &configPath)
 static QString appConfigPath()
 {
     const QString base = QCoreApplication::applicationDirPath();
-    const QStringList candidates = {
-        base + "/config/config.json",
-        base + "/../config/config.json",
-        base + "/../../config/config.json",
-        QStringLiteral("config/config.json")
-    };
-    for (const QString &c : candidates) {
+    const QStringList candidates = {base + "/config/config.json", base + "/../config/config.json",
+                                    base + "/../../config/config.json", QStringLiteral("config/config.json")};
+    for (const QString& c : candidates) {
         if (QFileInfo::exists(c))
             return c;
     }
@@ -60,17 +56,13 @@ static QString appConfigPath()
 
 // Ищет значение ключа в .env рядом с exe, рядом с config.json и в корне проекта —
 // тем же порядком, что и DatabaseManager (чтобы предупреждение не было ложным).
-static QString envValueFromDotEnv(const QString &configPath, const QString &key)
+static QString envValueFromDotEnv(const QString& configPath, const QString& key)
 {
     const QString appDir = QCoreApplication::applicationDirPath();
     const QFileInfo cfgInfo(configPath);
-    const QStringList candidates = {
-        appDir + "/.env",
-        appDir + "/../.env",
-        cfgInfo.absolutePath() + "/.env",
-        cfgInfo.absolutePath() + "/../../.env"
-    };
-    for (const QString &candidate : candidates) {
+    const QStringList candidates = {appDir + "/.env", appDir + "/../.env", cfgInfo.absolutePath() + "/.env",
+                                    cfgInfo.absolutePath() + "/../../.env"};
+    for (const QString& candidate : candidates) {
         QFile f(candidate);
         if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
             continue;
@@ -146,14 +138,10 @@ static int fixEnvPermissions()
     // Находит первый существующий .env (тот же порядок, что и DatabaseManager).
     const QString appDir = QCoreApplication::applicationDirPath();
     const QFileInfo cfgInfo(appConfigPath());
-    const QStringList candidates = {
-        appDir + "/.env",
-        appDir + "/../.env",
-        cfgInfo.absolutePath() + "/.env",
-        cfgInfo.absolutePath() + "/../../.env"
-    };
+    const QStringList candidates = {appDir + "/.env", appDir + "/../.env", cfgInfo.absolutePath() + "/.env",
+                                    cfgInfo.absolutePath() + "/../../.env"};
     QString found;
-    for (const QString &candidate : candidates) {
+    for (const QString& candidate : candidates) {
         if (QFileInfo::exists(candidate)) {
             found = candidate;
             break;
@@ -178,7 +166,7 @@ static int fixEnvPermissions()
 #endif
 }
 
-static void printUsage(const char *appName)
+static void printUsage(const char* appName)
 {
     std::printf("POC Terminal Tracker\n");
     std::printf("Использование: %s [опции]\n", appName);
@@ -189,7 +177,7 @@ static void printUsage(const char *appName)
     std::printf("  -h, --help   этот экран\n");
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     QApplication a(argc, argv);
 
@@ -226,9 +214,8 @@ int main(int argc, char *argv[])
             QJsonDocument cfgDoc = QJsonDocument::fromJson(cfgFile.readAll());
             const QJsonObject dbCfg = cfgDoc.object()["database"].toObject();
             const QString envPassword = envValueFromDotEnv(appConfigPath(), "POC_DB_PASSWORD");
-            if (dbCfg["password"].toString().isEmpty()
-                && qEnvironmentVariableIsEmpty("POC_DB_PASSWORD")
-                && envPassword.isEmpty())
+            if (dbCfg["password"].toString().isEmpty() && qEnvironmentVariableIsEmpty("POC_DB_PASSWORD") &&
+                envPassword.isEmpty())
                 qCWarning(logApp) << "config.json: database.password пуст и POC_DB_PASSWORD не задан — "
                                   << "подключение к БД, скорее всего, не удастся. Настройте .env или config.json";
         }
@@ -239,9 +226,9 @@ int main(int argc, char *argv[])
         splash.setWindowTitle("POC Terminal Tracker");
         splash.resize(400, 100);
         QMessageBox::critical(&splash, "Критическая ошибка",
-                             "Не удалось подключиться к базе данных.\n"
-                             "Проверьте конфигурационный файл config/config.json\n"
-                             "или переменную окружения POC_DB_PASSWORD");
+                              "Не удалось подключиться к базе данных.\n"
+                              "Проверьте конфигурационный файл config/config.json\n"
+                              "или переменную окружения POC_DB_PASSWORD");
         return -1;
     }
 
@@ -280,4 +267,3 @@ int main(int argc, char *argv[])
 
     return a.exec();
 }
-

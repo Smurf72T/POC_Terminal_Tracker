@@ -5,16 +5,15 @@
 #include <QSqlQueryModel>
 
 namespace Ui {
-    class ArchiveDocumentsForm;
+class ArchiveDocumentsForm;
 }
 
-class ArchiveDocumentsForm : public QDialog
-{
+class ArchiveDocumentsForm : public QDialog {
     Q_OBJECT
 
 public:
     // docType: 1 - Поступление, 2 - Аренда, 3 - Возврат, 4 - Оплата, 5 - Изменение статусов
-    explicit ArchiveDocumentsForm(int docType, QWidget *parent = nullptr);
+    explicit ArchiveDocumentsForm(int docType, QWidget* parent = nullptr);
     ~ArchiveDocumentsForm();
 
 private slots:
@@ -22,11 +21,11 @@ private slots:
     void on_btnExportExcel_clicked();
     void on_btnExportPdf_clicked();
     void on_btnClose_clicked();
-    void on_tableView_doubleClicked(const QModelIndex &index);
+    void on_tableView_doubleClicked(const QModelIndex& index);
 
 private:
-    Ui::ArchiveDocumentsForm *ui;
-    QSqlQueryModel *model;
+    Ui::ArchiveDocumentsForm* ui;
+    QSqlQueryModel* model;
     int m_docType;
 
     void setupUI();

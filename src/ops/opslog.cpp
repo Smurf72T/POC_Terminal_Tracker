@@ -11,12 +11,12 @@
 static QString levelToString(OpsLog::Level level)
 {
     switch (level) {
-    case OpsLog::Info:
-        return "INFO";
-    case OpsLog::Warning:
-        return "WARN";
-    case OpsLog::Error:
-        return "ERROR";
+        case OpsLog::Info:
+            return "INFO";
+        case OpsLog::Warning:
+            return "WARN";
+        case OpsLog::Error:
+            return "ERROR";
     }
     return "INFO";
 }
@@ -30,7 +30,7 @@ OpsLog& OpsLog::instance()
     return instance;
 }
 
-void OpsLog::setLogDirectory(const QString &directory)
+void OpsLog::setLogDirectory(const QString& directory)
 {
     QMutexLocker locker(&m_mutex);
     m_logDirectory = directory;
@@ -58,7 +58,7 @@ QString OpsLog::resolveLogDirectory() const
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
 }
 
-void OpsLog::rotateIfNeeded(const QString &filePath)
+void OpsLog::rotateIfNeeded(const QString& filePath)
 {
     QFileInfo info(filePath);
     if (info.size() <= 1024 * 1024)
@@ -67,13 +67,12 @@ void OpsLog::rotateIfNeeded(const QString &filePath)
     // Циклическая ротация: ops.log.1 — свежайший архив, ops.log.N — самый старый.
     QFile::remove(filePath + "." + QString::number(kMaxLogArchives));
     for (int i = kMaxLogArchives - 1; i >= 1; --i) {
-        QFile::rename(filePath + "." + QString::number(i),
-                      filePath + "." + QString::number(i + 1));
+        QFile::rename(filePath + "." + QString::number(i), filePath + "." + QString::number(i + 1));
     }
     QFile::rename(filePath, filePath + ".1");
 }
 
-void OpsLog::log(Level level, const QString &message)
+void OpsLog::log(Level level, const QString& message)
 {
     QMutexLocker locker(&m_mutex);
     QString filePath = resolveLogDirectory() + "/ops.log";
@@ -84,22 +83,22 @@ void OpsLog::log(Level level, const QString &message)
         return;
 
     QTextStream out(&file);
-    out << QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
-        << " [" << levelToString(level) << "] " << message << "\n";
+    out << QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss") << " [" << levelToString(level) << "] "
+        << message << "\n";
     file.close();
 }
 
-void OpsLog::info(const QString &message)
+void OpsLog::info(const QString& message)
 {
     log(Info, message);
 }
 
-void OpsLog::warning(const QString &message)
+void OpsLog::warning(const QString& message)
 {
     log(Warning, message);
 }
 
-void OpsLog::error(const QString &message)
+void OpsLog::error(const QString& message)
 {
     log(Error, message);
 }

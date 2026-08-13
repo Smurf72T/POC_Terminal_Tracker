@@ -2,11 +2,9 @@
 
 #include <QThread>
 
-ConnectionPool::ConnectionPool(ConnectionFactory factory, int maxPerThread)
-    : m_factory(std::move(factory))
-    , m_maxPerThread(maxPerThread > 0 ? maxPerThread : 1)
-{
-}
+ConnectionPool::ConnectionPool(ConnectionFactory factory, int maxPerThread) :
+    m_factory(std::move(factory)), m_maxPerThread(maxPerThread > 0 ? maxPerThread : 1)
+{}
 
 ConnectionPool::~ConnectionPool()
 {
@@ -17,8 +15,8 @@ QSqlDatabase ConnectionPool::acquire()
 {
     QMutexLocker locker(&m_mutex);
     const Qt::HANDLE threadId = QThread::currentThreadId();
-    QList<QSqlDatabase> &idle = m_idle[threadId];
-    int &active = m_activeCount[threadId];
+    QList<QSqlDatabase>& idle = m_idle[threadId];
+    int& active = m_activeCount[threadId];
 
     while (!m_closed && active >= m_maxPerThread && idle.isEmpty())
         m_cond.wait(&m_mutex);
@@ -43,7 +41,7 @@ QSqlDatabase ConnectionPool::acquire()
     return db;
 }
 
-void ConnectionPool::release(QSqlDatabase &db)
+void ConnectionPool::release(QSqlDatabase& db)
 {
     QMutexLocker locker(&m_mutex);
     const Qt::HANDLE threadId = QThread::currentThreadId();
@@ -73,7 +71,7 @@ void ConnectionPool::clear()
     m_cond.wakeAll();
 
     for (auto it = m_idle.begin(); it != m_idle.end(); ++it) {
-        for (QSqlDatabase &db : it.value()) {
+        for (QSqlDatabase& db : it.value()) {
             const QString name = db.connectionName();
             db.close();
             db = QSqlDatabase();

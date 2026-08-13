@@ -1,0 +1,38 @@
+# Набор проверок clang-tidy для POC Terminal Tracker.
+# Основной упор — на bugprone/performance/readability с низким шумом.
+# Тяжёлые и шумные кличи (llvm-*, misc-*, google-*, cppcoreguidelines-*) отключены.
+#
+# Настройка WarningsAsErrors: в release-ветке повышать нельзя локально —
+# ошибки делают невозможной сборку. Ошибками делаются только самые важные
+# кличи; остальное — предупреждения.
+
+Checks: >
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-unhandled-exception-at-new,
+  performance-*,
+  -performance-no-int-to-ptr,
+  readability-*,
+  -readability-avoid-const-params-in-decls,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-named-parameter,
+  -readability-qualified-auto,
+  -readability-simplify-boolean-expr,
+  -readability-uppercase-literal-suffix,
+  modernize-*,
+  -modernize-avoid-c-arrays,
+  -modernize-return-braced-init-list,
+  -modernize-use-trailing-return-type
+
+HeaderFilterRegex: '.*'
+
+WarningsAsErrors: >
+  bugprone-use-after-move,
+  bugprone-undefined-memory-manipulation
+
+CheckOptions:
+  - { key: readability-function-cognitive-complexity.Threshold, value: 40 }
+  - { key: performance-for-range-copy.AllowedTypes, value: 'QString;QVariant' }

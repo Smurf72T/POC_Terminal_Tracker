@@ -3,17 +3,14 @@
 
 #include <QStyledItemDelegate>
 
-class ReadOnlyDelegate : public QStyledItemDelegate
-{
+class ReadOnlyDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
 public:
-    explicit ReadOnlyDelegate(QObject *parent = nullptr)
-        : QStyledItemDelegate(parent) {}
+    explicit ReadOnlyDelegate(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
 
     // Запрещаем создание редактора — колонка будет только для чтения
-    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
-                          const QModelIndex &index) const override
+    QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override
     {
         Q_UNUSED(parent);
         Q_UNUSED(option);

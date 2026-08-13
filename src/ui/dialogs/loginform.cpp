@@ -12,9 +12,7 @@
 #include <QDebug>
 #include <algorithm>
 
-LoginForm::LoginForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::LoginForm)
+LoginForm::LoginForm(QWidget* parent) : QDialog(parent), ui(new Ui::LoginForm)
 {
     ui->setupUi(this);
     setWindowTitle("Вход в POC Terminal Tracker");
@@ -30,9 +28,18 @@ LoginForm::~LoginForm()
     delete ui;
 }
 
-QString LoginForm::getUsername() const { return m_username; }
-int LoginForm::getUserId() const { return m_userId; }
-QString LoginForm::getRole() const { return m_role; }
+QString LoginForm::getUsername() const
+{
+    return m_username;
+}
+int LoginForm::getUserId() const
+{
+    return m_userId;
+}
+QString LoginForm::getRole() const
+{
+    return m_role;
+}
 
 void LoginForm::loadUsers()
 {
@@ -112,8 +119,7 @@ void LoginForm::on_btnLogin_clicked()
             if (attempts >= 5) {
                 ui->labelError->setText("Слишком много попыток. Повторите через 30 с.");
             } else {
-                ui->labelError->setText(QString("Неверный пароль! Осталось попыток: %1")
-                    .arg(5 - attempts));
+                ui->labelError->setText(QString("Неверный пароль! Осталось попыток: %1").arg(5 - attempts));
             }
             return;
         }
@@ -137,14 +143,13 @@ void LoginForm::on_btnLogin_clicked()
         // Апгрейд хеша выполняем ТОЛЬКО после успешной смены пароля:
         // если пользователь отменит диалог, старый хеш останется в БД,
         // и при следующем входе смена пароля будет запрошена снова.
-        bool mustChange = isLegacyPasswordHash(storedHash)
-                || query.value(7).toBool();
+        bool mustChange = isLegacyPasswordHash(storedHash) || query.value(7).toBool();
         if (mustChange) {
             bool ok;
             QString newPass = QInputDialog::getText(this, "Смена пароля",
-                "Необходимо сменить пароль по умолчанию.\n"
-                "Новый пароль (мин. 8 символов, заглавная буква, цифра):",
-                QLineEdit::Password, QString(), &ok);
+                                                    "Необходимо сменить пароль по умолчанию.\n"
+                                                    "Новый пароль (мин. 8 символов, заглавная буква, цифра):",
+                                                    QLineEdit::Password, QString(), &ok);
             if (!ok || newPass.isEmpty()) {
                 reject();
                 return;
@@ -162,8 +167,7 @@ void LoginForm::on_btnLogin_clicked()
             updatePwd.bindValue(":hash", newHash);
             updatePwd.bindValue(":id", m_userId);
             if (!updatePwd.exec()) {
-                QMessageBox::critical(this, "Ошибка",
-                    "Не удалось обновить пароль: " + updatePwd.lastError().text());
+                QMessageBox::critical(this, "Ошибка", "Не удалось обновить пароль: " + updatePwd.lastError().text());
                 reject();
                 return;
             }
@@ -180,15 +184,14 @@ void LoginForm::on_btnCancel_clicked()
     reject();
 }
 
-bool LoginForm::registrationAllowed(QString *blockMessage)
+bool LoginForm::registrationAllowed(QString* blockMessage)
 {
     const qint64 current = QDateTime::currentMSecsSinceEpoch();
 
     // Выбрасываем устаревшие попытки за пределами окна.
-    m_registerAttempts.erase(
-        std::remove_if(m_registerAttempts.begin(), m_registerAttempts.end(),
-                       [current](qint64 t) { return current - t > kRateLimitWindowMs; }),
-        m_registerAttempts.end());
+    m_registerAttempts.erase(std::remove_if(m_registerAttempts.begin(), m_registerAttempts.end(),
+                                            [current](qint64 t) { return current - t > kRateLimitWindowMs; }),
+                             m_registerAttempts.end());
 
     if (m_registerAttempts.size() >= kMaxRegistrations) {
         if (blockMessage) {
@@ -216,16 +219,22 @@ void LoginForm::on_btnRegister_clicked()
 
     bool ok;
     QString username = QInputDialog::getText(this, "Регистрация", "Логин:", QLineEdit::Normal, QString(), &ok);
-    if (!ok || username.trimmed().isEmpty()) return;
+    if (!ok || username.trimmed().isEmpty())
+        return;
 
-    QString displayName = QInputDialog::getText(this, "Регистрация", "Отображаемое имя:", QLineEdit::Normal, username.trimmed(), &ok);
-    if (!ok || displayName.trimmed().isEmpty()) return;
+    QString displayName =
+        QInputDialog::getText(this, "Регистрация", "Отображаемое имя:", QLineEdit::Normal, username.trimmed(), &ok);
+    if (!ok || displayName.trimmed().isEmpty())
+        return;
 
     QString password = QInputDialog::getText(this, "Регистрация", "Пароль:", QLineEdit::Password, QString(), &ok);
-    if (!ok || password.isEmpty()) return;
+    if (!ok || password.isEmpty())
+        return;
 
-    QString confirmPassword = QInputDialog::getText(this, "Регистрация", "Подтвердите пароль:", QLineEdit::Password, QString(), &ok);
-    if (!ok) return;
+    QString confirmPassword =
+        QInputDialog::getText(this, "Регистрация", "Подтвердите пароль:", QLineEdit::Password, QString(), &ok);
+    if (!ok)
+        return;
 
     if (password != confirmPassword) {
         QMessageBox::warning(this, "Ошибка", "Пароли не совпадают!");
@@ -253,8 +262,9 @@ void LoginForm::on_btnRegister_clicked()
         // Учитываем успешную заявку в rate-limit.
         m_registerAttempts.append(QDateTime::currentMSecsSinceEpoch());
         QMessageBox::information(this, "Успех",
-            "Заявка на регистрацию '" + username.trimmed() + "' отправлена.\n"
-            "Учётная запись будет активирована администратором.");
+                                 "Заявка на регистрацию '" + username.trimmed() +
+                                     "' отправлена.\n"
+                                     "Учётная запись будет активирована администратором.");
         loadUsers();
         ui->lineEditPass->setFocus();
     } else {

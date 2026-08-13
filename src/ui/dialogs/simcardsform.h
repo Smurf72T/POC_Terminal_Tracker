@@ -10,15 +10,14 @@
 #include "delegates/readonlydelegate.h"
 
 namespace Ui {
-    class SIMCardsForm;
+class SIMCardsForm;
 }
 
-class SIMCardsForm : public QDialog
-{
+class SIMCardsForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit SIMCardsForm(QWidget *parent = nullptr);
+    explicit SIMCardsForm(QWidget* parent = nullptr);
     ~SIMCardsForm();
 
 private slots:
@@ -27,13 +26,13 @@ private slots:
     void on_btnClose_clicked();
 
 protected:
-    void closeEvent(QCloseEvent *event) override;
-    bool eventFilter(QObject *obj, QEvent *event) override;
+    void closeEvent(QCloseEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
-    Ui::SIMCardsForm *ui;
-    QSqlTableModel *model;
-    QTimer *searchTimer;
+    Ui::SIMCardsForm* ui;
+    QSqlTableModel* model;
+    QTimer* searchTimer;
 };
 
 #endif // SIMCARDSFORM_H

@@ -9,12 +9,11 @@
 class QNetworkReply;
 class QSslCertificate;
 
-class UpdateManager : public QObject
-{
+class UpdateManager : public QObject {
     Q_OBJECT
 
 public:
-    explicit UpdateManager(const QJsonObject &config, QObject *parent = nullptr);
+    explicit UpdateManager(const QJsonObject& config, QObject* parent = nullptr);
 
     bool isEnabled() const;
     bool startupCheckEnabled() const;
@@ -24,27 +23,27 @@ public:
     void start();
 
     // Допустим только HTTPS; http разрешён лишь для localhost (локальная отладка).
-    static bool isSecureUpdateUrl(const QString &url);
+    static bool isSecureUpdateUrl(const QString& url);
 
 public slots:
     void checkForUpdates();
-    void downloadUpdate(const QString &url);
+    void downloadUpdate(const QString& url);
 
 signals:
     void checkStarted();
     void checkFinished(bool updateAvailable);
-    void updateAvailable(const QString &version, const QString &releaseNotes, const QString &downloadUrl);
+    void updateAvailable(const QString& version, const QString& releaseNotes, const QString& downloadUrl);
     void noUpdateAvailable();
-    void checkFailed(const QString &error);
+    void checkFailed(const QString& error);
     void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
-    void downloadFinished(const QString &filePath);
-    void downloadFailed(const QString &error);
+    void downloadFinished(const QString& filePath);
+    void downloadFailed(const QString& error);
 
 private:
-    void handleManifest(QNetworkReply *reply);
-    static QString sha256Hex(const QByteArray &data);
-    bool certificateMatchesPin(const QSslCertificate &cert) const;
-    static QString spkiSha256Base64(const QSslCertificate &cert);
+    void handleManifest(QNetworkReply* reply);
+    static QString sha256Hex(const QByteArray& data);
+    bool certificateMatchesPin(const QSslCertificate& cert) const;
+    static QString spkiSha256Base64(const QSslCertificate& cert);
 
     QNetworkAccessManager m_nam;
     QString m_url;
@@ -53,7 +52,7 @@ private:
     QString m_pinnedSha256;
     QString m_expectedSha256;
     int m_timeoutMs = 30000;
-    QNetworkReply *m_downloadReply = nullptr;
+    QNetworkReply* m_downloadReply = nullptr;
 };
 
 #endif // UPDATEMANAGER_H

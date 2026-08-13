@@ -4,15 +4,14 @@
 #include <QDialog>
 
 namespace Ui {
-    class PaymentForm;
+class PaymentForm;
 }
 
-class PaymentForm : public QDialog
-{
+class PaymentForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit PaymentForm(QWidget *parent = nullptr);
+    explicit PaymentForm(QWidget* parent = nullptr);
     ~PaymentForm();
 
     void loadForEdit(int paymentId);
@@ -24,7 +23,7 @@ private slots:
     void on_comboBoxClient_currentIndexChanged(int index); // <-- Добавлено
 
 private:
-    Ui::PaymentForm *ui;
+    Ui::PaymentForm* ui;
 
     void loadClients();
     void loadMonths();

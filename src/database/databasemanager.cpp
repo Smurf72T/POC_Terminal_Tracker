@@ -22,21 +22,21 @@ namespace {
 
 constexpr int kMaxTxnRetries = 3;
 
-bool isTransientError(const QSqlError &err)
+bool isTransientError(const QSqlError& err)
 {
     const QString sqlState = err.nativeErrorCode().trimmed().toUpper();
     if (sqlState.isEmpty())
         return false;
-    if (sqlState.startsWith("08"))  // класс ошибок соединения
+    if (sqlState.startsWith("08")) // класс ошибок соединения
         return true;
-    return sqlState == "40P01"   // deadlock_detected
-        || sqlState == "40001"   // serialization_failure
-        || sqlState == "57P01";  // admin_shutdown
+    return sqlState == "40P01"     // deadlock_detected
+           || sqlState == "40001"  // serialization_failure
+           || sqlState == "57P01"; // admin_shutdown
 }
 
 } // namespace
 
-static QMap<QString, QString> loadEnvFile(const QString &filePath)
+static QMap<QString, QString> loadEnvFile(const QString& filePath)
 {
     QMap<QString, QString> env;
     QFile file(filePath);
@@ -57,7 +57,7 @@ static QMap<QString, QString> loadEnvFile(const QString &filePath)
 
 // На Linux предупреждает, если .env доступен на запись группе или остальным
 // (права 0644/0664): файл содержит секреты (пароль БД/кодовая фраза бэкапа).
-void warnOnInsecureEnvPermissions(const QString &filePath)
+void warnOnInsecureEnvPermissions(const QString& filePath)
 {
 #ifdef Q_OS_LINUX
     QFileInfo info(filePath);
@@ -93,7 +93,7 @@ bool DatabaseManager::suppressDialogs()
     return s_suppressDialogs;
 }
 
-IDatabaseManager &databaseManager()
+IDatabaseManager& databaseManager()
 {
     return DatabaseManager::instance();
 }
@@ -132,16 +132,12 @@ bool DatabaseManager::openConnection()
     // Ищем .env: рядом с executable, затем рядом с config.json, затем в корне проекта
     QFileInfo configInfo(m_configPath);
     QString appDir = QCoreApplication::applicationDirPath();
-    QStringList envCandidates = {
-        appDir + "/.env",
-        appDir + "/../.env",
-        configInfo.absolutePath() + "/.env",
-        configInfo.absolutePath() + "/../../.env"
-    };
+    QStringList envCandidates = {appDir + "/.env", appDir + "/../.env", configInfo.absolutePath() + "/.env",
+                                 configInfo.absolutePath() + "/../../.env"};
 
     QMap<QString, QString> env;
     QString loadedEnvPath;
-    for (const QString &candidate : envCandidates) {
+    for (const QString& candidate : envCandidates) {
         QMap<QString, QString> candidateEnv = loadEnvFile(candidate);
         if (!candidateEnv.isEmpty()) {
             env = candidateEnv;
@@ -183,8 +179,8 @@ bool DatabaseManager::openConnection()
     } else if (sslMode == "require") {
         m_database.setConnectOptions("sslmode=require");
         if (!m_database.open()) {
-            showError("Ошибка подключения к БД: сервер не поддерживает SSL (sslmode=require).\n"
-                      + m_database.lastError().text());
+            showError("Ошибка подключения к БД: сервер не поддерживает SSL (sslmode=require).\n" +
+                      m_database.lastError().text());
             return false;
         }
     } else if (sslMode == "disable") {
@@ -214,7 +210,7 @@ bool DatabaseManager::openConnection()
     return true;
 }
 
-bool DatabaseManager::checkConnection(const QString &configPath, QString *error)
+bool DatabaseManager::checkConnection(const QString& configPath, QString* error)
 {
     if (m_initialized) {
         return true;
@@ -250,20 +246,19 @@ void DatabaseManager::listenForDataChanges()
     // Подписка на канал NOTIFY 'poc_data_changed' (триггеры из 007-й миграции).
     // Доставленные уведомления эмитятся в dataChanged() — дашборды всех
     // запущенных экземпляров обновляются при изменениях в любом из них.
-    QSqlDriver *driver = m_database.driver();
+    QSqlDriver* driver = m_database.driver();
     if (!driver->hasFeature(QSqlDriver::DriverFeature::EventNotifications))
         return;
 
     if (!driver->subscribeToNotification(QStringLiteral("poc_data_changed"))) {
-        qCWarning(logDB) << "Не удалось подписаться на уведомления БД:"
-                         << m_database.lastError().text();
+        qCWarning(logDB) << "Не удалось подписаться на уведомления БД:" << m_database.lastError().text();
         return;
     }
 
     connect(driver, &QSqlDriver::notification, this,
-            [this](const QString & /*channel*/,
-                   QSqlDriver::NotificationSource /*source*/,
-                   const QVariant & /*payload*/) { emit dataChanged(); });
+            [this](const QString& /*channel*/, QSqlDriver::NotificationSource /*source*/, const QVariant& /*payload*/) {
+                emit dataChanged();
+            });
 
     m_listening = true;
 }
@@ -304,7 +299,7 @@ void DatabaseManager::close()
     m_initialized = false;
 }
 
-const QSqlDatabase &DatabaseManager::getDatabase() const
+const QSqlDatabase& DatabaseManager::getDatabase() const
 {
     return m_database;
 }
@@ -320,9 +315,9 @@ QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMess
         // Запрос не выполняется: circuit breaker открыт после серии сбоев БД.
         // Не выполняем заведомо некорректный SQL ради заполнения lastError —
         // возвращаем невыполненный запрос и сообщаем о проблеме.
-        const QString message = QStringLiteral(
-            "База данных временно недоступна: слишком много неудачных запросов подряд. "
-            "Повторите действие через несколько секунд.");
+        const QString message =
+            QStringLiteral("База данных временно недоступна: слишком много неудачных запросов подряд. "
+                           "Повторите действие через несколько секунд.");
         qCWarning(logDB) << message;
         if (showErrorMessage)
             showError(message);
@@ -335,8 +330,7 @@ QSqlQuery DatabaseManager::executeQuery(const QString& query, bool showErrorMess
     } else {
         m_circuitBreaker.onFailure();
         if (showErrorMessage) {
-            showError("Ошибка выполнения запроса: " + sqlQuery.lastError().text() +
-                     "\nЗапрос: " + query);
+            showError("Ошибка выполнения запроса: " + sqlQuery.lastError().text() + "\nЗапрос: " + query);
         }
     }
     return sqlQuery;
@@ -389,8 +383,8 @@ bool DatabaseManager::executeTransaction(const std::function<bool(QSqlDatabase&)
             return false;
         }
 
-        qCWarning(logDB) << "Транзакция отменена transient-ошибкой (попытка"
-                         << attempt << "из" << kMaxTxnRetries << "):" << commitError.text();
+        qCWarning(logDB) << "Транзакция отменена transient-ошибкой (попытка" << attempt << "из" << kMaxTxnRetries
+                         << "):" << commitError.text();
         QThread::msleep(100 * attempt);
     }
 
@@ -414,7 +408,7 @@ void DatabaseManager::showError(const QString& message)
         qCCritical(logDB) << message;
         return;
     }
-    QWidget *parent = QApplication::activeWindow();
+    QWidget* parent = QApplication::activeWindow();
     QMessageBox::critical(parent, "Ошибка базы данных", message);
 }
 
@@ -432,9 +426,8 @@ QString DatabaseManager::generateDocNumber(const QString& docType)
     return query.value(0).toString();
 }
 
-void DatabaseManager::logAction(const QString& action, const QString& tableName, int recordId,
-                                const QString& username, const QString& oldValues,
-                                const QString& newValues)
+void DatabaseManager::logAction(const QString& action, const QString& tableName, int recordId, const QString& username,
+                                const QString& oldValues, const QString& newValues)
 {
     QSqlQuery query(m_database);
     query.prepare("SELECT log_audit_action(:action, :table, :recid, :uname, :oldv, :newv)");
@@ -502,12 +495,10 @@ bool DatabaseManager::isCurrentUserAdmin() const
 bool DatabaseManager::ensureMigrationsTable()
 {
     QSqlQuery q(m_database);
-    return q.exec(
-        "CREATE TABLE IF NOT EXISTS schema_migrations ("
-        "  version VARCHAR(255) PRIMARY KEY,"
-        "  applied_at TIMESTAMP DEFAULT NOW()"
-        ")"
-    );
+    return q.exec("CREATE TABLE IF NOT EXISTS schema_migrations ("
+                  "  version VARCHAR(255) PRIMARY KEY,"
+                  "  applied_at TIMESTAMP DEFAULT NOW()"
+                  ")");
 }
 
 QStringList DatabaseManager::pendingMigrations()
@@ -527,14 +518,15 @@ QStringList DatabaseManager::pendingMigrations()
     }
 
     QString migrationsDir;
-    QStringList candidates = {
-        QCoreApplication::applicationDirPath() + "/sql/migrations/",
-        QCoreApplication::applicationDirPath() + "/../sql/migrations/",
-        QCoreApplication::applicationDirPath() + "/../../sql/migrations/"
-    };
-    for (const QString &c : candidates) {
+    QStringList candidates = {QCoreApplication::applicationDirPath() + "/sql/migrations/",
+                              QCoreApplication::applicationDirPath() + "/../sql/migrations/",
+                              QCoreApplication::applicationDirPath() + "/../../sql/migrations/"};
+    for (const QString& c : candidates) {
         QDir d(c);
-        if (d.exists()) { migrationsDir = d.absolutePath(); break; }
+        if (d.exists()) {
+            migrationsDir = d.absolutePath();
+            break;
+        }
     }
     if (migrationsDir.isEmpty()) {
         qCInfo(logMigration) << "Директория миграций не найдена";
@@ -572,14 +564,15 @@ QStringList DatabaseManager::pendingMigrationsReadOnly() const
     }
 
     QString migrationsDir;
-    QStringList candidates = {
-        QCoreApplication::applicationDirPath() + "/sql/migrations/",
-        QCoreApplication::applicationDirPath() + "/../sql/migrations/",
-        QCoreApplication::applicationDirPath() + "/../../sql/migrations/"
-    };
-    for (const QString &c : candidates) {
+    QStringList candidates = {QCoreApplication::applicationDirPath() + "/sql/migrations/",
+                              QCoreApplication::applicationDirPath() + "/../sql/migrations/",
+                              QCoreApplication::applicationDirPath() + "/../../sql/migrations/"};
+    for (const QString& c : candidates) {
         QDir d(c);
-        if (d.exists()) { migrationsDir = d.absolutePath(); break; }
+        if (d.exists()) {
+            migrationsDir = d.absolutePath();
+            break;
+        }
     }
     if (migrationsDir.isEmpty()) {
         qCInfo(logMigration) << "Директория миграций не найдена";
@@ -597,7 +590,7 @@ QStringList DatabaseManager::pendingMigrationsReadOnly() const
     return pending;
 }
 
-bool DatabaseManager::runMigrations(const QString &migrationsDir)
+bool DatabaseManager::runMigrations(const QString& migrationsDir)
 {
     Q_UNUSED(migrationsDir);
 
@@ -609,8 +602,7 @@ bool DatabaseManager::runMigrations(const QString &migrationsDir)
     lockQuery.prepare("SELECT pg_advisory_lock(:key)");
     lockQuery.bindValue(":key", kMigrationLockKey);
     if (!lockQuery.exec()) {
-        qCWarning(logMigration) << "Не удалось взять advisory lock на миграции:"
-                                << lockQuery.lastError().text();
+        qCWarning(logMigration) << "Не удалось взять advisory lock на миграции:" << lockQuery.lastError().text();
         return false;
     }
 
@@ -620,8 +612,7 @@ bool DatabaseManager::runMigrations(const QString &migrationsDir)
     unlockQuery.prepare("SELECT pg_advisory_unlock(:key)");
     unlockQuery.bindValue(":key", kMigrationLockKey);
     if (!unlockQuery.exec()) {
-        qCWarning(logMigration) << "Не удалось снять advisory lock:"
-                                << unlockQuery.lastError().text();
+        qCWarning(logMigration) << "Не удалось снять advisory lock:" << unlockQuery.lastError().text();
     }
 
     return ok;
@@ -636,7 +627,7 @@ bool DatabaseManager::applyPendingMigrations()
 
     qCInfo(logMigration) << "Найдено ожидающих миграций:" << pending.size();
 
-    for (const QString &filePath : pending) {
+    for (const QString& filePath : pending) {
         QFile file(filePath);
         if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
             qCWarning(logMigration) << "Не удалось открыть:" << filePath;
@@ -705,8 +696,7 @@ void DatabaseManager::seedAdminAccount()
                 qCInfo(logDB) << "Учётной записи admin задан новый случайный пароль";
                 printOneTimeAdminPassword(password);
             } else {
-                qCCritical(logDB) << "Не удалось установить пароль admin:"
-                                  << upd.lastError().text();
+                qCCritical(logDB) << "Не удалось установить пароль admin:" << upd.lastError().text();
             }
         }
         return;
@@ -721,24 +711,22 @@ void DatabaseManager::seedAdminAccount()
         qCInfo(logDB) << "Создана учётная запись admin со случайным паролем";
         printOneTimeAdminPassword(password);
     } else {
-        qCCritical(logDB) << "Не удалось создать учётную запись admin:"
-                          << ins.lastError().text();
+        qCCritical(logDB) << "Не удалось создать учётную запись admin:" << ins.lastError().text();
     }
 }
 
 QString DatabaseManager::generateRandomPassword()
 {
-    const QString chars =
-        "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const QString chars = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     QString password;
     password.reserve(16);
-    QRandomGenerator *rng = QRandomGenerator::global();
+    QRandomGenerator* rng = QRandomGenerator::global();
     for (int i = 0; i < 16; ++i)
         password += chars.at(rng->bounded(chars.size()));
     return password;
 }
 
-void DatabaseManager::printOneTimeAdminPassword(const QString &password)
+void DatabaseManager::printOneTimeAdminPassword(const QString& password)
 {
     // Печатаем пароль один раз в stdout (--check-db / первый запуск).
     std::printf("\n============================================================\n"

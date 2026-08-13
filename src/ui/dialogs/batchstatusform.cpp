@@ -5,10 +5,8 @@
 #include <QSqlQuery>
 #include <QSqlError>
 
-BatchStatusForm::BatchStatusForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::BatchStatusForm),
-    model(new QSqlQueryModel(this))
+BatchStatusForm::BatchStatusForm(QWidget* parent) :
+    QDialog(parent), ui(new Ui::BatchStatusForm), model(new QSqlQueryModel(this))
 {
     ui->setupUi(this);
     setWindowTitle("Массовое обновление статусов");
@@ -53,16 +51,15 @@ void BatchStatusForm::loadStatuses()
 void BatchStatusForm::loadTerminals(int currentStatus)
 {
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare(
-        "SELECT t.terminalid AS \"ID\", "
-        "t.serialnumber AS \"Серийный номер\", "
-        "COALESCE(m.modelname, '—') AS \"Модель\", "
-        "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS \"Статус\" "
-        "FROM tblterminals t "
-        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-        "WHERE t.status = :status AND t.is_deactivated = FALSE "
-        "ORDER BY t.serialnumber"
-    );
+    query.prepare("SELECT t.terminalid AS \"ID\", "
+                  "t.serialnumber AS \"Серийный номер\", "
+                  "COALESCE(m.modelname, '—') AS \"Модель\", "
+                  "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' WHEN 3 THEN "
+                  "'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS \"Статус\" "
+                  "FROM tblterminals t "
+                  "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                  "WHERE t.status = :status AND t.is_deactivated = FALSE "
+                  "ORDER BY t.serialnumber");
     query.bindValue(":status", currentStatus);
 
     if (!query.exec()) {
@@ -95,22 +92,20 @@ void BatchStatusForm::on_btnApply_clicked()
     // Списание (3) и утеря (4) — административные действия, доступны только админу.
     if ((newStatus == 3 || newStatus == 4) && !DatabaseManager::instance().isCurrentUserAdmin()) {
         QMessageBox::warning(this, "Доступ запрещён",
-            "Изменение статуса на «Списан» / «Утерян» доступно только администратору.");
+                             "Изменение статуса на «Списан» / «Утерян» доступно только администратору.");
         return;
     }
 
-    static const char *const kStatusNames[] = {
-        "Свободен", "В аренде", "В ремонте", "Списан", "Утерян"
-    };
-    QString statusText = (newStatus >= 0 && newStatus <= 4)
-        ? QString::fromUtf8(kStatusNames[newStatus])
-        : QString::fromUtf8("Статус %1").arg(newStatus);
+    static const char* const kStatusNames[] = {"Свободен", "В аренде", "В ремонте", "Списан", "Утерян"};
+    QString statusText = (newStatus >= 0 && newStatus <= 4) ? QString::fromUtf8(kStatusNames[newStatus])
+                                                            : QString::fromUtf8("Статус %1").arg(newStatus);
 
-    QMessageBox::StandardButton reply = QMessageBox::question(this, "Подтверждение",
-        QString("Изменить статус %1 терминалов на «%2»?").arg(selected.size()).arg(statusText),
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, "Подтверждение", QString("Изменить статус %1 терминалов на «%2»?").arg(selected.size()).arg(statusText),
         QMessageBox::Yes | QMessageBox::No);
 
-    if (reply != QMessageBox::Yes) return;
+    if (reply != QMessageBox::Yes)
+        return;
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
     if (!db.transaction()) {
@@ -120,7 +115,7 @@ void BatchStatusForm::on_btnApply_clicked()
 
     int updated = 0;
     int expectedStatus = ui->comboBoxCurrentStatus->currentData().toInt();
-    for (const QModelIndex &idx : selected) {
+    for (const QModelIndex& idx : selected) {
         int terminalId = model->data(model->index(idx.row(), 0)).toInt();
 
         QSqlQuery lockQuery(db);
@@ -129,16 +124,16 @@ void BatchStatusForm::on_btnApply_clicked()
 
         if (!lockQuery.exec() || !lockQuery.next()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Терминал %1 занят другим пользователем. Повторите попытку.").arg(terminalId));
+            QMessageBox::critical(
+                this, "Ошибка", QString("Терминал %1 занят другим пользователем. Повторите попытку.").arg(terminalId));
             return;
         }
 
         if (lockQuery.value(0).toInt() != expectedStatus) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Статус терминала %1 изменился. Перезагрузите список и повторите попытку.")
-                    .arg(terminalId));
+            QMessageBox::critical(
+                this, "Ошибка",
+                QString("Статус терминала %1 изменился. Перезагрузите список и повторите попытку.").arg(terminalId));
             return;
         }
 
@@ -151,7 +146,8 @@ void BatchStatusForm::on_btnApply_clicked()
             updated++;
         } else {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
+            QMessageBox::critical(
+                this, "Ошибка",
                 QString("Ошибка обновления терминала %1: %2").arg(terminalId).arg(query.lastError().text()));
             return;
         }

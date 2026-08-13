@@ -12,7 +12,7 @@ struct Version {
     int patch = 0;
 };
 
-inline bool parseVersion(const QString &text, Version &out)
+inline bool parseVersion(const QString& text, Version& out)
 {
     QString s = text.trimmed();
     int dash = s.indexOf('-');
@@ -43,7 +43,7 @@ inline bool parseVersion(const QString &text, Version &out)
     return true;
 }
 
-inline int compareVersions(const QString &a, const QString &b)
+inline int compareVersions(const QString& a, const QString& b)
 {
     Version va, vb;
     if (!parseVersion(a, va) || !parseVersion(b, vb))
@@ -58,7 +58,7 @@ inline int compareVersions(const QString &a, const QString &b)
     return 0;
 }
 
-inline bool isVersionNewer(const QString &candidate, const QString &current)
+inline bool isVersionNewer(const QString& candidate, const QString& current)
 {
     return compareVersions(candidate, current) > 0;
 }

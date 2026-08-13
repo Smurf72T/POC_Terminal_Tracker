@@ -5,15 +5,14 @@
 #include <QSqlQueryModel>
 
 namespace Ui {
-    class ReportsForm;
+class ReportsForm;
 }
 
-class ReportsForm : public QDialog
-{
+class ReportsForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit ReportsForm(QWidget *parent = nullptr);
+    explicit ReportsForm(QWidget* parent = nullptr);
     ~ReportsForm();
 
 private slots:
@@ -22,8 +21,8 @@ private slots:
     void on_btnClose_clicked();
 
 private:
-    Ui::ReportsForm *ui;
-    QSqlQueryModel *model;
+    Ui::ReportsForm* ui;
+    QSqlQueryModel* model;
 
     void loadReportTypes();
     void generateRevenueByClient();
@@ -31,7 +30,7 @@ private:
     void generateRentalConversion();
     void generateSIMUsage();
     void generateDebtReport();
-    void generateSummary(const QString &text);
+    void generateSummary(const QString& text);
 };
 
 #endif // REPORTSFORM_H

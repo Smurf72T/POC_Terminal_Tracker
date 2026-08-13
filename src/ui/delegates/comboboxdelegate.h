@@ -7,24 +7,21 @@
 #include <QPair>
 #include <QMap>
 
-class ComboBoxDelegate : public QStyledItemDelegate
-{
+class ComboBoxDelegate : public QStyledItemDelegate {
     Q_OBJECT
 
 public:
-    explicit ComboBoxDelegate(const QList<QPair<int, QString>>& items, QObject *parent = nullptr,
-                              bool editable = false)
-        : QStyledItemDelegate(parent), m_editable(editable)
+    explicit ComboBoxDelegate(const QList<QPair<int, QString>>& items, QObject* parent = nullptr,
+                              bool editable = false) : QStyledItemDelegate(parent), m_editable(editable)
     {
-        for (const auto &item : items) {
+        for (const auto& item : items) {
             m_idToText[item.first] = item.second;
         }
     }
 
-    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
-                          const QModelIndex &index) const override
+    QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const override
     {
-        QComboBox *editor = new QComboBox(parent);
+        QComboBox* editor = new QComboBox(parent);
         for (auto it = m_idToText.begin(); it != m_idToText.end(); ++it) {
             editor->addItem(it.value(), it.key());
         }
@@ -35,10 +32,10 @@ public:
         return editor;
     }
 
-    void setEditorData(QWidget *editor, const QModelIndex &index) const override
+    void setEditorData(QWidget* editor, const QModelIndex& index) const override
     {
         int id = index.model()->data(index, Qt::UserRole).toInt();
-        QComboBox *comboBox = static_cast<QComboBox*>(editor);
+        QComboBox* comboBox = static_cast<QComboBox*>(editor);
         int comboIndex = comboBox->findData(id);
         if (comboIndex >= 0) {
             comboBox->setCurrentIndex(comboIndex);
@@ -47,10 +44,9 @@ public:
         }
     }
 
-    void setModelData(QWidget *editor, QAbstractItemModel *model,
-                      const QModelIndex &index) const override
+    void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override
     {
-        QComboBox *comboBox = static_cast<QComboBox*>(editor);
+        QComboBox* comboBox = static_cast<QComboBox*>(editor);
         QString text = comboBox->currentText().trimmed();
         int id = 0;
 

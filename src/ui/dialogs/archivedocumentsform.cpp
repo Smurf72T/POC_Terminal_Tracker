@@ -15,11 +15,8 @@
 #include <QFileDialog>
 #include <QTextDocument>
 
-ArchiveDocumentsForm::ArchiveDocumentsForm(int docType, QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::ArchiveDocumentsForm),
-    model(new QSqlQueryModel(this)),
-    m_docType(docType)
+ArchiveDocumentsForm::ArchiveDocumentsForm(int docType, QWidget* parent) :
+    QDialog(parent), ui(new Ui::ArchiveDocumentsForm), model(new QSqlQueryModel(this)), m_docType(docType)
 {
     ui->setupUi(this);
     setupUI();
@@ -98,25 +95,27 @@ void ArchiveDocumentsForm::applyFilter()
                            "WHERE docdate BETWEEN :dateFrom AND :dateTo "
                            "ORDER BY docdate DESC");
     } else if (m_docType == 2) { // Аренда — с возвратом и оплатой
-        queryStr = QString(
-            "SELECT r.rentaldocid, "
-            "r.docnumber AS \"Номер\", "
-            "r.docdate AS \"Дата\", "
-            "c.clientname AS \"Клиент\", "
-            "r.comments AS \"Комментарий\", "
-            "COALESCE(ret.returned_cnt, 0)::text || ' из ' || COALESCE(det.total_cnt, 0)::text AS \"Возврат\", "
-            "CASE WHEN pay.payment_cnt > 0 THEN 'Оплачено' ELSE 'Не оплачено' END AS \"Оплата\" "
-            "FROM tblrentaldocs r "
-            "LEFT JOIN tblclients c ON r.clientid = c.clientid "
-            "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS total_cnt FROM tblrentaldetails GROUP BY rentaldocid) det ON r.rentaldocid = det.rentaldocid "
-            "LEFT JOIN (SELECT rd.rentaldocid, COUNT(DISTINCT rtd.terminalid) AS returned_cnt "
-            "          FROM tblreturndetails rtd "
-            "          JOIN tblrentaldetails rd ON rtd.terminalid = rd.terminalid "
-            "          GROUP BY rd.rentaldocid) ret ON r.rentaldocid = ret.rentaldocid "
-            "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS payment_cnt FROM tblpayment_rental_links GROUP BY rentaldocid) pay ON r.rentaldocid = pay.rentaldocid "
-            "WHERE r.docdate BETWEEN :dateFrom AND :dateTo "
-            "AND (:clientId = 0 OR r.clientid = :clientId) "
-            "ORDER BY r.docdate DESC");
+        queryStr =
+            QString("SELECT r.rentaldocid, "
+                    "r.docnumber AS \"Номер\", "
+                    "r.docdate AS \"Дата\", "
+                    "c.clientname AS \"Клиент\", "
+                    "r.comments AS \"Комментарий\", "
+                    "COALESCE(ret.returned_cnt, 0)::text || ' из ' || COALESCE(det.total_cnt, 0)::text AS \"Возврат\", "
+                    "CASE WHEN pay.payment_cnt > 0 THEN 'Оплачено' ELSE 'Не оплачено' END AS \"Оплата\" "
+                    "FROM tblrentaldocs r "
+                    "LEFT JOIN tblclients c ON r.clientid = c.clientid "
+                    "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS total_cnt FROM tblrentaldetails GROUP BY rentaldocid) "
+                    "det ON r.rentaldocid = det.rentaldocid "
+                    "LEFT JOIN (SELECT rd.rentaldocid, COUNT(DISTINCT rtd.terminalid) AS returned_cnt "
+                    "          FROM tblreturndetails rtd "
+                    "          JOIN tblrentaldetails rd ON rtd.terminalid = rd.terminalid "
+                    "          GROUP BY rd.rentaldocid) ret ON r.rentaldocid = ret.rentaldocid "
+                    "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS payment_cnt FROM tblpayment_rental_links GROUP BY "
+                    "rentaldocid) pay ON r.rentaldocid = pay.rentaldocid "
+                    "WHERE r.docdate BETWEEN :dateFrom AND :dateTo "
+                    "AND (:clientId = 0 OR r.clientid = :clientId) "
+                    "ORDER BY r.docdate DESC");
     } else if (m_docType == 3) { // Возврат
         queryStr = QString("SELECT r.returndocid, "
                            "r.docnumber AS \"Номер\", "
@@ -129,39 +128,38 @@ void ArchiveDocumentsForm::applyFilter()
                            "AND (:clientId = 0 OR r.clientid = :clientId) "
                            "ORDER BY r.docdate DESC");
     } else if (m_docType == 4) { // Оплата
-        queryStr = QString(
-            "SELECT p.paymentid, "
-            "p.paymentdate AS \"Дата\", "
-            "c.clientname AS \"Клиент\", "
-            "pm.monthname AS \"Месяц\", "
-            "p.periodyear AS \"Год\", "
-            "p.amount AS \"Сумма\", "
-            "p.comment AS \"Комментарий\" "
-            "FROM tblpayments p "
-            "LEFT JOIN tblclients c ON p.clientid = c.clientid "
-            "LEFT JOIN (VALUES "
-            "(1, 'Январь'), (2, 'Февраль'), (3, 'Март'), (4, 'Апрель'), "
-            "(5, 'Май'), (6, 'Июнь'), (7, 'Июль'), (8, 'Август'), "
-            "(9, 'Сентябрь'), (10, 'Октябрь'), (11, 'Ноябрь'), (12, 'Декабрь') "
-            ") AS pm(monthnum, monthname) ON p.periodmonth = pm.monthnum "
-            "WHERE p.paymentdate BETWEEN :dateFrom AND :dateTo "
-            "AND (:clientId = 0 OR p.clientid = :clientId) "
-            "ORDER BY p.paymentdate DESC");
+        queryStr = QString("SELECT p.paymentid, "
+                           "p.paymentdate AS \"Дата\", "
+                           "c.clientname AS \"Клиент\", "
+                           "pm.monthname AS \"Месяц\", "
+                           "p.periodyear AS \"Год\", "
+                           "p.amount AS \"Сумма\", "
+                           "p.comment AS \"Комментарий\" "
+                           "FROM tblpayments p "
+                           "LEFT JOIN tblclients c ON p.clientid = c.clientid "
+                           "LEFT JOIN (VALUES "
+                           "(1, 'Январь'), (2, 'Февраль'), (3, 'Март'), (4, 'Апрель'), "
+                           "(5, 'Май'), (6, 'Июнь'), (7, 'Июль'), (8, 'Август'), "
+                           "(9, 'Сентябрь'), (10, 'Октябрь'), (11, 'Ноябрь'), (12, 'Декабрь') "
+                           ") AS pm(monthnum, monthname) ON p.periodmonth = pm.monthnum "
+                           "WHERE p.paymentdate BETWEEN :dateFrom AND :dateTo "
+                           "AND (:clientId = 0 OR p.clientid = :clientId) "
+                           "ORDER BY p.paymentdate DESC");
     } else if (m_docType == 5) { // Изменение статусов
-        queryStr = QString(
-            "SELECT sc.statuschangedocid, "
-            "sc.docnumber AS \"Номер\", "
-            "sc.docdate AS \"Дата\", "
-            "CASE sc.actiontype WHEN 'repair' THEN 'В ремонт' WHEN 'repair_return' THEN 'Возврат из ремонта' "
-            "WHEN 'writeoff' THEN 'Списан' WHEN 'lost' THEN 'Утерян' ELSE sc.actiontype END AS \"Операция\", "
-            "COALESCE(det.cnt, 0)::text || ' терминал(ов)' AS \"Терминалов\", "
-            "sc.comment AS \"Комментарий\" "
-            "FROM tblstatuschangedocs sc "
-            "LEFT JOIN (SELECT statuschangedocid, COUNT(*) AS cnt "
-            "          FROM tblstatuschangedetails GROUP BY statuschangedocid) det "
-            "ON sc.statuschangedocid = det.statuschangedocid "
-            "WHERE sc.docdate BETWEEN :dateFrom AND :dateTo "
-            "ORDER BY sc.docdate DESC");
+        queryStr =
+            QString("SELECT sc.statuschangedocid, "
+                    "sc.docnumber AS \"Номер\", "
+                    "sc.docdate AS \"Дата\", "
+                    "CASE sc.actiontype WHEN 'repair' THEN 'В ремонт' WHEN 'repair_return' THEN 'Возврат из ремонта' "
+                    "WHEN 'writeoff' THEN 'Списан' WHEN 'lost' THEN 'Утерян' ELSE sc.actiontype END AS \"Операция\", "
+                    "COALESCE(det.cnt, 0)::text || ' терминал(ов)' AS \"Терминалов\", "
+                    "sc.comment AS \"Комментарий\" "
+                    "FROM tblstatuschangedocs sc "
+                    "LEFT JOIN (SELECT statuschangedocid, COUNT(*) AS cnt "
+                    "          FROM tblstatuschangedetails GROUP BY statuschangedocid) det "
+                    "ON sc.statuschangedocid = det.statuschangedocid "
+                    "WHERE sc.docdate BETWEEN :dateFrom AND :dateTo "
+                    "ORDER BY sc.docdate DESC");
     }
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
@@ -189,18 +187,29 @@ void ArchiveDocumentsForm::on_btnClose_clicked()
     close();
 }
 
-void ArchiveDocumentsForm::on_tableView_doubleClicked(const QModelIndex &index)
+void ArchiveDocumentsForm::on_tableView_doubleClicked(const QModelIndex& index)
 {
     int row = index.row();
     int docId = getDocIdFromRow(row);
-    if (docId <= 0) return;
+    if (docId <= 0)
+        return;
 
     switch (m_docType) {
-        case 1: openReceiptForEdit(docId); break;
-        case 2: openRentalForEdit(docId); break;
-        case 3: openReturnForEdit(docId); break;
-        case 4: openPaymentForEdit(docId); break;
-        case 5: openStatusChangeForEdit(docId); break;
+        case 1:
+            openReceiptForEdit(docId);
+            break;
+        case 2:
+            openRentalForEdit(docId);
+            break;
+        case 3:
+            openReturnForEdit(docId);
+            break;
+        case 4:
+            openPaymentForEdit(docId);
+            break;
+        case 5:
+            openStatusChangeForEdit(docId);
+            break;
     }
 }
 
@@ -264,29 +273,32 @@ void ArchiveDocumentsForm::setupCheckBoxColumn()
 
 void ArchiveDocumentsForm::on_btnExportExcel_clicked()
 {
-    QString filePath = ReportExporter::getSaveFilePath(
-        this, "Сохранить отчёт в Excel",
-        "Excel файлы (*.xlsx)");
+    QString filePath = ReportExporter::getSaveFilePath(this, "Сохранить отчёт в Excel", "Excel файлы (*.xlsx)");
 
-    if (filePath.isEmpty()) return;
+    if (filePath.isEmpty())
+        return;
 
     QString title;
-    if (m_docType == 1) title = "Архив: Поступление терминалов";
-    else if (m_docType == 2) title = "Архив: Передача в аренду";
-    else if (m_docType == 3) title = "Архив: Возврат из аренды";
-    else if (m_docType == 4) title = "Архив: Оплата";
-    else title = "Архив: Изменение статусов";
+    if (m_docType == 1)
+        title = "Архив: Поступление терминалов";
+    else if (m_docType == 2)
+        title = "Архив: Передача в аренду";
+    else if (m_docType == 3)
+        title = "Архив: Возврат из аренды";
+    else if (m_docType == 4)
+        title = "Архив: Оплата";
+    else
+        title = "Архив: Изменение статусов";
 
     ReportExporter::exportModelToExcel(model, title, filePath, this);
 }
 
 void ArchiveDocumentsForm::on_btnExportPdf_clicked()
 {
-    QString filePath = ReportExporter::getSaveFilePath(
-        this, "Сохранить отчёт в PDF",
-        "PDF файлы (*.pdf)");
+    QString filePath = ReportExporter::getSaveFilePath(this, "Сохранить отчёт в PDF", "PDF файлы (*.pdf)");
 
-    if (filePath.isEmpty()) return;
+    if (filePath.isEmpty())
+        return;
 
     // Формируем HTML-таблицу из модели
     QString html = "<html><head><meta charset='utf-8'>"
@@ -299,14 +311,19 @@ void ArchiveDocumentsForm::on_btnExportPdf_clicked()
                    "tr:nth-child(even) { background-color: #f2f2f2; }"
                    "</style></head><body>";
 
-    if (m_docType == 1) html += "<h1>Архив: Поступление терминалов</h1>";
-    else if (m_docType == 2) html += "<h1>Архив: Передача в аренду</h1>";
-    else if (m_docType == 3) html += "<h1>Архив: Возврат из аренды</h1>";
-    else if (m_docType == 4) html += "<h1>Архив: Оплата</h1>";
-    else html += "<h1>Архив: Изменение статусов</h1>";
+    if (m_docType == 1)
+        html += "<h1>Архив: Поступление терминалов</h1>";
+    else if (m_docType == 2)
+        html += "<h1>Архив: Передача в аренду</h1>";
+    else if (m_docType == 3)
+        html += "<h1>Архив: Возврат из аренды</h1>";
+    else if (m_docType == 4)
+        html += "<h1>Архив: Оплата</h1>";
+    else
+        html += "<h1>Архив: Изменение статусов</h1>";
 
-    html += "<p>Период: с " + ui->dateEditFrom->date().toString("dd.MM.yyyy") +
-            " по " + ui->dateEditTo->date().toString("dd.MM.yyyy") + "</p>";
+    html += "<p>Период: с " + ui->dateEditFrom->date().toString("dd.MM.yyyy") + " по " +
+            ui->dateEditTo->date().toString("dd.MM.yyyy") + "</p>";
     html += "<p>Дата формирования: " + QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss") + "</p>";
 
     html += "<table><tr>";

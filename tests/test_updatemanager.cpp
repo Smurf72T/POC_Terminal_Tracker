@@ -11,8 +11,7 @@
 
 #include "update/updatemanager.h"
 
-class TestUpdateManager : public QObject
-{
+class TestUpdateManager : public QObject {
     Q_OBJECT
 
 private slots:
@@ -63,17 +62,15 @@ void TestUpdateManager::hangingServerTimesOut()
     QObject::connect(&server, &QTcpServer::newConnection, [&server, &openSockets]() {
         // Принимаем соединение, но не отвечаем — клиент должен упереться в таймаут.
         while (server.hasPendingConnections()) {
-            QTcpSocket *socket = server.nextPendingConnection();
+            QTcpSocket* socket = server.nextPendingConnection();
             openSockets.append(socket);
         }
     });
 
     QJsonObject config;
     config["application"] = QJsonObject{{"version", "1.0.0"}};
-    config["update"] = QJsonObject{
-        {"url", QString("http://localhost:%1/update.json").arg(server.serverPort())},
-        {"timeout_ms", 500}
-    };
+    config["update"] =
+        QJsonObject{{"url", QString("http://localhost:%1/update.json").arg(server.serverPort())}, {"timeout_ms", 500}};
 
     UpdateManager um(config);
     QSignalSpy failedSpy(&um, &UpdateManager::checkFailed);

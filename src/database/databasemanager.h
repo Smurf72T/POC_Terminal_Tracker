@@ -12,8 +12,7 @@
 #include "idatabasemanager.h"
 #include "utils/circuitbreaker.h"
 
-class DatabaseManager : public QObject, public IDatabaseManager
-{
+class DatabaseManager : public QObject, public IDatabaseManager {
     Q_OBJECT
 
 public:
@@ -31,23 +30,22 @@ public:
     // загружает конфиг, открывает соединение, выполняет SELECT 1.
     // При успехе соединение остаётся открытым (для последующего read-only
     // запроса pendingMigrations). Ошибка — в *error.
-    bool checkConnection(const QString &configPath, QString *error);
+    bool checkConnection(const QString& configPath, QString* error);
 
     // Миграции БД
-    bool runMigrations(const QString &migrationsDir = "sql/migrations/") override;
+    bool runMigrations(const QString& migrationsDir = "sql/migrations/") override;
     QStringList pendingMigrations() override;
 
     // Read-only версия pendingMigrations: НЕ создаёт schema_migrations.
     // Если таблицы нет — все .sql-файлы считаются ожидающими (свежая БД).
     QStringList pendingMigrationsReadOnly() const;
-    const QSqlDatabase &getDatabase() const override;
+    const QSqlDatabase& getDatabase() const override;
     QJsonObject configObject() const override;
     QSqlQuery executeQuery(const QString& query, bool showErrorMessage = true) override;
     bool executeTransaction(const std::function<bool(QSqlDatabase&)>& transactionFunc) override;
     QString generateDocNumber(const QString& docType) override; // receipt, rental, return, payment
-    void logAction(const QString& action, const QString& tableName, int recordId,
-                   const QString& username = QString(), const QString& oldValues = "{}",
-                   const QString& newValues = "{}") override;
+    void logAction(const QString& action, const QString& tableName, int recordId, const QString& username = QString(),
+                   const QString& oldValues = "{}", const QString& newValues = "{}") override;
 
     void notifyDataChanged() override;
     void setCurrentUser(const QString& username) override;
@@ -74,7 +72,7 @@ private:
     bool applyPendingMigrations();
     void seedAdminAccount();
     static QString generateRandomPassword();
-    static void printOneTimeAdminPassword(const QString &password);
+    static void printOneTimeAdminPassword(const QString& password);
 
     QSqlDatabase m_database;
     QJsonObject m_config;

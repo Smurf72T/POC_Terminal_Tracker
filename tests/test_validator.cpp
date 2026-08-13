@@ -4,8 +4,7 @@
 #include "utils/validator.h"
 #include "utils/password_utils.h"
 
-class TestValidator : public QObject
-{
+class TestValidator : public QObject {
     Q_OBJECT
 
 private slots:
@@ -27,8 +26,8 @@ private slots:
 
     void testValidateINEI_stripsNonDigits()
     {
-        QVERIFY(Validator::validateIMEI("99-0000862471854"));  // hyphens stripped → 15 digits
-        QVERIFY(Validator::validateIMEI("99 0000862471854"));  // spaces stripped
+        QVERIFY(Validator::validateIMEI("99-0000862471854")); // hyphens stripped → 15 digits
+        QVERIFY(Validator::validateIMEI("99 0000862471854")); // spaces stripped
     }
 
     void testValidateINN_10digit()
@@ -37,19 +36,16 @@ private slots:
         QVERIFY(Validator::validateINN("1234567894"));
     }
 
-    void testValidateINN_12digit()
-    {
-        QVERIFY(Validator::validateINN("770708389324"));
-    }
+    void testValidateINN_12digit() { QVERIFY(Validator::validateINN("770708389324")); }
 
     void testValidateINN_invalid()
     {
         QVERIFY(!Validator::validateINN(""));
-        QVERIFY(!Validator::validateINN("12345"));              // too short
-        QVERIFY(!Validator::validateINN("12345678901"));        // 11 digits — neither 10 nor 12
-        QVERIFY(!Validator::validateINN("7707083890"));         // wrong checksum (10-digit)
-        QVERIFY(!Validator::validateINN("770708389325"));       // wrong checksum (12-digit)
-        QVERIFY(!Validator::validateINN("abcdefghij"));         // letters
+        QVERIFY(!Validator::validateINN("12345"));        // too short
+        QVERIFY(!Validator::validateINN("12345678901"));  // 11 digits — neither 10 nor 12
+        QVERIFY(!Validator::validateINN("7707083890"));   // wrong checksum (10-digit)
+        QVERIFY(!Validator::validateINN("770708389325")); // wrong checksum (12-digit)
+        QVERIFY(!Validator::validateINN("abcdefghij"));   // letters
     }
 
     void testValidateSerialNotEmpty_valid()
@@ -63,15 +59,15 @@ private slots:
     {
         QVERIFY(!Validator::validateSerialNotEmpty(""));
         QVERIFY(!Validator::validateSerialNotEmpty("   "));
-        QVERIFY(!Validator::validateSerialNotEmpty("AB"));     // 2 chars
-        QVERIFY(!Validator::validateSerialNotEmpty("a"));      // 1 char
-        QVERIFY(!Validator::validateSerialNotEmpty("  A  "));  // 1 char after trim
+        QVERIFY(!Validator::validateSerialNotEmpty("AB"));    // 2 chars
+        QVERIFY(!Validator::validateSerialNotEmpty("a"));     // 1 char
+        QVERIFY(!Validator::validateSerialNotEmpty("  A  ")); // 1 char after trim
     }
 
     void testCheckLuhn_valid()
     {
         // Known valid Luhn numbers:
-        QVERIFY(Validator::checkLuhn("79927398713")); // classic test
+        QVERIFY(Validator::checkLuhn("79927398713"));      // classic test
         QVERIFY(Validator::checkLuhn("4532015112830366")); // Visa test
         QVERIFY(Validator::checkLuhn("0"));
     }
@@ -128,10 +124,18 @@ private slots:
             const int len = int(rng.bounded(64));
             for (int j = 0; j < len; ++j) {
                 switch (rng.bounded(4)) {
-                case 0: s += QChar('0' + rng.bounded(10)); break;
-                case 1: s += QChar('A' + rng.bounded(26)); break;
-                case 2: s += QChar(0x0410 + rng.bounded(32)); break; // кириллица
-                default: s += QChar(0x20 + rng.bounded(0x5F)); break; // печатный ASCII
+                    case 0:
+                        s += QChar('0' + rng.bounded(10));
+                        break;
+                    case 1:
+                        s += QChar('A' + rng.bounded(26));
+                        break;
+                    case 2:
+                        s += QChar(0x0410 + rng.bounded(32));
+                        break; // кириллица
+                    default:
+                        s += QChar(0x20 + rng.bounded(0x5F));
+                        break; // печатный ASCII
                 }
             }
             (void)Validator::validateIMEI(s);
@@ -155,9 +159,15 @@ private slots:
             const int len = int(rng.bounded(1, 32));
             for (int j = 0; j < len; ++j) {
                 switch (rng.bounded(3)) {
-                case 0: s += QChar('0' + rng.bounded(10)); break;
-                case 1: s += QChar('A' + rng.bounded(26)); break;
-                default: s += QChar(0x20 + rng.bounded(0x5F)); break;
+                    case 0:
+                        s += QChar('0' + rng.bounded(10));
+                        break;
+                    case 1:
+                        s += QChar('A' + rng.bounded(26));
+                        break;
+                    default:
+                        s += QChar(0x20 + rng.bounded(0x5F));
+                        break;
                 }
             }
             QString hash = hashPassword(s);

@@ -12,10 +12,8 @@
 #include <QPrintDialog>
 #include <QTextDocument>
 
-StatusChangeForm::StatusChangeForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::StatusChangeForm),
-    rowsModel(new QStandardItemModel(0, 6, this))
+StatusChangeForm::StatusChangeForm(QWidget* parent) :
+    QDialog(parent), ui(new Ui::StatusChangeForm), rowsModel(new QStandardItemModel(0, 6, this))
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Изменение статуса терминалов");
@@ -31,8 +29,7 @@ StatusChangeForm::StatusChangeForm(QWidget *parent) :
     // Номер документа генерируется при проведении (не здесь), чтобы не
     // сжигать значения последовательности для отменённых форм.
 
-    rowsModel->setHorizontalHeaderLabels(
-        {"Выбрать", "Серийный номер", "Модель", "IMEI 1", "Статус", "Был в ремонте"});
+    rowsModel->setHorizontalHeaderLabels({"Выбрать", "Серийный номер", "Модель", "IMEI 1", "Статус", "Был в ремонте"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->setAlternatingRowColors(true);
@@ -55,10 +52,14 @@ QString StatusChangeForm::actionType() const
 
 QString StatusChangeForm::actionTitle() const
 {
-    if (actionType() == "repair") return "В ремонт";
-    if (actionType() == "repair_return") return "Возврат из ремонта";
-    if (actionType() == "writeoff") return "Списан";
-    if (actionType() == "lost") return "Утерян";
+    if (actionType() == "repair")
+        return "В ремонт";
+    if (actionType() == "repair_return")
+        return "Возврат из ремонта";
+    if (actionType() == "writeoff")
+        return "Списан";
+    if (actionType() == "lost")
+        return "Утерян";
     return "Изменение статуса";
 }
 
@@ -69,31 +70,45 @@ void StatusChangeForm::updateWindowTitle()
 
 int StatusChangeForm::targetStatus() const
 {
-    if (actionType() == "repair") return 2;
-    if (actionType() == "repair_return") return 0;
-    if (actionType() == "writeoff") return 3;
-    if (actionType() == "lost") return 4;
+    if (actionType() == "repair")
+        return 2;
+    if (actionType() == "repair_return")
+        return 0;
+    if (actionType() == "writeoff")
+        return 3;
+    if (actionType() == "lost")
+        return 4;
     return 0;
 }
 
 bool StatusChangeForm::expectStatus(int status) const
 {
-    if (actionType() == "repair") return status == 0;
-    if (actionType() == "repair_return") return status == 2;
-    if (actionType() == "writeoff") return status == 0 || status == 2;
-    if (actionType() == "lost") return status == 1 || status == 2;
+    if (actionType() == "repair")
+        return status == 0;
+    if (actionType() == "repair_return")
+        return status == 2;
+    if (actionType() == "writeoff")
+        return status == 0 || status == 2;
+    if (actionType() == "lost")
+        return status == 1 || status == 2;
     return false;
 }
 
 QString StatusChangeForm::statusText(int status) const
 {
     switch (status) {
-        case 0: return "Свободен";
-        case 1: return "В аренде";
-        case 2: return "В ремонте";
-        case 3: return "Списан";
-        case 4: return "Утерян";
-        default: return "Прочее";
+        case 0:
+            return "Свободен";
+        case 1:
+            return "В аренде";
+        case 2:
+            return "В ремонте";
+        case 3:
+            return "Списан";
+        case 4:
+            return "Утерян";
+        default:
+            return "Прочее";
     }
 }
 
@@ -111,9 +126,8 @@ void StatusChangeForm::loadRepairDocs()
     }
 
     while (query.next()) {
-        QString display = QString("%1 от %2")
-            .arg(query.value(1).toString(),
-                 query.value(2).toDateTime().toString("dd.MM.yyyy"));
+        QString display =
+            QString("%1 от %2").arg(query.value(1).toString(), query.value(2).toDateTime().toString("dd.MM.yyyy"));
         ui->comboBoxRepairDoc->addItem(display, query.value(0).toInt());
     }
 }
@@ -127,18 +141,17 @@ void StatusChangeForm::loadTerminalsFromRepairDoc(int repairDocId)
     }
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare(
-        "SELECT t.terminalid, t.serialnumber, "
-        "COALESCE(m.modelname, '—') AS modelname, "
-        "COALESCE(t.imei1, '') AS imei1, "
-        "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' "
-        "WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
-        "t.was_repaired "
-        "FROM tblstatuschangedetails scd "
-        "JOIN tblterminals t ON scd.terminalid = t.terminalid "
-        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-        "WHERE scd.statuschangedocid = :did AND t.status = 2 "
-        "ORDER BY t.serialnumber");
+    query.prepare("SELECT t.terminalid, t.serialnumber, "
+                  "COALESCE(m.modelname, '—') AS modelname, "
+                  "COALESCE(t.imei1, '') AS imei1, "
+                  "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' "
+                  "WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
+                  "t.was_repaired "
+                  "FROM tblstatuschangedetails scd "
+                  "JOIN tblterminals t ON scd.terminalid = t.terminalid "
+                  "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                  "WHERE scd.statuschangedocid = :did AND t.status = 2 "
+                  "ORDER BY t.serialnumber");
     query.bindValue(":did", repairDocId);
 
     if (!query.exec()) {
@@ -150,14 +163,14 @@ void StatusChangeForm::loadTerminalsFromRepairDoc(int repairDocId)
         int row = rowsModel->rowCount();
         rowsModel->insertRow(row);
 
-        QStandardItem *checkItem = new QStandardItem();
+        QStandardItem* checkItem = new QStandardItem();
         checkItem->setCheckable(true);
         checkItem->setCheckState(Qt::Unchecked);
         checkItem->setData(query.value(0).toInt(), Qt::UserRole);
         rowsModel->setItem(row, 0, checkItem);
 
         for (int col = 1; col < 6; ++col) {
-            QStandardItem *item = new QStandardItem(query.value(col).toString());
+            QStandardItem* item = new QStandardItem(query.value(col).toString());
             item->setEditable(false);
             item->setData(query.value(0).toInt(), Qt::UserRole);
             rowsModel->setItem(row, col, item);
@@ -170,24 +183,30 @@ void StatusChangeForm::loadTerminals()
     rowsModel->removeRows(0, rowsModel->rowCount());
 
     QString statusCond;
-    if (actionType() == "repair") statusCond = "t.status = 0";
-    else if (actionType() == "repair_return") statusCond = "t.status = 2";
-    else if (actionType() == "writeoff") statusCond = "t.status IN (0, 2)";
-    else if (actionType() == "lost") statusCond = "t.status IN (1, 2)";
-    else return;
+    if (actionType() == "repair")
+        statusCond = "t.status = 0";
+    else if (actionType() == "repair_return")
+        statusCond = "t.status = 2";
+    else if (actionType() == "writeoff")
+        statusCond = "t.status IN (0, 2)";
+    else if (actionType() == "lost")
+        statusCond = "t.status IN (1, 2)";
+    else
+        return;
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare(
-        "SELECT t.terminalid, t.serialnumber, "
-        "COALESCE(m.modelname, '—') AS modelname, "
-        "COALESCE(t.imei1, '') AS imei1, "
-        "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' "
-        "WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
-        "t.was_repaired "
-        "FROM tblterminals t "
-        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
-        "WHERE " + statusCond + " "
-        "ORDER BY t.serialnumber");
+    query.prepare("SELECT t.terminalid, t.serialnumber, "
+                  "COALESCE(m.modelname, '—') AS modelname, "
+                  "COALESCE(t.imei1, '') AS imei1, "
+                  "CASE t.status WHEN 0 THEN 'Свободен' WHEN 1 THEN 'В аренде' WHEN 2 THEN 'В ремонте' "
+                  "WHEN 3 THEN 'Списан' WHEN 4 THEN 'Утерян' ELSE 'Прочее' END AS status, "
+                  "t.was_repaired "
+                  "FROM tblterminals t "
+                  "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                  "WHERE " +
+                  statusCond +
+                  " "
+                  "ORDER BY t.serialnumber");
 
     if (!query.exec()) {
         qCWarning(logSQL) << "Failed to load terminals:" << query.lastError().text();
@@ -198,14 +217,14 @@ void StatusChangeForm::loadTerminals()
         int row = rowsModel->rowCount();
         rowsModel->insertRow(row);
 
-        QStandardItem *checkItem = new QStandardItem();
+        QStandardItem* checkItem = new QStandardItem();
         checkItem->setCheckable(true);
         checkItem->setCheckState(Qt::Unchecked);
         checkItem->setData(query.value(0).toInt(), Qt::UserRole);
         rowsModel->setItem(row, 0, checkItem);
 
         for (int col = 1; col < 6; ++col) {
-            QStandardItem *item = new QStandardItem(query.value(col).toString());
+            QStandardItem* item = new QStandardItem(query.value(col).toString());
             item->setEditable(false);
             item->setData(query.value(0).toInt(), Qt::UserRole);
             rowsModel->setItem(row, col, item);
@@ -230,8 +249,7 @@ void StatusChangeForm::on_comboBoxRepairDoc_currentIndexChanged(int index)
 
 void StatusChangeForm::on_btnRefresh_clicked()
 {
-    if (actionType() == "repair_return" &&
-        ui->comboBoxRepairDoc->currentData().toInt() > 0) {
+    if (actionType() == "repair_return" && ui->comboBoxRepairDoc->currentData().toInt() > 0) {
         loadTerminalsFromRepairDoc(ui->comboBoxRepairDoc->currentData().toInt());
     } else {
         loadTerminals();
@@ -242,7 +260,7 @@ QList<int> StatusChangeForm::checkedTerminalIds() const
 {
     QList<int> ids;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
-        QStandardItem *checkItem = rowsModel->item(i, 0);
+        QStandardItem* checkItem = rowsModel->item(i, 0);
         if (checkItem && checkItem->checkState() == Qt::Checked) {
             ids.append(checkItem->data(Qt::UserRole).toInt());
         }
@@ -254,8 +272,7 @@ void StatusChangeForm::on_btnPost_clicked()
 {
     QString comment = ui->textEditComment->toPlainText().trimmed();
     if (comment.isEmpty()) {
-        QMessageBox::warning(this, "Внимание",
-            "Укажите комментарий: что ремонтируется или причина списания/утери.");
+        QMessageBox::warning(this, "Внимание", "Укажите комментарий: что ремонтируется или причина списания/утери.");
         return;
     }
 
@@ -265,8 +282,7 @@ void StatusChangeForm::on_btnPost_clicked()
         return;
     }
 
-    int basedocid = (actionType() == "repair_return")
-        ? ui->comboBoxRepairDoc->currentData().toInt() : 0;
+    int basedocid = (actionType() == "repair_return") ? ui->comboBoxRepairDoc->currentData().toInt() : 0;
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
     if (!db.transaction()) {
@@ -291,8 +307,7 @@ void StatusChangeForm::on_btnPost_clicked()
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД",
-                "Не удалось обновить шапку: " + query.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
             return;
         }
 
@@ -300,8 +315,7 @@ void StatusChangeForm::on_btnPost_clicked()
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД",
-                "Не удалось обновить строки: " + query.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить строки: " + query.lastError().text());
             return;
         }
     } else {
@@ -328,8 +342,7 @@ void StatusChangeForm::on_btnPost_clicked()
 
         if (!query.exec() || !query.next()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД",
-                "Не удалось создать документ: " + query.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось создать документ: " + query.lastError().text());
             return;
         }
         docId = query.value(0).toInt();
@@ -340,26 +353,27 @@ void StatusChangeForm::on_btnPost_clicked()
     // Терминалы, убранные из документа при редактировании, должны быть
     // возвращены в прежний статус (откат операции).
     QSet<int> checked;
-    for (int tid : terminalIds) checked.insert(tid);
+    for (int tid : terminalIds)
+        checked.insert(tid);
     QList<int> removed;
     if (m_editMode) {
         for (int tid : m_originalTerminals) {
-            if (!checked.contains(tid)) removed.append(tid);
+            if (!checked.contains(tid))
+                removed.append(tid);
         }
     }
 
     for (int termId : terminalIds) {
         QSqlQuery checkQuery(db);
-        checkQuery.prepare(
-            "SELECT status FROM tblterminals "
-            "WHERE terminalid = :id FOR UPDATE NOWAIT");
+        checkQuery.prepare("SELECT status FROM tblterminals "
+                           "WHERE terminalid = :id FOR UPDATE NOWAIT");
         checkQuery.bindValue(":id", termId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.")
-                    .arg(termId));
+            QMessageBox::critical(
+                this, "Ошибка",
+                QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
             return;
         }
 
@@ -367,12 +381,15 @@ void StatusChangeForm::on_btnPost_clicked()
         bool ok = expectStatus(currentStatus);
         // При редактировании терминал может уже стоять в целевом статусе —
         // это допустимо (повторное применение идемпотентно).
-        if (m_editMode) ok = ok || (currentStatus == target);
+        if (m_editMode)
+            ok = ok || (currentStatus == target);
         if (!ok) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Терминал %1 имеет статус «%2», операция «%3» для него недоступна.")
-                    .arg(termId).arg(statusText(currentStatus)).arg(actionTitle()));
+                                  QString("Терминал %1 имеет статус «%2», операция «%3» для него недоступна.")
+                                      .arg(termId)
+                                      .arg(statusText(currentStatus))
+                                      .arg(actionTitle()));
             return;
         }
 
@@ -383,31 +400,29 @@ void StatusChangeForm::on_btnPost_clicked()
             oldStatus = m_originalStatus.value(termId, currentStatus);
 
         QSqlQuery updateQuery(db);
-        updateQuery.prepare(
-            "UPDATE tblterminals SET status = :status, "
-            "was_repaired = CASE WHEN :status = 2 THEN TRUE ELSE was_repaired END "
-            "WHERE terminalid = :id");
+        updateQuery.prepare("UPDATE tblterminals SET status = :status, "
+                            "was_repaired = CASE WHEN :status = 2 THEN TRUE ELSE was_repaired END "
+                            "WHERE terminalid = :id");
         updateQuery.bindValue(":status", target);
         updateQuery.bindValue(":id", termId);
         if (!updateQuery.exec()) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
-                QString("Не удалось обновить статус терминала %1:\n%2")
-                    .arg(termId).arg(updateQuery.lastError().text()));
+                                  QString("Не удалось обновить статус терминала %1:\n%2")
+                                      .arg(termId)
+                                      .arg(updateQuery.lastError().text()));
             return;
         }
 
         QSqlQuery detailQuery(db);
-        detailQuery.prepare(
-            "INSERT INTO tblstatuschangedetails (statuschangedocid, terminalid, old_status) "
-            "VALUES (:did, :tid, :old)");
+        detailQuery.prepare("INSERT INTO tblstatuschangedetails (statuschangedocid, terminalid, old_status) "
+                            "VALUES (:did, :tid, :old)");
         detailQuery.bindValue(":did", docId);
         detailQuery.bindValue(":tid", termId);
         detailQuery.bindValue(":old", oldStatus);
         if (!detailQuery.exec()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД",
-                "Ошибка связи: " + detailQuery.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
             return;
         }
     }
@@ -415,16 +430,15 @@ void StatusChangeForm::on_btnPost_clicked()
     // Откат статусов для терминалов, убранных из документа
     for (int termId : removed) {
         QSqlQuery checkQuery(db);
-        checkQuery.prepare(
-            "SELECT status FROM tblterminals "
-            "WHERE terminalid = :id FOR UPDATE NOWAIT");
+        checkQuery.prepare("SELECT status FROM tblterminals "
+                           "WHERE terminalid = :id FOR UPDATE NOWAIT");
         checkQuery.bindValue(":id", termId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.")
-                    .arg(termId));
+            QMessageBox::critical(
+                this, "Ошибка",
+                QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
             return;
         }
 
@@ -432,21 +446,25 @@ void StatusChangeForm::on_btnPost_clicked()
         if (currentStatus != target) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Статус терминала %1 («%2») уже изменён другим документом, "
-                        "откат невозможен. Уберите его вручную.")
-                    .arg(termId).arg(statusText(currentStatus)));
+                                  QString("Статус терминала %1 («%2») уже изменён другим документом, "
+                                          "откат невозможен. Уберите его вручную.")
+                                      .arg(termId)
+                                      .arg(statusText(currentStatus)));
             return;
         }
 
         int oldStatus = m_originalStatus.value(termId, -1);
         if (oldStatus < 0) {
-            if (m_originalActionType == "repair") oldStatus = 0;
-            else if (m_originalActionType == "repair_return") oldStatus = 2;
+            if (m_originalActionType == "repair")
+                oldStatus = 0;
+            else if (m_originalActionType == "repair_return")
+                oldStatus = 2;
             else {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка",
-                    QString("Прежний статус терминала %1 неизвестен (документ проведён до "
-                            "введения снимков статусов). Верните его вручную.").arg(termId));
+                                      QString("Прежний статус терминала %1 неизвестен (документ проведён до "
+                                              "введения снимков статусов). Верните его вручную.")
+                                          .arg(termId));
                 return;
             }
         }
@@ -458,8 +476,9 @@ void StatusChangeForm::on_btnPost_clicked()
         if (!updateQuery.exec()) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
-                QString("Не удалось восстановить статус терминала %1:\n%2")
-                    .arg(termId).arg(updateQuery.lastError().text()));
+                                  QString("Не удалось восстановить статус терминала %1:\n%2")
+                                      .arg(termId)
+                                      .arg(updateQuery.lastError().text()));
             return;
         }
     }
@@ -470,12 +489,10 @@ void StatusChangeForm::on_btnPost_clicked()
         return;
     }
 
-    DatabaseManager::instance().logAction(m_editMode ? "UPDATE" : "POST",
-                                          "tblstatuschangedocs", docId);
+    DatabaseManager::instance().logAction(m_editMode ? "UPDATE" : "POST", "tblstatuschangedocs", docId);
     DatabaseManager::instance().notifyDataChanged();
-    QMessageBox::information(this, "Успех",
-        QString("Документ «%1» успешно %2!")
-            .arg(actionTitle(), m_editMode ? "обновлён" : "проведён"));
+    QMessageBox::information(
+        this, "Успех", QString("Документ «%1» успешно %2!").arg(actionTitle(), m_editMode ? "обновлён" : "проведён"));
     this->close();
 }
 
@@ -540,7 +557,7 @@ void StatusChangeForm::loadForEdit(int docId)
     }
 
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
-        QStandardItem *checkItem = rowsModel->item(i, 0);
+        QStandardItem* checkItem = rowsModel->item(i, 0);
         if (checkItem && docTerminals.contains(checkItem->data(Qt::UserRole).toInt())) {
             checkItem->setCheckState(Qt::Checked);
         }
@@ -562,10 +579,16 @@ void StatusChangeForm::on_btnPrint_clicked()
 
     QString type = actionType();
     QString title;
-    if (type == "repair") title = "АКТ ПЕРЕДАЧИ В РЕМОНТ";    else if (type == "repair_return") title = "АКТ ВОЗВРАТА ИЗ РЕМОНТА";
-    else if (type == "writeoff") title = "АКТ СПИСАНИЯ";
-    else if (type == "lost") title = "АКТ УТЕРИ";
-    else return;
+    if (type == "repair")
+        title = "АКТ ПЕРЕДАЧИ В РЕМОНТ";
+    else if (type == "repair_return")
+        title = "АКТ ВОЗВРАТА ИЗ РЕМОНТА";
+    else if (type == "writeoff")
+        title = "АКТ СПИСАНИЯ";
+    else if (type == "lost")
+        title = "АКТ УТЕРИ";
+    else
+        return;
 
     QString html = "<html><head><meta charset='utf-8'>"
                    "<style>"
@@ -585,13 +608,20 @@ void StatusChangeForm::on_btnPrint_clicked()
 
     int num = 0;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
-        QStandardItem *checkItem = rowsModel->item(i, 0);
-        if (!checkItem || checkItem->checkState() != Qt::Checked) continue;
+        QStandardItem* checkItem = rowsModel->item(i, 0);
+        if (!checkItem || checkItem->checkState() != Qt::Checked)
+            continue;
         ++num;
-        html += "<tr><td>" + QString::number(num) + "</td>"
-                "<td>" + rowsModel->item(i, 1)->text().toHtmlEscaped() + "</td>"
-                "<td>" + rowsModel->item(i, 2)->text().toHtmlEscaped() + "</td>"
-                "<td>" + rowsModel->item(i, 3)->text().toHtmlEscaped() + "</td></tr>";
+        html += "<tr><td>" + QString::number(num) +
+                "</td>"
+                "<td>" +
+                rowsModel->item(i, 1)->text().toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                rowsModel->item(i, 2)->text().toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                rowsModel->item(i, 3)->text().toHtmlEscaped() + "</td></tr>";
     }
     html += "</table>";
 

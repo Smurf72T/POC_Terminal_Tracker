@@ -6,15 +6,14 @@
 #include <QSet>
 
 namespace Ui {
-    class ReturnForm;
+class ReturnForm;
 }
 
-class ReturnForm : public QDialog
-{
+class ReturnForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit ReturnForm(QWidget *parent = nullptr);
+    explicit ReturnForm(QWidget* parent = nullptr);
     ~ReturnForm();
 
     void loadForEdit(int docId);
@@ -27,8 +26,8 @@ private slots:
     void on_btnClose_clicked();
 
 private:
-    Ui::ReturnForm *ui;
-    QStandardItemModel *rowsModel;
+    Ui::ReturnForm* ui;
+    QStandardItemModel* rowsModel;
 
     void loadClientsToComboBox();
     void loadRentalDocs(int clientId);

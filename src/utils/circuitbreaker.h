@@ -8,8 +8,7 @@
 // Закрыт — запросы выполняются. N подряд идущих сбоев переводят в открытое состояние:
 // запросы отклоняются мгновенно (fail fast). После cooldown — полуоткрытое: пропускается
 // ограниченное число пробных запросов; успех возвращает в закрытое, сбой — снова в открытое.
-class CircuitBreaker
-{
+class CircuitBreaker {
 public:
     explicit CircuitBreaker(int failureThreshold = 5, int cooldownMs = 30000, int halfOpenTries = 1);
 

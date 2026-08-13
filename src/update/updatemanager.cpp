@@ -19,15 +19,13 @@
 #include <QTimer>
 #include <QUrl>
 
-UpdateManager::UpdateManager(const QJsonObject &config, QObject *parent)
-    : QObject(parent)
+UpdateManager::UpdateManager(const QJsonObject& config, QObject* parent) : QObject(parent)
 {
     QJsonObject update = config["update"].toObject();
     m_url = update["url"].toString().trimmed();
     if (!m_url.isEmpty() && !isSecureUpdateUrl(m_url)) {
-        OpsLog::instance().error(
-            "update.url должен использовать HTTPS (указано: " + m_url
-            + "). Автообновление отключено. Для локальной отладки допустим http://localhost");
+        OpsLog::instance().error("update.url должен использовать HTTPS (указано: " + m_url +
+                                 "). Автообновление отключено. Для локальной отладки допустим http://localhost");
         m_url.clear();
     }
     m_checkOnStartup = update["check_on_startup"].toBool(true);
@@ -48,18 +46,18 @@ UpdateManager::UpdateManager(const QJsonObject &config, QObject *parent)
     }
 }
 
-QString UpdateManager::sha256Hex(const QByteArray &data)
+QString UpdateManager::sha256Hex(const QByteArray& data)
 {
     return QString::fromLatin1(QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex());
 }
 
-QString UpdateManager::spkiSha256Base64(const QSslCertificate &cert)
+QString UpdateManager::spkiSha256Base64(const QSslCertificate& cert)
 {
     QByteArray spki = cert.publicKey().toDer();
     return QString::fromLatin1(QCryptographicHash::hash(spki, QCryptographicHash::Sha256).toBase64());
 }
 
-bool UpdateManager::certificateMatchesPin(const QSslCertificate &cert) const
+bool UpdateManager::certificateMatchesPin(const QSslCertificate& cert) const
 {
     return !cert.isNull() && spkiSha256Base64(cert) == m_pinnedSha256;
 }
@@ -69,7 +67,7 @@ bool UpdateManager::isEnabled() const
     return !m_url.isEmpty();
 }
 
-bool UpdateManager::isSecureUpdateUrl(const QString &url)
+bool UpdateManager::isSecureUpdateUrl(const QString& url)
 {
     const QUrl parsed(url);
     const QString scheme = parsed.scheme().toLower();
@@ -115,24 +113,21 @@ void UpdateManager::checkForUpdates()
     emit checkStarted();
 
     QNetworkRequest request{QUrl(m_url)};
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QString("POC_Terminal_Tracker/%1").arg(m_currentVersion));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setHeader(QNetworkRequest::UserAgentHeader, QString("POC_Terminal_Tracker/%1").arg(m_currentVersion));
     request.setTransferTimeout(m_timeoutMs);
 
-    QNetworkReply *reply = m_nam.get(request);
+    QNetworkReply* reply = m_nam.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() { handleManifest(reply); });
 }
 
-void UpdateManager::handleManifest(QNetworkReply *reply)
+void UpdateManager::handleManifest(QNetworkReply* reply)
 {
     reply->deleteLater();
 
     if (reply->error() != QNetworkReply::NoError) {
         QString msg;
-        if (reply->error() == QNetworkReply::OperationCanceledError
-            || reply->error() == QNetworkReply::TimeoutError) {
+        if (reply->error() == QNetworkReply::OperationCanceledError || reply->error() == QNetworkReply::TimeoutError) {
             msg = QString("Таймаут проверки обновлений: сервер не ответил за %1 с.").arg(m_timeoutMs / 1000);
         } else {
             msg = QString("Не удалось проверить обновления: %1").arg(reply->errorString());
@@ -183,7 +178,8 @@ void UpdateManager::handleManifest(QNetworkReply *reply)
     QString downloadUrl = manifest["download_url"].toString().trimmed();
     m_expectedSha256 = manifest["sha256"].toString().trimmed().toLower();
     if (!m_expectedSha256.isEmpty() && m_expectedSha256.length() != 64) {
-        OpsLog::instance().warning("Манифест обновлений содержит некорректный sha256 — проверка контрольной суммы отключена");
+        OpsLog::instance().warning(
+            "Манифест обновлений содержит некорректный sha256 — проверка контрольной суммы отключена");
         m_expectedSha256.clear();
     }
     OpsLog::instance().info(QString("Доступна новая версия %1").arg(newVersion));
@@ -191,7 +187,7 @@ void UpdateManager::handleManifest(QNetworkReply *reply)
     emit checkFinished(true);
 }
 
-void UpdateManager::downloadUpdate(const QString &url)
+void UpdateManager::downloadUpdate(const QString& url)
 {
     if (url.isEmpty()) {
         emit downloadFailed("URL для скачивания обновления пуст");
@@ -209,10 +205,8 @@ void UpdateManager::downloadUpdate(const QString &url)
     }
 
     QNetworkRequest request{QUrl(url)};
-    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
-                         QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QString("POC_Terminal_Tracker/%1").arg(m_currentVersion));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setHeader(QNetworkRequest::UserAgentHeader, QString("POC_Terminal_Tracker/%1").arg(m_currentVersion));
     request.setTransferTimeout(m_timeoutMs);
 
     m_downloadReply = m_nam.get(request);
@@ -221,14 +215,14 @@ void UpdateManager::downloadUpdate(const QString &url)
             [this](qint64 received, qint64 total) { emit downloadProgress(received, total); });
 
     connect(m_downloadReply, &QNetworkReply::finished, this, [this]() {
-        QNetworkReply *reply = m_downloadReply;
+        QNetworkReply* reply = m_downloadReply;
         m_downloadReply = nullptr;
         reply->deleteLater();
 
         if (reply->error() != QNetworkReply::NoError) {
             QString msg;
-            if (reply->error() == QNetworkReply::OperationCanceledError
-                || reply->error() == QNetworkReply::TimeoutError) {
+            if (reply->error() == QNetworkReply::OperationCanceledError ||
+                reply->error() == QNetworkReply::TimeoutError) {
                 msg = QString("Таймаут скачивания обновления: сервер не ответил за %1 с.").arg(m_timeoutMs / 1000);
             } else {
                 msg = "Ошибка скачивания: " + reply->errorString();
@@ -286,9 +280,7 @@ void UpdateManager::downloadUpdate(const QString &url)
         file.write(data);
         file.close();
 
-        OpsLog::instance().info(QString("Скачано обновление: %1 (%2 КБ)")
-                                    .arg(filePath)
-                                    .arg(data.size() / 1024));
+        OpsLog::instance().info(QString("Скачано обновление: %1 (%2 КБ)").arg(filePath).arg(data.size() / 1024));
         emit downloadFinished(filePath);
     });
 }

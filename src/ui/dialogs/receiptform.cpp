@@ -15,9 +15,7 @@
 #include <QPrintDialog>
 #include <QTextDocument>
 
-ReceiptForm::ReceiptForm(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::ReceiptForm)
+ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Поступление терминалов");
@@ -105,19 +103,19 @@ void ReceiptForm::loadForEdit(int docId)
             QString imei1 = detailQuery.value(3).toString();
             QString imei2 = detailQuery.value(4).toString();
 
-            QStandardItem *serialItem = new QStandardItem(serial);
+            QStandardItem* serialItem = new QStandardItem(serial);
             serialItem->setData(terminalId, Qt::UserRole);
             rowsModel->setItem(row, 0, serialItem);
 
             // Find model name from m_models list
             QString modelName;
-            for (const auto &pair : m_models) {
+            for (const auto& pair : m_models) {
                 if (pair.first == modelId) {
                     modelName = pair.second;
                     break;
                 }
             }
-            QStandardItem *modelItem = new QStandardItem();
+            QStandardItem* modelItem = new QStandardItem();
             modelItem->setText(modelName);
             modelItem->setData(modelId, Qt::UserRole);
             rowsModel->setItem(row, 1, modelItem);
@@ -219,7 +217,8 @@ void ReceiptForm::on_btnPost_clicked()
         delDetails.bindValue(":id", docId);
         if (!delDetails.exec()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить старые связи: " + delDetails.lastError().text());
+            QMessageBox::critical(this, "Ошибка БД",
+                                  "Не удалось удалить старые связи: " + delDetails.lastError().text());
             return;
         }
     }
@@ -235,16 +234,15 @@ void ReceiptForm::on_btnPost_clicked()
         // Валидация модели
         if (modelId <= 0) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                QString("Строка %1: выберите модель из списка.").arg(i + 1));
+            QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите модель из списка.").arg(i + 1));
             return;
         }
 
         // Валидация серийного номера
         if (!Validator::validateSerialNotEmpty(serial)) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка", 
-                QString("Строка %1: серийный номер должен содержать минимум 3 символа.").arg(i + 1));
+            QMessageBox::critical(this, "Ошибка",
+                                  QString("Строка %1: серийный номер должен содержать минимум 3 символа.").arg(i + 1));
             return;
         }
 
@@ -257,15 +255,17 @@ void ReceiptForm::on_btnPost_clicked()
 
         if (cleanImei1 != imei1 && !imei1.isEmpty()) {
             QMessageBox::information(this, "Форматирование IMEI",
-                QString("Строка %1: IMEI 1 был очищен от разделителей:\n"
-                        "Было: %2\nСтало: %3")
-                .arg(i + 1).arg(imei1, cleanImei1));
+                                     QString("Строка %1: IMEI 1 был очищен от разделителей:\n"
+                                             "Было: %2\nСтало: %3")
+                                         .arg(i + 1)
+                                         .arg(imei1, cleanImei1));
         }
         if (cleanImei2 != imei2 && !imei2.isEmpty()) {
             QMessageBox::information(this, "Форматирование IMEI",
-                QString("Строка %1: IMEI 2 был очищен от разделителей:\n"
-                        "Было: %2\nСтало: %3")
-                .arg(i + 1).arg(imei2, cleanImei2));
+                                     QString("Строка %1: IMEI 2 был очищен от разделителей:\n"
+                                             "Было: %2\nСтало: %3")
+                                         .arg(i + 1)
+                                         .arg(imei2, cleanImei2));
         }
 
         imei1 = cleanImei1;
@@ -274,16 +274,20 @@ void ReceiptForm::on_btnPost_clicked()
         if (!imei1.isEmpty() && imei1.length() != 15) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
-                .arg(i + 1).arg(imei1).arg(imei1.length()));
+                                  QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
+                                      .arg(i + 1)
+                                      .arg(imei1)
+                                      .arg(imei1.length()));
             return;
         }
 
         if (!imei2.isEmpty() && imei2.length() != 15) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка",
-                QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
-                .arg(i + 1).arg(imei2).arg(imei2.length()));
+                                  QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
+                                      .arg(i + 1)
+                                      .arg(imei2)
+                                      .arg(imei2.length()));
             return;
         }
 
@@ -301,7 +305,8 @@ void ReceiptForm::on_btnPost_clicked()
 
             if (!termQuery.exec()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД",
+                QMessageBox::critical(
+                    this, "Ошибка БД",
                     QString("Ошибка при обновлении терминала %1:\n%2").arg(serial, termQuery.lastError().text()));
                 return;
             }
@@ -318,7 +323,8 @@ void ReceiptForm::on_btnPost_clicked()
 
             if (!termQuery.exec() || !termQuery.next()) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД",
+                QMessageBox::critical(
+                    this, "Ошибка БД",
                     QString("Ошибка при добавлении терминала %1:\n%2").arg(serial, termQuery.lastError().text()));
                 return;
             }
@@ -345,7 +351,7 @@ void ReceiptForm::on_btnPost_clicked()
     } else {
         // Логирование действия
         DatabaseManager::instance().logAction("POST", "tblreceiptdocs", docId);
-        
+
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
         DatabaseManager::instance().notifyDataChanged();
         this->close();
@@ -386,17 +392,28 @@ void ReceiptForm::on_btnPrint_clicked()
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
         int modelId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
         QString modelName;
-        for (const auto &m : m_models) {
-            if (m.first == modelId) { modelName = m.second; break; }
+        for (const auto& m : m_models) {
+            if (m.first == modelId) {
+                modelName = m.second;
+                break;
+            }
         }
         QString imei1 = rowsModel->data(rowsModel->index(i, 2)).toString();
         QString imei2 = rowsModel->data(rowsModel->index(i, 3)).toString();
 
-        html += "<tr><td>" + QString::number(i + 1) + "</td>"
-                "<td>" + serial.toHtmlEscaped() + "</td>"
-                "<td>" + modelName.toHtmlEscaped() + "</td>"
-                "<td>" + imei1.toHtmlEscaped() + "</td>"
-                "<td>" + imei2.toHtmlEscaped() + "</td></tr>";
+        html += "<tr><td>" + QString::number(i + 1) +
+                "</td>"
+                "<td>" +
+                serial.toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                modelName.toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                imei1.toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                imei2.toHtmlEscaped() + "</td></tr>";
     }
     html += "</table>";
 
@@ -417,20 +434,21 @@ void ReceiptForm::on_btnClose_clicked()
     close();
 }
 
-bool ReceiptForm::eventFilter(QObject *obj, QEvent *event)
+bool ReceiptForm::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == ui->tableView && event->type() == QEvent::KeyPress) {
-        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
         if (keyEvent->key() == Qt::Key_F9) {
             int row = ui->tableView->currentIndex().row();
-            if (row < 0) return true;
+            if (row < 0)
+                return true;
 
             int newRow = rowsModel->rowCount();
             rowsModel->insertRow(newRow);
 
             for (int col = 0; col < rowsModel->columnCount(); ++col) {
                 QModelIndex src = rowsModel->index(row, col);
-                QStandardItem *newItem = rowsModel->itemFromIndex(src)->clone();
+                QStandardItem* newItem = rowsModel->itemFromIndex(src)->clone();
                 rowsModel->setItem(newRow, col, newItem);
             }
 

@@ -5,15 +5,14 @@
 #include <QVector>
 
 namespace Ui {
-    class LoginForm;
+class LoginForm;
 }
 
-class LoginForm : public QDialog
-{
+class LoginForm : public QDialog {
     Q_OBJECT
 
 public:
-    explicit LoginForm(QWidget *parent = nullptr);
+    explicit LoginForm(QWidget* parent = nullptr);
     ~LoginForm();
 
     QString getUsername() const;
@@ -33,10 +32,10 @@ private slots:
 private:
     void loadUsers();
     // Регистрация разрешена? Иначе возвращает сообщение ожидания.
-    bool registrationAllowed(QString *blockMessage);
+    bool registrationAllowed(QString* blockMessage);
 
 private:
-    Ui::LoginForm *ui;
+    Ui::LoginForm* ui;
     QString m_username;
     int m_userId = 0;
     QString m_role;
