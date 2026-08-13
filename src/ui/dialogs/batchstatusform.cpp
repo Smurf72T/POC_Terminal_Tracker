@@ -40,13 +40,14 @@ void BatchStatusForm::loadStatuses()
     ui->comboBoxCurrentStatus->addItem("Списан (3)", 3);
     ui->comboBoxCurrentStatus->addItem("Утерян (4)", 4);
 
+    // «В аренде» (1) выставляется только через документ аренды — в массовом
+    // обновлении этот статус недоступен.
     ui->comboBoxNewStatus->clear();
     ui->comboBoxNewStatus->addItem("Свободен (0)", 0);
-    ui->comboBoxNewStatus->addItem("В аренде (1)", 1);
     ui->comboBoxNewStatus->addItem("В ремонте (2)", 2);
     ui->comboBoxNewStatus->addItem("Списан (3)", 3);
     ui->comboBoxNewStatus->addItem("Утерян (4)", 4);
-    ui->comboBoxNewStatus->setCurrentIndex(1);
+    ui->comboBoxNewStatus->setCurrentIndex(0);
 }
 
 void BatchStatusForm::loadTerminals(int currentStatus)
@@ -90,7 +91,20 @@ void BatchStatusForm::on_btnApply_clicked()
     }
 
     int newStatus = ui->comboBoxNewStatus->currentData().toInt();
-    QString statusText = (newStatus == 0) ? "Свободен" : "В аренде";
+
+    // Списание (3) и утеря (4) — административные действия, доступны только админу.
+    if ((newStatus == 3 || newStatus == 4) && !DatabaseManager::instance().isCurrentUserAdmin()) {
+        QMessageBox::warning(this, "Доступ запрещён",
+            "Изменение статуса на «Списан» / «Утерян» доступно только администратору.");
+        return;
+    }
+
+    static const char *const kStatusNames[] = {
+        "Свободен", "В аренде", "В ремонте", "Списан", "Утерян"
+    };
+    QString statusText = (newStatus >= 0 && newStatus <= 4)
+        ? QString::fromUtf8(kStatusNames[newStatus])
+        : QString::fromUtf8("Статус %1").arg(newStatus);
 
     QMessageBox::StandardButton reply = QMessageBox::question(this, "Подтверждение",
         QString("Изменить статус %1 терминалов на «%2»?").arg(selected.size()).arg(statusText),

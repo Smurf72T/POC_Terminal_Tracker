@@ -13,14 +13,15 @@
 #include <QCloseEvent>
 #include <QSqlField>
 #include <QSqlDriver>
-#include <QStyledItemDelegate>
 
-// Делегат для отображения статуса SIM-карты текстом вместо цифр
-class SimStatusDelegate : public QStyledItemDelegate
+// Делегат для отображения статуса SIM-карты текстом вместо цифр.
+// Наследует ReadOnlyDelegate: inline-редактирование статуса запрещено
+// (статус меняется только через документы аренды/возврата).
+class SimStatusDelegate : public ReadOnlyDelegate
 {
 public:
     explicit SimStatusDelegate(QObject *parent = nullptr)
-        : QStyledItemDelegate(parent) {}
+        : ReadOnlyDelegate(parent) {}
 
     QString displayText(const QVariant &value, const QLocale &) const override
     {
