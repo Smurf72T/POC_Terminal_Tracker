@@ -191,13 +191,32 @@ void TerminalsForm::goToPage(int newOffset)
 
 void TerminalsForm::on_btnAdd_clicked()
 {
-    QSqlQuery checkQuery(DatabaseManager::instance().getDatabase());
-    checkQuery.exec("SELECT modelid FROM tblmodels ORDER BY modelid LIMIT 1");
-    if (!checkQuery.next()) {
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
+
+    // Загружаем справочник моделей для выбора (с производителем).
+    QSqlQuery modelQuery(db);
+    modelQuery.prepare("SELECT m.modelid, "
+                       "CASE WHEN mf.manufacturername IS NULL THEN m.modelname "
+                       "     ELSE mf.manufacturername || ' — ' || m.modelname END AS displayname "
+                       "FROM tblmodels m "
+                       "LEFT JOIN tblmanufacturers mf ON m.manufacturerid = mf.manufacturerid "
+                       "ORDER BY mf.manufacturername, m.modelname");
+    if (!modelQuery.exec()) {
+        QMessageBox::critical(this, "Ошибка БД", "Не удалось загрузить модели: " + modelQuery.lastError().text());
+        return;
+    }
+
+    QList<int> modelIds;
+    QStringList modelNames;
+    while (modelQuery.next()) {
+        modelIds.append(modelQuery.value(0).toInt());
+        modelNames.append(modelQuery.value(1).toString());
+    }
+
+    if (modelIds.isEmpty()) {
         QMessageBox::warning(this, "Внимание", "Сначала добавьте модели в справочнике моделей!");
         return;
     }
-    int defaultModelId = checkQuery.value(0).toInt();
 
     bool ok;
     QString serial = QInputDialog::getText(this, "Добавление терминала", "Серийный номер:", QLineEdit::Normal,
@@ -209,6 +228,12 @@ void TerminalsForm::on_btnAdd_clicked()
         QMessageBox::warning(this, "Ошибка", "Серийный номер должен содержать минимум 3 символа.");
         return;
     }
+
+    QString selectedModel = QInputDialog::getItem(this, "Добавление терминала", "Модель терминала:", modelNames, 0,
+                                                  false, &ok);
+    if (!ok)
+        return;
+    int selectedModelId = modelIds.at(modelNames.indexOf(selectedModel));
 
     QString imei =
         QInputDialog::getText(this, "Добавление терминала", "IMEI 1:", QLineEdit::Normal, "000000000000000", &ok);
@@ -224,7 +249,7 @@ void TerminalsForm::on_btnAdd_clicked()
     query.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status) "
                   "VALUES (:serial, :modelid, :imei1, :imei2, 0)");
     query.bindValue(":serial", serial.trimmed());
-    query.bindValue(":modelid", defaultModelId);
+    query.bindValue(":modelid", selectedModelId);
     query.bindValue(":imei1", imei);
     query.bindValue(":imei2", imei2);
 
