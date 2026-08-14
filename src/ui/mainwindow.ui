@@ -332,11 +332,8 @@
      </property>
      <addaction name="actionGlobalSearch"/>
      <addaction name="separator"/>
-     <addaction name="actionTerminalHistory"/>
-    <addaction name="actionFreeDevicesReport"/>
     <addaction name="actionBulkImport"/>
     <addaction name="actionBatchStatus"/>
-    <addaction name="actionReports"/>
      <addaction name="separator"/>
      <addaction name="actionBackup"/>
      <addaction name="actionRestore"/>
@@ -349,11 +346,20 @@
      <addaction name="separator"/>
      <addaction name="actionUserManagement"/>
    </widget>
+   <widget class="QMenu" name="menuReports">
+    <property name="title">
+     <string>Отчёты</string>
+    </property>
+    <addaction name="actionTerminalHistory"/>
+    <addaction name="actionFreeDevicesReport"/>
+    <addaction name="actionReports"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuDictionaries"/>
     <addaction name="menuDocuments"/>
     <addaction name="menuArchives"/>
-    <addaction name="menuService"/>
+     <addaction name="menuService"/>
+   <addaction name="menuReports"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
