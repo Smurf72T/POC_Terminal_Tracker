@@ -23,6 +23,7 @@ private slots:
     void on_btnAdd_clicked();
     void on_btnDelete_clicked();
     void on_btnClose_clicked();
+    void on_tableView_doubleClicked(const QModelIndex& index);
 
 private:
     Ui::TerminalsForm* ui;

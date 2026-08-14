@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>TerminalEditForm</class>
+    <widget class="QDialog" name="TerminalEditForm">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>520</width>
+                <height>480</height>
+            </rect>
+        </property>
+        <property name="windowTitle">
+            <string>Редактирование терминала</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <layout class="QFormLayout" name="formLayout">
+                    <item row="0" column="0">
+                        <widget class="QLabel" name="labelSerial">
+                            <property name="text">
+                                <string>Серийный номер:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="0" column="1">
+                        <widget class="QLineEdit" name="lineEditSerial"/>
+                    </item>
+                    <item row="1" column="0">
+                        <widget class="QLabel" name="labelModel">
+                            <property name="text">
+                                <string>Модель:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="1" column="1">
+                        <widget class="QComboBox" name="comboModel"/>
+                    </item>
+                    <item row="2" column="0">
+                        <widget class="QLabel" name="labelImei1">
+                            <property name="text">
+                                <string>IMEI 1:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="2" column="1">
+                        <widget class="QLineEdit" name="lineEditImei1"/>
+                    </item>
+                    <item row="3" column="0">
+                        <widget class="QLabel" name="labelImei2">
+                            <property name="text">
+                                <string>IMEI 2:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="3" column="1">
+                        <widget class="QLineEdit" name="lineEditImei2"/>
+                    </item>
+                    <item row="4" column="0">
+                        <widget class="QLabel" name="labelStatus">
+                            <property name="text">
+                                <string>Статус:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="4" column="1">
+                        <widget class="QComboBox" name="comboStatus"/>
+                    </item>
+                    <item row="5" column="0">
+                        <widget class="QLabel" name="labelPurchaseDate">
+                            <property name="text">
+                                <string>Дата покупки:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="5" column="1">
+                        <layout class="QHBoxLayout" name="purchaseDateLayout">
+                            <item>
+                                <widget class="QCheckBox" name="checkBoxNoDate">
+                                    <property name="text">
+                                        <string>Без даты</string>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QDateEdit" name="dateEditPurchase">
+                                    <property name="calendarPopup">
+                                        <bool>true</bool>
+                                    </property>
+                                </widget>
+                            </item>
+                        </layout>
+                    </item>
+                    <item row="6" column="0">
+                        <widget class="QLabel" name="labelNotes">
+                            <property name="text">
+                                <string>Примечание:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="6" column="1">
+                        <widget class="QTextEdit" name="textEditNotes">
+                            <property name="maximumSize">
+                                <size>
+                                    <width>16777215</width>
+                                    <height>90</height>
+                                </size>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="7" column="0">
+                        <widget class="QLabel" name="labelRepaired">
+                            <property name="text">
+                                <string>Был в ремонте:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="7" column="1">
+                        <widget class="QCheckBox" name="checkBoxRepaired">
+                            <property name="text">
+                                <string>Да</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="8" column="0">
+                        <widget class="QLabel" name="labelDeactivated">
+                            <property name="text">
+                                <string>Деактивирован:</string>
+                            </property>
+                        </widget>
+                    </item>
+                    <item row="8" column="1">
+                        <widget class="QCheckBox" name="checkBoxDeactivated">
+                            <property name="text">
+                                <string>Да</string>
+                            </property>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="horizontalLayout">
+                    <item>
+                        <widget class="QPushButton" name="btnSave">
+                            <property name="text">
+                                <string>Сохранить</string>
+                            </property>
+                            <property name="default">
+                                <bool>true</bool>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QPushButton" name="btnCancel">
+                            <property name="text">
+                                <string>Отмена</string>
+                            </property>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+        </layout>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

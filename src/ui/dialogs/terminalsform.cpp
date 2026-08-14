@@ -1,4 +1,5 @@
 #include "terminalsform.h"
+#include "terminaleditform.h"
 #include "ui_terminalsform.h"
 #include "database/databasemanager.h"
 #include "utils/terminal_status.h"
@@ -320,4 +321,18 @@ void TerminalsForm::on_btnDelete_clicked()
 void TerminalsForm::on_btnClose_clicked()
 {
     close();
+}
+
+void TerminalsForm::on_tableView_doubleClicked(const QModelIndex& index)
+{
+    if (!index.isValid())
+        return;
+
+    int id = model->data(model->index(index.row(), 0)).toInt();
+    if (id <= 0)
+        return;
+
+    TerminalEditForm dialog(id, this);
+    if (dialog.exec() == QDialog::Accepted)
+        loadModel(ui->lineEditSearch->text());
 }

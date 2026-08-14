@@ -69,6 +69,7 @@ set(SOURCES
         src/ui/dialogs/clientsform.cpp
         src/ui/dialogs/simcardsform.cpp
         src/ui/dialogs/terminalsform.cpp
+        src/ui/dialogs/terminaleditform.cpp
         resources.qrc
         src/ui/dialogs/receiptform.cpp
         src/ui/dialogs/rentalform.cpp
@@ -125,6 +126,7 @@ set(HEADERS
         src/ui/dialogs/clientsform.h
         src/ui/dialogs/simcardsform.h
         src/ui/dialogs/terminalsform.h
+        src/ui/dialogs/terminaleditform.h
         src/ui/delegates/readonlydelegate.h
         src/ui/dialogs/receiptform.h
         src/ui/delegates/comboboxdelegate.h
@@ -168,6 +170,7 @@ set(UI_FILES
         src/ui/dialogs/clientsform.ui
         src/ui/dialogs/simcardsform.ui
         src/ui/dialogs/terminalsform.ui
+        src/ui/dialogs/terminaleditform.ui
         src/ui/dialogs/receiptform.ui
         src/ui/dialogs/rentalform.ui
         src/ui/dialogs/returnform.ui

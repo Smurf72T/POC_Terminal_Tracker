@@ -1,6 +1,7 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include <QDate>
 #include <QString>
 
 // Value-модель POC-терминала (tblterminals). Не содержит логики доступа к БД;
@@ -17,6 +18,9 @@ struct Terminal {
     int status = 0;
     bool deactivated = false;
     int currentSimCardId = 0;
+    QDate purchaseDate;
+    QString notes;
+    bool wasRepaired = false;
 };
 
 } // namespace models

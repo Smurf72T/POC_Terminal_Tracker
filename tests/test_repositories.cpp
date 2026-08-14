@@ -25,6 +25,7 @@ private slots:
     void paymentQueries();
     void populateMethodsFillModels();
     void terminalLoadMethods();
+    void terminalUpdateMethod();
     void simCardLoadMethods();
     void clientLoadMethods();
     void documentModelMethods();
@@ -62,7 +63,8 @@ void TestRepositories::initTestCase()
            "createdat TEXT)");
     q.exec("CREATE TABLE tblterminals (terminalid INTEGER PRIMARY KEY, serialnumber TEXT, status INTEGER, "
            "modelid INTEGER, currentsimcardid INTEGER, imei1 TEXT, imei2 TEXT, "
-           "is_deactivated INTEGER NOT NULL DEFAULT 0)");
+           "is_deactivated INTEGER NOT NULL DEFAULT 0, purchasedate TEXT, notes TEXT, "
+           "was_repaired INTEGER NOT NULL DEFAULT 0)");
     q.exec("CREATE TABLE tblclients (clientid INTEGER PRIMARY KEY, clientname TEXT, inn TEXT, address TEXT, "
            "contactphone TEXT, contactemail TEXT)");
     q.exec("CREATE TABLE tblrentaldocs (rentaldocid INTEGER PRIMARY KEY, clientid INTEGER, docnumber TEXT, "
@@ -441,6 +443,49 @@ void TestRepositories::terminalLoadMethods()
     QVERIFY(ids.contains(4));
     QVERIFY(ids.contains(10));
     QVERIFY(!ids.contains(11));
+}
+
+void TestRepositories::terminalUpdateMethod()
+{
+    insertTerminalFull(20, "SN-EDIT-1", 0, 2, 0, "333333333333333", QString(), 0);
+
+    TerminalRepository repo(m_db);
+    TerminalUpdate data;
+    data.serialNumber = "SN-EDIT-1-RENAMED";
+    data.modelId = 1;
+    data.imei1 = "444444444444444";
+    data.imei2 = "555555555555555";
+    data.status = 2;
+    data.purchaseDate = QDate(2026, 8, 1);
+    data.notes = "обновлено из формы";
+    data.wasRepaired = true;
+    data.deactivated = true;
+
+    QVERIFY(repo.update(20, data));
+
+    const models::Terminal t = repo.loadById(20);
+    QCOMPARE(t.serialNumber, QString("SN-EDIT-1-RENAMED"));
+    QCOMPARE(t.modelId, 1);
+    QCOMPARE(t.imei1, QString("444444444444444"));
+    QCOMPARE(t.imei2, QString("555555555555555"));
+    QCOMPARE(t.status, 2);
+    QCOMPARE(t.purchaseDate, QDate(2026, 8, 1));
+    QCOMPARE(t.notes, QString("обновлено из формы"));
+    QVERIFY(t.wasRepaired);
+    QVERIFY(t.deactivated);
+
+    // Очистка даты покупки — invalid-дата записывается как NULL.
+    TerminalUpdate clearDate;
+    clearDate.serialNumber = t.serialNumber;
+    clearDate.modelId = t.modelId;
+    clearDate.imei1 = t.imei1;
+    clearDate.imei2 = t.imei2;
+    clearDate.status = t.status;
+    clearDate.notes = t.notes;
+    clearDate.wasRepaired = t.wasRepaired;
+    clearDate.deactivated = t.deactivated;
+    QVERIFY(repo.update(20, clearDate));
+    QVERIFY(!repo.loadById(20).purchaseDate.isValid());
 }
 
 void TestRepositories::simCardLoadMethods()

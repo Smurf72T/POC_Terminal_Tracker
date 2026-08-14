@@ -13,6 +13,19 @@
 
 #include "models/terminal.h"
 
+// Данные для редактирования терминала (UPDATE tblterminals).
+struct TerminalUpdate {
+    QString serialNumber;
+    int modelId = 0;
+    QString imei1;
+    QString imei2;
+    int status = 0;
+    QDate purchaseDate;      // invalid — записать NULL
+    QString notes;
+    bool wasRepaired = false;
+    bool deactivated = false;
+};
+
 // Доступ к данным таблицы tblterminals без SQL в UI-слое.
 // Методы с префиксом `load` возвращают готовые структуры данных,
 // методы с префиксом `populate` заполняют переданную модель.
@@ -48,11 +61,16 @@ public:
     // Терминалы для выбора в аренду: свободные и не деактивированные.
     QVector<models::Terminal> loadFreeForSelection() const;
 
+    // Сохраняет изменения существующего терминала. true при успехе.
+    bool update(int terminalId, const TerminalUpdate& data) const;
+
     // Заполняет модель колонками [serialnumber, modelname, simstatus].
     void populateFreeTerminals(QSqlQueryModel* model) const;
 
 private:
     QSqlQuery makeQuery() const;
+    // Собирает models::Terminal из текущей строки запроса (общий формат SELECT).
+    models::Terminal makeTerminal(const QSqlQuery& query, int startColumn) const;
 
     QSqlDatabase m_db;
 };

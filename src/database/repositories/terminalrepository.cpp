@@ -83,7 +83,8 @@ models::Terminal TerminalRepository::loadById(int terminalId) const
 {
     QSqlQuery query = makeQuery();
     query.prepare("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
-                  "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid "
+                  "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
+                  "t.purchasedate, t.notes, t.was_repaired "
                   "FROM tblterminals t "
                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                   "WHERE t.terminalid = :id");
@@ -100,6 +101,27 @@ models::Terminal TerminalRepository::loadById(int terminalId) const
     t.status = query.value(6).toInt();
     t.deactivated = query.value(7).toBool();
     t.currentSimCardId = query.value(8).toInt();
+    t.purchaseDate = query.value(9).toDate();
+    t.notes = query.value(10).toString();
+    t.wasRepaired = query.value(11).toBool();
+    return t;
+}
+
+models::Terminal TerminalRepository::makeTerminal(const QSqlQuery& query, int startColumn) const
+{
+    models::Terminal t;
+    t.id = query.value(startColumn + 0).toInt();
+    t.serialNumber = query.value(startColumn + 1).toString();
+    t.modelId = query.value(startColumn + 2).toInt();
+    t.modelName = query.value(startColumn + 3).toString();
+    t.imei1 = query.value(startColumn + 4).toString();
+    t.imei2 = query.value(startColumn + 5).toString();
+    t.status = query.value(startColumn + 6).toInt();
+    t.deactivated = query.value(startColumn + 7).toBool();
+    t.currentSimCardId = query.value(startColumn + 8).toInt();
+    t.purchaseDate = query.value(startColumn + 9).toDate();
+    t.notes = query.value(startColumn + 10).toString();
+    t.wasRepaired = query.value(startColumn + 11).toBool();
     return t;
 }
 
@@ -116,7 +138,8 @@ QVector<models::Terminal> TerminalRepository::loadByIds(const QList<int>& ids) c
     }
     QSqlQuery query = makeQuery();
     query.prepare(QString("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
-                          "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid "
+                          "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
+                          "t.purchasedate, t.notes, t.was_repaired "
                           "FROM tblterminals t "
                           "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                           "WHERE t.terminalid IN (%1) ")
@@ -128,16 +151,7 @@ QVector<models::Terminal> TerminalRepository::loadByIds(const QList<int>& ids) c
 
     QHash<int, models::Terminal> byId;
     while (query.next()) {
-        models::Terminal t;
-        t.id = query.value(0).toInt();
-        t.serialNumber = query.value(1).toString();
-        t.modelId = query.value(2).toInt();
-        t.modelName = query.value(3).toString();
-        t.imei1 = query.value(4).toString();
-        t.imei2 = query.value(5).toString();
-        t.status = query.value(6).toInt();
-        t.deactivated = query.value(7).toBool();
-        t.currentSimCardId = query.value(8).toInt();
+        models::Terminal t = makeTerminal(query, 0);
         byId.insert(t.id, t);
     }
     for (int id : ids) {
@@ -152,26 +166,45 @@ QVector<models::Terminal> TerminalRepository::loadFreeForSelection() const
     QVector<models::Terminal> result;
     QSqlQuery query = makeQuery();
     if (query.exec("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
-                   "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid "
+                   "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
+                   "t.purchasedate, t.notes, t.was_repaired "
                    "FROM tblterminals t "
                    "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                    "WHERE t.status = 0 AND t.is_deactivated = FALSE "
                    "ORDER BY t.serialnumber")) {
-        while (query.next()) {
-            models::Terminal t;
-            t.id = query.value(0).toInt();
-            t.serialNumber = query.value(1).toString();
-            t.modelId = query.value(2).toInt();
-            t.modelName = query.value(3).toString();
-            t.imei1 = query.value(4).toString();
-            t.imei2 = query.value(5).toString();
-            t.status = query.value(6).toInt();
-            t.deactivated = query.value(7).toBool();
-            t.currentSimCardId = query.value(8).toInt();
-            result.append(t);
-        }
+        while (query.next())
+            result.append(makeTerminal(query, 0));
     }
     return result;
+}
+
+bool TerminalRepository::update(int terminalId, const TerminalUpdate& data) const
+{
+    QSqlQuery query = makeQuery();
+    if (data.purchaseDate.isValid()) {
+        query.prepare("UPDATE tblterminals SET serialnumber = :sn, modelid = :mid, "
+                      "imei1 = :imei1, imei2 = :imei2, status = :status, "
+                      "purchasedate = :pdate, notes = :notes, "
+                      "was_repaired = :repaired, is_deactivated = :deactivated "
+                      "WHERE terminalid = :id");
+        query.bindValue(":pdate", data.purchaseDate);
+    } else {
+        query.prepare("UPDATE tblterminals SET serialnumber = :sn, modelid = :mid, "
+                      "imei1 = :imei1, imei2 = :imei2, status = :status, "
+                      "purchasedate = NULL, notes = :notes, "
+                      "was_repaired = :repaired, is_deactivated = :deactivated "
+                      "WHERE terminalid = :id");
+    }
+    query.bindValue(":sn", data.serialNumber.trimmed());
+    query.bindValue(":mid", data.modelId);
+    query.bindValue(":imei1", data.imei1);
+    query.bindValue(":imei2", data.imei2);
+    query.bindValue(":status", data.status);
+    query.bindValue(":notes", data.notes);
+    query.bindValue(":repaired", data.wasRepaired);
+    query.bindValue(":deactivated", data.deactivated);
+    query.bindValue(":id", terminalId);
+    return query.exec();
 }
 
 void TerminalRepository::populateFreeTerminals(QSqlQueryModel* model) const
