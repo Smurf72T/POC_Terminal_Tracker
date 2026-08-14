@@ -6,6 +6,7 @@
 #include <QList>
 #include <QPair>
 #include <QMap>
+#include <QTimer>
 
 class ComboBoxDelegate : public QStyledItemDelegate {
     Q_OBJECT
@@ -28,6 +29,10 @@ public:
         if (m_editable) {
             editor->setEditable(true);
             editor->setInsertPolicy(QComboBox::NoInsert);
+            // Сразу раскрываем список при открытии редактора (например,
+            // «SIM-карта» в аренде) — иначе пользователь не видит свободные
+            // значения, пока не кликнет по стрелке.
+            QTimer::singleShot(0, editor, &QComboBox::showPopup);
         }
         return editor;
     }

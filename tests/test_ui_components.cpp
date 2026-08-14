@@ -1,6 +1,7 @@
 #include <QtTest>
 #include <QStandardItemModel>
 #include <QComboBox>
+#include <QAbstractItemView>
 #include <QMouseEvent>
 
 #include "ui/delegates/CheckBoxDelegate.h"
@@ -20,6 +21,7 @@ private slots:
     void checkboxDelegateSizeHint();
     void editableComboboxWritesNewTextAsZeroId();
     void editableComboboxResolvesTextToExistingItem();
+    void editableComboboxAutoShowsPopup();
 };
 
 void TestUiComponents::checkboxDelegateTogglesOnClick()
@@ -171,6 +173,29 @@ void TestUiComponents::editableComboboxResolvesTextToExistingItem()
     delegate.setModelData(&editor, &model, index);
     QCOMPARE(model.data(index, Qt::UserRole).toInt(), 2);
     QCOMPARE(model.data(index, Qt::DisplayRole).toString(), QString("Списан"));
+}
+
+void TestUiComponents::editableComboboxAutoShowsPopup()
+{
+    QList<QPair<int, QString>> items = {{30, "897019925051015676W"}, {32, "897019925051015675W"}};
+    ComboBoxDelegate delegate(items, nullptr, true);
+
+    QWidget parent;
+    parent.resize(200, 50);
+    parent.show();
+
+    QStyleOptionViewItem option;
+    QStandardItemModel model;
+    QWidget* editorWidget = delegate.createEditor(&parent, option, model.index(0, 0));
+    QVERIFY(editorWidget != nullptr);
+    QComboBox* editor = qobject_cast<QComboBox*>(editorWidget);
+    QVERIFY(editor != nullptr);
+    QVERIFY(editor->isEditable());
+
+    editor->show();
+    QTest::qWait(200);
+    QVERIFY(editor->view()->isVisible());
+    delete editorWidget;
 }
 
 QTEST_MAIN(TestUiComponents)
