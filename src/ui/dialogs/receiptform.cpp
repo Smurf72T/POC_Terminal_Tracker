@@ -4,6 +4,9 @@
 #include "database/databasemanager.h"
 #include "database/repositories/documentrepository.h"
 #include "utils/validator.h"
+#include "utils/barcodeparser.h"
+#include "utils/barcodescanner.h"
+#include <QApplication>
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -11,6 +14,10 @@
 #include <QTime>
 #include <QDebug>
 #include <QKeyEvent>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QTextEdit>
+#include <QPlainTextEdit>
 #include "utils/logging.h"
 #include <QPrinter>
 #include <QPrintDialog>
@@ -40,10 +47,16 @@ ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptF
 
     // F9 для дублирования строки
     ui->tableView->installEventFilter(this);
+
+    // Сканер штрих-кода: перехват ввода по всей форме, заполнение табличной части.
+    m_scanner = new BarcodeScanner(this);
+    connect(m_scanner, &BarcodeScanner::scanFinished, this, &ReceiptForm::onScanFinished);
+    qApp->installEventFilter(this);
 }
 
 ReceiptForm::~ReceiptForm()
 {
+    qApp->removeEventFilter(this);
     delete ui;
 }
 
@@ -419,6 +432,59 @@ void ReceiptForm::on_btnClose_clicked()
     close();
 }
 
+bool ReceiptForm::canAcceptScan() const
+{
+    if (!isActiveWindow())
+        return false;
+    QWidget* focus = QApplication::focusWidget();
+    if (!focus)
+        return true;
+    // Не перехватываем ввод в текстовых редакторах (в т.ч. редакторе ячейки),
+    // комбобоксах и поле ввода комментария.
+    if (qobject_cast<QLineEdit*>(focus) || qobject_cast<QTextEdit*>(focus) ||
+        qobject_cast<QPlainTextEdit*>(focus) || qobject_cast<QComboBox*>(focus))
+        return false;
+    return focus->window() == window();
+}
+
+void ReceiptForm::onScanFinished(const QString& raw)
+{
+    const BarcodeScan data = BarcodeParser::parse(raw);
+    if (!data.hasData())
+        return;
+
+    // Целевая строка: текущая, если у неё ещё нет серийного номера; иначе — новая.
+    int row = -1;
+    const QModelIndex cur = ui->tableView->currentIndex();
+    if (cur.isValid()) {
+        const int r = cur.row();
+        if (rowsModel->data(rowsModel->index(r, 0)).toString().isEmpty())
+            row = r;
+    }
+
+    if (row < 0) {
+        row = rowsModel->rowCount();
+        rowsModel->insertRow(row);
+        // Колонка «Модель»: дефолт — первая из справочника (остаётся ручным выбором).
+        const int defaultModelId = m_models.isEmpty() ? 0 : m_models.first().first;
+        const QString defaultModelName = m_models.isEmpty() ? QString() : m_models.first().second;
+        QStandardItem* modelItem = new QStandardItem();
+        modelItem->setText(defaultModelName);
+        modelItem->setData(defaultModelId, Qt::UserRole);
+        rowsModel->setItem(row, 1, modelItem);
+    }
+
+    if (!data.serial.isEmpty())
+        rowsModel->setItem(row, 0, new QStandardItem(data.serial));
+    if (!data.imei1.isEmpty())
+        rowsModel->setItem(row, 2, new QStandardItem(data.imei1));
+    if (!data.imei2.isEmpty())
+        rowsModel->setItem(row, 3, new QStandardItem(data.imei2));
+
+    ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
+    ui->tableView->setFocus();
+}
+
 bool ReceiptForm::eventFilter(QObject* obj, QEvent* event)
 {
     if (obj == ui->tableView && event->type() == QEvent::KeyPress) {
@@ -439,6 +505,34 @@ bool ReceiptForm::eventFilter(QObject* obj, QEvent* event)
 
             ui->tableView->setCurrentIndex(rowsModel->index(newRow, 0));
             return true;
+        }
+    }
+
+    // Сканер штрих-кода: обрабатываем нажатия только если форма активна
+    // и фокус не «сидит» в текстовом поле.
+    if (m_scanner && event->type() == QEvent::KeyPress && canAcceptScan()) {
+        QKeyEvent* key = static_cast<QKeyEvent*>(event);
+        const int k = key->key();
+        if (k == Qt::Key_Return || k == Qt::Key_Enter || k == Qt::Key_Tab) {
+            if (m_scanner->feedTerminator())
+                return true; // терминатор сканера — не нажимаем кнопку/не уводим фокус
+        } else {
+            const QString text = key->text();
+            // Символы штрих-кода — ASCII (до 0xFF). Кириллицу ручного ввода не трогаем.
+            if (!text.isEmpty()) {
+                bool isAscii = true;
+                for (QChar ch : text) {
+                    if (ch.unicode() > 0xFF) {
+                        isAscii = false;
+                        break;
+                    }
+                }
+                if (isAscii) {
+                    m_scanner->feed(text);
+                    if (m_scanner->isActive())
+                        return true; // поглощаем нажатия активного буста
+                }
+            }
         }
     }
     return QDialog::eventFilter(obj, event);

@@ -5,6 +5,8 @@
 #include <QStandardItemModel>
 #include <QPair>
 
+class BarcodeScanner;
+
 namespace Ui {
 class ReceiptForm;
 }
@@ -23,6 +25,7 @@ private slots:
     void on_btnPost_clicked(); // Кнопка "Провести"
     void on_btnPrint_clicked();
     void on_btnClose_clicked();
+    void onScanFinished(const QString& raw);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
@@ -32,8 +35,11 @@ private:
     QStandardItemModel* rowsModel;
 
     void loadModelsToDelegate();
+    // Можно ли принять скан: форма активна, фокус не в текстовом редакторе.
+    bool canAcceptScan() const;
 
     QList<QPair<int, QString>> m_models;
+    BarcodeScanner* m_scanner = nullptr;
     bool m_editMode = false;
     int m_editDocId = 0;
 };
