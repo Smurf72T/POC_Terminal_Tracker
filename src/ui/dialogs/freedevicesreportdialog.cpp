@@ -81,7 +81,7 @@ void FreeDevicesReportDialog::exportTerminals()
     QString filePath = QFileDialog::getSaveFileName(this, "Экспорт свободных терминалов", "free_terminals.xlsx",
                                                     "Excel (*.xlsx);;Все файлы (*)");
     if (!filePath.isEmpty()) {
-        if (ReportExporter::exportModelToExcel(model, "Свободные терминалы", filePath))
+        if (ReportExporter::exportModelToExcel(model, "Свободные терминалы", filePath, this))
             QMessageBox::information(this, "Успех", "Терминалы экспортированы.");
     }
 }
@@ -94,7 +94,7 @@ void FreeDevicesReportDialog::exportSimCards()
     QString filePath = QFileDialog::getSaveFileName(this, "Экспорт свободных SIM", "free_simcards.xlsx",
                                                     "Excel (*.xlsx);;Все файлы (*)");
     if (!filePath.isEmpty()) {
-        if (ReportExporter::exportModelToExcel(model, "Свободные SIM-карты", filePath))
+        if (ReportExporter::exportModelToExcel(model, "Свободные SIM-карты", filePath, this))
             QMessageBox::information(this, "Успех", "SIM-карты экспортированы.");
     }
 }

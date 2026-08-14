@@ -83,7 +83,7 @@ void ClientRentalReportDialog::exportReport()
         this, "Экспорт отчёта", QString("terminals_%1.xlsx").arg(m_clientName.simplified().replace(' ', '_')),
         "Excel (*.xlsx);;Все файлы (*)");
     if (!filePath.isEmpty()) {
-        if (ReportExporter::exportModelToExcel(m_model, m_clientName, filePath))
+        if (ReportExporter::exportModelToExcel(m_model, m_clientName, filePath, this))
             QMessageBox::information(this, "Успех", "Отчёт экспортирован.");
     }
 }

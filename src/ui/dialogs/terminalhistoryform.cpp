@@ -183,7 +183,7 @@ void TerminalHistoryForm::on_btnExportExcel_clicked()
     if (filePath.isEmpty())
         return;
 
-    if (ReportExporter::exportModelToExcel(currentModel, tabTitle, filePath)) {
+    if (ReportExporter::exportModelToExcel(currentModel, tabTitle, filePath, this)) {
         QMessageBox::information(this, "Успех", QString("Данные экспортированы в:\n%1").arg(filePath));
     }
 }

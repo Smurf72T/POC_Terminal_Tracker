@@ -21,7 +21,10 @@ bool ReportExporter::exportModelToExcel(QSqlQueryModel* model, const QString& ti
                                         QWidget* parent)
 {
     if (!model || model->rowCount() == 0) {
-        QMessageBox::warning(parent, "Экспорт", "Нет данных для экспорта!");
+        // Модальное окно с parent==nullptr заблокирует процесс в headless-среде
+        // (CI): показываем предупреждение только когда есть родитель (UI-вызов).
+        if (parent)
+            QMessageBox::warning(parent, "Экспорт", "Нет данных для экспорта!");
         return false;
     }
 

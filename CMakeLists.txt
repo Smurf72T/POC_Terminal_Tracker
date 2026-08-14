@@ -366,6 +366,7 @@ if(BUILD_TESTS)
     target_link_libraries(test_reportexporter PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets
             Qt6::Sql Qt6::PrintSupport QXlsx::QXlsx)
     add_test(NAME test_reportexporter COMMAND test_reportexporter)
+    set_tests_properties(test_reportexporter PROPERTIES TIMEOUT 60)
 
     add_executable(test_repositories tests/test_repositories.cpp
             src/database/repositories/terminalrepository.cpp
