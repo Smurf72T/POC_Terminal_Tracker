@@ -95,6 +95,8 @@ set(SOURCES
         src/utils/registration_ratelimiter.cpp
         src/utils/logging.cpp
         src/utils/circuitbreaker.cpp
+        src/utils/barcodeparser.cpp
+        src/utils/barcodescanner.cpp
         src/ops/backupmanager.cpp
         src/ops/backupworker.cpp
         src/ops/opslog.cpp
@@ -156,6 +158,8 @@ set(HEADERS
         src/utils/registration_ratelimiter.h
         src/utils/logging.h
         src/utils/circuitbreaker.h
+        src/utils/barcodeparser.h
+        src/utils/barcodescanner.h
         src/utils/password_utils.h
         src/ops/backupmanager.h
         src/ops/backupworker.h
@@ -291,6 +295,16 @@ if(BUILD_TESTS)
     target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(test_update_utils PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_update_utils COMMAND test_update_utils)
+
+    add_executable(test_barcodeparser tests/test_barcodeparser.cpp src/utils/barcodeparser.cpp)
+    target_include_directories(test_barcodeparser PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_barcodeparser PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME test_barcodeparser COMMAND test_barcodeparser)
+
+    add_executable(test_barcodescanner tests/test_barcodescanner.cpp src/utils/barcodescanner.cpp)
+    target_include_directories(test_barcodescanner PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_link_libraries(test_barcodescanner PRIVATE Qt6::Test Qt6::Core)
+    add_test(NAME test_barcodescanner COMMAND test_barcodescanner)
 
     add_executable(test_updatemanager tests/test_updatemanager.cpp
             src/update/updatemanager.cpp
