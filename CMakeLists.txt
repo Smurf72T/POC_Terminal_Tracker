@@ -89,6 +89,7 @@ set(SOURCES
         src/ui/dialogs/terminalhistorypickerdialog.cpp
         src/ui/dialogs/freedevicesreportdialog.cpp
         src/ui/dialogs/clientrentalreportdialog.cpp
+        src/ui/dialogs/updatesettingsdialog.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
         src/utils/registration_ratelimiter.cpp
@@ -149,6 +150,7 @@ set(HEADERS
         src/ui/dialogs/terminalhistorypickerdialog.h
         src/ui/dialogs/freedevicesreportdialog.h
         src/ui/dialogs/clientrentalreportdialog.h
+        src/ui/dialogs/updatesettingsdialog.h
         src/utils/reportexporter.h
         src/utils/validator.h
         src/utils/registration_ratelimiter.h

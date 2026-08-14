@@ -10,11 +10,10 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
-#include <QFileInfo>
 #include <QLabel>
 #include <QMessageBox>
-#include <QPushButton>
 #include <QStatusBar>
+#include <QTimer>
 #include <QUrl>
 #include <QWidget>
 #include <memory>
@@ -63,24 +62,21 @@ void MaintenancePanel::setupScheduler(const QJsonObject& opsConfig)
 void MaintenancePanel::setupUpdater(const QJsonObject& opsConfig)
 {
     m_updater = new UpdateManager(opsConfig, this);
+    // Авторежим: при нахождении новой версии сами скачиваем и устанавливаем её.
+    // Ручной режим (переключатель выключен) полностью обслуживает окно
+    // UpdateSettingsDialog — здесь эти сигналы игнорируются.
     connect(m_updater, &UpdateManager::updateAvailable, this,
-            [this](const QString& version, const QString& notes, const QString& url) {
-                QString text =
-                    QString("Доступна новая версия %1\nТекущая версия: %2").arg(version, m_updater->currentVersion());
-                if (!notes.isEmpty())
-                    text += "\n\nЧто нового:\n" + notes;
-                QMessageBox box(m_parentWidget);
-                box.setWindowTitle("Обновление");
-                box.setText(text);
-                QPushButton* downloadBtn = box.addButton("Скачать", QMessageBox::AcceptRole);
-                QPushButton* laterBtn = box.addButton("Позже", QMessageBox::RejectRole);
-                box.setDefaultButton(laterBtn);
-                box.exec();
-                if (box.clickedButton() == downloadBtn && !url.isEmpty())
-                    m_updater->downloadUpdate(url);
+            [this](const QString& version, const QString& /*notes*/, const QString& url) {
+                if (!m_updater->autoUpdateEnabled() || url.isEmpty())
+                    return;
+                m_statusBar->showMessage(QString("Доступна новая версия %1 — скачиваю автоматически...").arg(version),
+                                         5000);
+                m_updater->downloadUpdate(url);
             });
     connect(m_updater, &UpdateManager::noUpdateAvailable, this, [this]() {
-        m_statusBar->showMessage(QString("Обновлений нет (версия %1)").arg(m_updater->currentVersion()), 8000);
+        if (m_updater->autoUpdateEnabled())
+            m_statusBar->showMessage(QString("Обновлений нет (версия %1 актуальна)").arg(m_updater->currentVersion()),
+                                     8000);
     });
     connect(m_updater, &UpdateManager::checkFailed, this, [this](const QString& error) {
         if (m_updater->isEnabled())
@@ -88,20 +84,28 @@ void MaintenancePanel::setupUpdater(const QJsonObject& opsConfig)
         qCWarning(logApp) << error;
     });
     connect(m_updater, &UpdateManager::downloadProgress, this, [this](qint64 received, qint64 total) {
+        if (!m_updater->autoUpdateEnabled())
+            return;
         if (total > 0)
             m_statusBar->showMessage(
                 QString("Скачивание обновления: %1 / %2 КБ").arg(received / 1024).arg(total / 1024));
         else
             m_statusBar->showMessage(QString("Скачивание обновления: %1 КБ").arg(received / 1024));
     });
-    connect(m_updater, &UpdateManager::downloadFinished, this, [this](const QString& filePath) {
-        QMessageBox::information(m_parentWidget, "Скачивание завершено",
-                                 "Обновление скачано:\n" + filePath +
-                                     "\n\nРаспакуйте архив и замените файлы приложения.");
-        QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(filePath).absolutePath()));
+    connect(m_updater, &UpdateManager::downloadFinished, this, [this](const QString& /*filePath*/) {
+        if (!m_updater->autoUpdateEnabled())
+            return;
+        m_updater->applyUpdate();
     });
-    connect(m_updater, &UpdateManager::downloadFailed, this,
-            [this](const QString& error) { QMessageBox::warning(m_parentWidget, "Скачивание обновления", error); });
+    connect(m_updater, &UpdateManager::updateInstallScheduled, this, [this]() {
+        QMessageBox::information(m_parentWidget, "Обновление",
+                                 "Новая версия скачана и будет установлена.\nПриложение будет перезапущено.");
+        QTimer::singleShot(500, qApp, &QCoreApplication::quit);
+    });
+    connect(m_updater, &UpdateManager::downloadFailed, this, [this](const QString& error) {
+        if (m_updater->autoUpdateEnabled())
+            QMessageBox::warning(m_parentWidget, "Скачивание обновления", error);
+    });
 }
 
 void MaintenancePanel::start()
@@ -143,18 +147,4 @@ void MaintenancePanel::openOpsLog()
         return;
     }
     QDesktopServices::openUrl(QUrl::fromLocalFile(path));
-}
-
-void MaintenancePanel::checkUpdates()
-{
-    if (!m_updater)
-        return;
-    if (!m_updater->isEnabled()) {
-        QMessageBox::information(m_parentWidget, "Проверка обновлений",
-                                 "Автообновление не настроено.\n"
-                                 "Укажите update.url в config/config.json.");
-        return;
-    }
-    m_statusBar->showMessage("Проверка обновлений...", 5000);
-    m_updater->checkForUpdates();
 }

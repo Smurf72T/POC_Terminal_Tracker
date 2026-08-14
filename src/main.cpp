@@ -282,7 +282,10 @@ int main(int argc, char* argv[])
     int rc = 0;
     {
         MainWindow w;
-        w.setWindowTitle(QString("POC Terminal Tracker — %1").arg(loginDialog.getUsername()));
+        QString version = readAppVersion(appConfigPath());
+        w.setWindowTitle(QString("POC Terminal Tracker — %1%2")
+                             .arg(loginDialog.getUsername())
+                             .arg(version.isEmpty() ? QString() : " (v" + version + ")"));
         w.show();
         rc = a.exec();
     }

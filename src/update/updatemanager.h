@@ -20,6 +20,15 @@ public:
     QString currentVersion() const;
     QString updateUrl() const;
 
+    // Переключатель автообновления (пользовательская настройка, QSettings).
+    // Включено: при запуске программа сама проверяет, скачивает и устанавливает
+    // новую версию. Выключено: обновление только по кнопке в окне настроек.
+    bool autoUpdateEnabled() const;
+    void setAutoUpdateEnabled(bool enabled);
+
+    // Путь, куда UpdateManager скачивает обновление: <каталог приложения>/update/.
+    static QString updateFilePath();
+
     void start();
 
     // Допустим только HTTPS; http разрешён лишь для localhost (локальная отладка).
@@ -28,6 +37,8 @@ public:
 public slots:
     void checkForUpdates();
     void downloadUpdate(const QString& url);
+    // Запускает установку скачанного обновления (самозамена exe после выхода).
+    void applyUpdate();
 
 signals:
     void checkStarted();
@@ -38,6 +49,8 @@ signals:
     void downloadProgress(qint64 bytesReceived, qint64 bytesTotal);
     void downloadFinished(const QString& filePath);
     void downloadFailed(const QString& error);
+    // Обновление скачано и передано на установку — приложение можно закрывать.
+    void updateInstallScheduled();
 
 private:
     void handleManifest(QNetworkReply* reply);
@@ -48,6 +61,7 @@ private:
     QNetworkAccessManager m_nam;
     QString m_url;
     bool m_checkOnStartup = true;
+    bool m_autoUpdate = false;
     QString m_currentVersion = "1.0.0";
     QString m_pinnedSha256;
     QString m_expectedSha256;

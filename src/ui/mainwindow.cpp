@@ -27,6 +27,7 @@
 #include "dialogs/terminalhistorypickerdialog.h"
 #include "dialogs/freedevicesreportdialog.h"
 #include "dialogs/clientrentalreportdialog.h"
+#include "dialogs/updatesettingsdialog.h"
 #include "ops/opslog.h"
 #include "utils/logging.h"
 
@@ -157,8 +158,10 @@ void MainWindow::setupUI()
 
 void MainWindow::updateStatusBar()
 {
-    QString statusText = QString("Подключено к БД: ") + (DatabaseManager::instance().isConnected() ? "Да" : "Нет") +
-                         " | " + QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
+    QString version = DatabaseManager::instance().configObject()["application"].toObject()["version"].toString("1.0.0");
+    QString statusText = QString("Версия %1 | Подключено к БД: ").arg(version) +
+                         (DatabaseManager::instance().isConnected() ? "Да" : "Нет") + " | " +
+                         QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
     statusBar()->showMessage(statusText);
 }
 
@@ -301,7 +304,10 @@ void MainWindow::onActionOpsLog_triggered()
 
 void MainWindow::onActionCheckUpdates_triggered()
 {
-    m_maintenance->checkUpdates();
+    if (!m_maintenance->updater())
+        return;
+    UpdateSettingsDialog dialog(m_maintenance->updater(), this);
+    dialog.exec();
 }
 
 void MainWindow::onActionAuditLog_triggered()

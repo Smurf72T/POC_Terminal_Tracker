@@ -27,10 +27,12 @@ public:
     void resetBackupSchedule();
     void resetIntegritySchedule();
 
+    // Доступ к менеджеру обновлений для окна настроек обновлений.
+    UpdateManager* updater() const { return m_updater; }
+
 public slots:
     void runIntegrityCheck();
     void openOpsLog();
-    void checkUpdates();
 
 signals:
     void integrityCheckFinished(const QString& summary);

@@ -4,6 +4,7 @@
 #include "update/version.h"
 
 #include <QCryptographicHash>
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -12,9 +13,11 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QProcess>
 #include <QSslCertificate>
 #include <QSslConfiguration>
 #include <QSslKey>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
@@ -33,6 +36,9 @@ UpdateManager::UpdateManager(const QJsonObject& config, QObject* parent) : QObje
     m_timeoutMs = update["timeout_ms"].toInt(30000);
     if (m_timeoutMs <= 0)
         m_timeoutMs = 30000;
+
+    // Пользовательский переключатель автообновления (окно «Обновления»).
+    m_autoUpdate = QSettings("POC", "TerminalTracker").value("autoUpdate", false).toBool();
 
     // Публичный ключ сервера в формате SHA-256 (base64, SubjectPublicKeyInfo).
     // Если задан — сертификат обновляющегося сервера должен ему совпадать,
@@ -85,6 +91,25 @@ bool UpdateManager::startupCheckEnabled() const
     return m_checkOnStartup;
 }
 
+bool UpdateManager::autoUpdateEnabled() const
+{
+    return m_autoUpdate;
+}
+
+void UpdateManager::setAutoUpdateEnabled(bool enabled)
+{
+    if (m_autoUpdate == enabled)
+        return;
+    m_autoUpdate = enabled;
+    QSettings("POC", "TerminalTracker").setValue("autoUpdate", enabled);
+    OpsLog::instance().info(QString("Автообновление %1").arg(enabled ? "включено" : "выключено"));
+}
+
+QString UpdateManager::updateFilePath()
+{
+    return QCoreApplication::applicationDirPath() + "/update/POC_Terminal_Tracker_update.zip";
+}
+
 QString UpdateManager::currentVersion() const
 {
     return m_currentVersion;
@@ -97,7 +122,10 @@ QString UpdateManager::updateUrl() const
 
 void UpdateManager::start()
 {
-    if (isEnabled() && m_checkOnStartup)
+    // Автоматическая проверка/установка — только если включён переключатель
+    // «Автообновление» в окне «Обновления». В выключенном режиме обновление
+    // запускается вручную из этого окна.
+    if (isEnabled() && m_autoUpdate)
         QTimer::singleShot(0, this, &UpdateManager::checkForUpdates);
 }
 
@@ -261,15 +289,8 @@ void UpdateManager::downloadUpdate(const QString& url)
             OpsLog::instance().info("Контрольная сумма обновления (sha256) подтверждена");
         }
 
-        QString fileName = QFileInfo(reply->url().path()).fileName();
-        if (fileName.isEmpty())
-            fileName = "POC_Terminal_Tracker_update.bin";
-
-        QString dir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
-        if (dir.isEmpty())
-            dir = QDir::homePath();
-
-        QString filePath = dir + "/" + fileName;
+        QString filePath = updateFilePath();
+        QDir().mkpath(QFileInfo(filePath).absolutePath());
         QFile file(filePath);
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             QString msg = "Не удалось сохранить файл обновления: " + filePath;
@@ -283,4 +304,57 @@ void UpdateManager::downloadUpdate(const QString& url)
         OpsLog::instance().info(QString("Скачано обновление: %1 (%2 КБ)").arg(filePath).arg(data.size() / 1024));
         emit downloadFinished(filePath);
     });
+}
+
+void UpdateManager::applyUpdate()
+{
+    const QString zipPath = updateFilePath();
+    if (!QFileInfo::exists(zipPath)) {
+        QString msg = "Файл обновления не найден: " + zipPath;
+        OpsLog::instance().error(msg);
+        emit downloadFailed(msg);
+        return;
+    }
+
+    const QString updateDir = QFileInfo(zipPath).absolutePath();
+    const QString batPath = updateDir + "/apply_update.bat";
+
+    // Скрипт установки: ждёт завершения работающего приложения, распаковывает
+    // дистрибутив поверх каталога приложения и перезапускает exe. Бат-скрипт
+    // ASCII-only (кириллица в кодировке cp866/utf-8 сломала бы команды).
+    QString bat;
+    bat += "@echo off\r\n";
+    bat += "setlocal\r\n";
+    bat += "cd /d \"%~dp0\"\r\n";
+    bat += ":waitloop\r\n";
+    bat += "tasklist /FI \"IMAGENAME eq POC_Terminal_Tracker.exe\" 2>nul | find /I \"POC_Terminal_Tracker.exe\" >nul\r\n";
+    bat += "if %errorlevel%==0 (timeout /t 1 /nobreak >nul & goto waitloop)\r\n";
+    bat += "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -Force -LiteralPath '%~dp0POC_Terminal_Tracker_update.zip' -DestinationPath '%~dp0..'\"\r\n";
+    bat += "if %errorlevel% neq 0 (echo UPDATE_EXTRACT_FAILED & pause & exit /b 1)\r\n";
+    bat += "cd /d \"%TEMP%\"\r\n";
+    bat += "start \"\" \"%~dp0..\\POC_Terminal_Tracker.exe\"\r\n";
+    bat += "del /q \"%~dp0POC_Terminal_Tracker_update.zip\" 2>nul\r\n";
+    bat += "del /q \"%~dp0apply_update.bat\" 2>nul\r\n";
+    bat += "rmdir \"%~dp0\" 2>nul\r\n";
+    bat += "endlocal\r\n";
+
+    QFile batFile(batPath);
+    if (!batFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QString msg = "Не удалось создать скрипт установки обновления: " + batPath;
+        OpsLog::instance().error(msg);
+        emit downloadFailed(msg);
+        return;
+    }
+    batFile.write(bat.toUtf8());
+    batFile.close();
+
+    if (!QProcess::startDetached(batPath)) {
+        QString msg = "Не удалось запустить установку обновления: " + batPath;
+        OpsLog::instance().error(msg);
+        emit downloadFailed(msg);
+        return;
+    }
+
+    OpsLog::instance().info("Установка обновления запущена (скрипт: " + batPath + ")");
+    emit updateInstallScheduled();
 }
