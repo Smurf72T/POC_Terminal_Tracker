@@ -377,6 +377,21 @@ if(BUILD_TESTS)
         endforeach()
     endif()
 
+    # QPA-платформа (qwindows.dll) для GUI-тестов. Qt DLL копируются рядом с
+    # exe-тестами, поэтому Qt вычисляет каталог плагинов относительно exe и
+    # не находит «windows»-плагин — QApplication падает на qFatal
+    # (0xc0000602). Копируем плагины в стандартную раскладку <exe>/plugins/.
+    if(DEFINED CMAKE_PREFIX_PATH AND EXISTS "${CMAKE_PREFIX_PATH}/plugins/platforms")
+        foreach(_test test_ui_components test_reportexporter)
+            add_custom_command(TARGET ${_test} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${CMAKE_PREFIX_PATH}/plugins/platforms"
+                    "$<TARGET_FILE_DIR:${_test}>/plugins/platforms"
+                    COMMENT "Copying Qt platform plugins for ${_test}"
+            )
+        endforeach()
+    endif()
+
     # Копируем DLL Qt и PostgreSQL рядом с тестами, чтобы ctest работал без настройки PATH
     foreach(_test test_password_utils test_validator test_loginform test_update_utils test_updatemanager
             test_opsscheduler test_db_integration test_concurrency
