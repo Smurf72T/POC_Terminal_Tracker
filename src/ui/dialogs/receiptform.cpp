@@ -7,7 +7,7 @@
 #include "utils/serialscanner.h"
 #include "ui/delegates/comboboxdelegate.h"
 #include "ui/delegates/readonlydelegate.h"
-#include "ui/dialogs/seriallistdialog.h"
+#include "ui/dialogs/serialunitsdialog.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QSqlQuery>
@@ -42,24 +42,21 @@ ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptF
     // Номер документа генерируется при проведении (не здесь), чтобы не
     // сжигать значения последовательности для отменённых форм.
 
-    // Табличная часть в стиле 1С: строка = модель + кол-во + списки серийников/IMEI.
-    rowsModel = new QStandardItemModel(0, 5, this);
-    rowsModel->setHorizontalHeaderLabels({"Модель", "Кол-во", "Серийные номера", "IMEI 1", "IMEI 2"});
+    // Табличная часть в стиле 1С: строка = модель + кол-во + комплекты
+    // «серийный номер и его IMEI 1 / IMEI 2» (колонка ColSerials).
+    rowsModel = new QStandardItemModel(0, 3, this);
+    rowsModel->setHorizontalHeaderLabels({"Модель", "Кол-во", "Серийные номера (SN · IMEI 1 · IMEI 2)"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
     ui->tableView->setColumnWidth(ColModel, 180);
     ui->tableView->setColumnWidth(ColQty, 60);
-    ui->tableView->setColumnWidth(ColSerial, 220);
-    ui->tableView->setColumnWidth(ColImei1, 200);
-    ui->tableView->setColumnWidth(ColImei2, 200);
 
-    // Двойной клик по колонке-списку открывает окно ввода.
+    // Двойной клик по ячейке комплектов открывает окно ввода.
     connect(ui->tableView, &QTableView::doubleClicked, this, &ReceiptForm::onTableViewDoubleClicked);
 
-    // Колонки-списки только для чтения: вместо редактора ячейки открываем окно ввода.
-    for (int col = ColSerial; col <= ColImei2; ++col)
-        ui->tableView->setItemDelegateForColumn(col, new ReadOnlyDelegate(this));
+    // Колонка комплектов только для чтения: вместо редактора ячейки — окно ввода.
+    ui->tableView->setItemDelegateForColumn(ColSerials, new ReadOnlyDelegate(this));
 
     // Загружаем модели для комбобокса в ячейке.
     loadModelsToDelegate();
@@ -179,9 +176,7 @@ void ReceiptForm::loadForEdit(int docId)
             imei1 << s.imei1;
             imei2 << s.imei2;
         }
-        setListForRow(r, ColSerial, serials);
-        setListForRow(r, ColImei1, imei1);
-        setListForRow(r, ColImei2, imei2);
+        setUnitsForRow(r, serials, imei1, imei2);
         refreshRow(r);
     }
 
@@ -204,12 +199,10 @@ void ReceiptForm::on_btnAddRow_clicked()
     modelItem->setData(modelId, Qt::UserRole);
     rowsModel->setItem(row, ColModel, modelItem);
     rowsModel->setItem(row, ColQty, new QStandardItem("1"));
-    rowsModel->setItem(row, ColSerial, new QStandardItem());
-    rowsModel->setItem(row, ColImei1, new QStandardItem());
-    rowsModel->setItem(row, ColImei2, new QStandardItem());
+    rowsModel->setItem(row, ColSerials, new QStandardItem());
     refreshRow(row);
 
-    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerial));
+    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerials));
 }
 
 void ReceiptForm::on_btnDeleteRow_clicked()
@@ -230,20 +223,34 @@ int ReceiptForm::rowQty(int row) const
     return (ok && v > 0) ? v : 1;
 }
 
-QStringList ReceiptForm::listForRow(int row, int col) const
+QStringList ReceiptForm::serialsForRow(int row) const
 {
-    QStandardItem* item = rowsModel->item(row, col);
-    return item ? item->data(ListRole).toStringList() : QStringList();
+    QStandardItem* item = rowsModel->item(row, ColSerials);
+    return item ? item->data(RoleSerials).toStringList() : QStringList();
 }
 
-void ReceiptForm::setListForRow(int row, int col, const QStringList& values)
+QStringList ReceiptForm::imei1ForRow(int row) const
 {
-    QStandardItem* item = rowsModel->item(row, col);
+    QStandardItem* item = rowsModel->item(row, ColSerials);
+    return item ? item->data(RoleImei1).toStringList() : QStringList();
+}
+
+QStringList ReceiptForm::imei2ForRow(int row) const
+{
+    QStandardItem* item = rowsModel->item(row, ColSerials);
+    return item ? item->data(RoleImei2).toStringList() : QStringList();
+}
+
+void ReceiptForm::setUnitsForRow(int row, const QStringList& serials, const QStringList& imei1, const QStringList& imei2)
+{
+    QStandardItem* item = rowsModel->item(row, ColSerials);
     if (!item) {
         item = new QStandardItem();
-        rowsModel->setItem(row, col, item);
+        rowsModel->setItem(row, ColSerials, item);
     }
-    item->setData(values, ListRole);
+    item->setData(serials, RoleSerials);
+    item->setData(imei1, RoleImei1);
+    item->setData(imei2, RoleImei2);
 }
 
 QString ReceiptForm::listSummary(const QStringList& values, int expected) const
@@ -258,27 +265,20 @@ QString ReceiptForm::listSummary(const QStringList& values, int expected) const
 
 void ReceiptForm::refreshRow(int row)
 {
-    const int qty = rowQty(row);
-    for (int col = ColSerial; col <= ColImei2; ++col) {
-        QStandardItem* item = rowsModel->item(row, col);
-        if (item)
-            item->setText(listSummary(listForRow(row, col), qty));
-    }
+    QStandardItem* item = rowsModel->item(row, ColSerials);
+    if (item)
+        item->setText(listSummary(serialsForRow(row), rowQty(row)));
 }
 
-void ReceiptForm::openListDialog(int row, int col)
+void ReceiptForm::openUnitsDialog(int row)
 {
-    if (col < ColSerial || col > ColImei2)
+    if (row < 0)
         return;
 
-    const int qty = rowQty(row);
-    const bool imei = col >= ColImei1;
-    const SerialListDialog::Mode mode = imei ? SerialListDialog::Imei : SerialListDialog::Serial;
-    const QString title = col == ColSerial ? "Серийные номера" : (col == ColImei1 ? "IMEI 1" : "IMEI 2");
-
-    SerialListDialog dlg(mode, qty, !imei, listForRow(row, col), title, this);
+    SerialUnitsDialog dlg(rowQty(row), serialsForRow(row), imei1ForRow(row), imei2ForRow(row),
+                          "Серийные номера: комплекты (SN · IMEI 1 · IMEI 2)", this);
     if (dlg.exec() == QDialog::Accepted) {
-        setListForRow(row, col, dlg.values());
+        setUnitsForRow(row, dlg.serials(), dlg.imei1(), dlg.imei2());
         refreshRow(row);
     }
 }
@@ -287,7 +287,8 @@ void ReceiptForm::onTableViewDoubleClicked(const QModelIndex& index)
 {
     if (!index.isValid())
         return;
-    openListDialog(index.row(), index.column());
+    if (index.column() == ColSerials)
+        openUnitsDialog(index.row());
 }
 
 void ReceiptForm::on_btnPost_clicked()
@@ -312,9 +313,16 @@ void ReceiptForm::on_btnPost_clicked()
         ItemData it;
         it.modelId = rowsModel->data(rowsModel->index(r, ColModel), Qt::UserRole).toInt();
         it.qty = rowQty(r);
-        it.serials = listForRow(r, ColSerial);
-        it.imei1 = listForRow(r, ColImei1);
-        it.imei2 = listForRow(r, ColImei2);
+        it.serials = serialsForRow(r);
+        QStringList imei1 = imei1ForRow(r);
+        QStringList imei2 = imei2ForRow(r);
+        // IMEI могут быть не заполнены вовсе — выравниваем под серийники.
+        if (imei1.isEmpty())
+            imei1 = QStringList(it.serials.size(), QString());
+        if (imei2.isEmpty())
+            imei2 = QStringList(it.serials.size(), QString());
+        it.imei1 = imei1;
+        it.imei2 = imei2;
 
         if (it.modelId <= 0) {
             QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите модель из списка.").arg(r + 1));
@@ -328,62 +336,67 @@ void ReceiptForm::on_btnPost_clicked()
                                       .arg(it.qty));
             return;
         }
-        if (!it.imei1.isEmpty() && it.imei1.size() != it.qty) {
+        // Серийник в каждом комплекте обязателен.
+        for (int k = 0; k < it.serials.size(); ++k) {
+            if (it.serials.at(k).trimmed().isEmpty()) {
+                QMessageBox::critical(this, "Ошибка",
+                                      QString("Строка %1, комплект %2: не заполнен серийный номер.")
+                                          .arg(r + 1)
+                                          .arg(k + 1));
+                return;
+            }
+        }
+        if (it.imei1.size() != it.serials.size() || it.imei2.size() != it.serials.size()) {
             QMessageBox::critical(this, "Ошибка",
-                                  QString("Строка %1: введено %2 значений IMEI 1 из %3.")
-                                      .arg(r + 1)
-                                      .arg(it.imei1.size())
-                                      .arg(it.qty));
+                                  QString("Строка %1: количество IMEI не соответствует числу серийных номеров.")
+                                      .arg(r + 1));
             return;
         }
-        if (!it.imei2.isEmpty() && it.imei2.size() != it.qty) {
-            QMessageBox::critical(this, "Ошибка",
-                                  QString("Строка %1: введено %2 значений IMEI 2 из %3.")
-                                      .arg(r + 1)
-                                      .arg(it.imei2.size())
-                                      .arg(it.qty));
-            return;
-        }
+        for (int k = 0; k < it.serials.size(); ++k) {
+            const QString sn = it.serials.at(k).trimmed();
+            const QString im1 = it.imei1.at(k).trimmed();
+            const QString im2 = it.imei2.at(k).trimmed();
 
-        for (const QString& sn : it.serials) {
             if (usedSerials.contains(sn)) {
                 QMessageBox::critical(this, "Ошибка",
                                       QString("Серийный номер повторяется в документе: %1").arg(sn));
                 return;
             }
             usedSerials.insert(sn);
-        }
-        for (const QString& im : it.imei1) {
-            if (im.isEmpty())
-                continue;
-            if (im.size() != 15) {
-                QMessageBox::critical(this, "Ошибка",
-                                      QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр (сейчас: %2)")
-                                          .arg(r + 1)
-                                          .arg(im));
-                return;
+
+            if (!im1.isEmpty()) {
+                if (im1.size() != 15) {
+                    QMessageBox::critical(this, "Ошибка",
+                                          QString("Строка %1, комплект %2: IMEI 1 должен содержать ровно 15 цифр "
+                                                  "(сейчас: %3)")
+                                              .arg(r + 1)
+                                              .arg(k + 1)
+                                              .arg(im1));
+                    return;
+                }
+                if (usedImei1.contains(im1)) {
+                    QMessageBox::critical(this, "Ошибка", QString("IMEI 1 повторяется в документе: %1").arg(im1));
+                    return;
+                }
+                usedImei1.insert(im1);
             }
-            if (usedImei1.contains(im)) {
-                QMessageBox::critical(this, "Ошибка", QString("IMEI 1 повторяется в документе: %1").arg(im));
-                return;
+
+            if (!im2.isEmpty()) {
+                if (im2.size() != 15) {
+                    QMessageBox::critical(this, "Ошибка",
+                                          QString("Строка %1, комплект %2: IMEI 2 должен содержать ровно 15 цифр "
+                                                  "(сейчас: %3)")
+                                              .arg(r + 1)
+                                              .arg(k + 1)
+                                              .arg(im2));
+                    return;
+                }
+                if (usedImei2.contains(im2)) {
+                    QMessageBox::critical(this, "Ошибка", QString("IMEI 2 повторяется в документе: %1").arg(im2));
+                    return;
+                }
+                usedImei2.insert(im2);
             }
-            usedImei1.insert(im);
-        }
-        for (const QString& im : it.imei2) {
-            if (im.isEmpty())
-                continue;
-            if (im.size() != 15) {
-                QMessageBox::critical(this, "Ошибка",
-                                      QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр (сейчас: %2)")
-                                          .arg(r + 1)
-                                          .arg(im));
-                return;
-            }
-            if (usedImei2.contains(im)) {
-                QMessageBox::critical(this, "Ошибка", QString("IMEI 2 повторяется в документе: %1").arg(im));
-                return;
-            }
-            usedImei2.insert(im);
         }
 
         items.append(it);
@@ -475,9 +488,9 @@ void ReceiptForm::on_btnPost_clicked()
         const int itemId = itemQuery.value(0).toInt();
 
         for (int i = 0; i < it.serials.size(); ++i) {
-            const QString serial = it.serials.at(i);
-            const QString im1 = i < it.imei1.size() ? it.imei1.at(i) : QString();
-            const QString im2 = i < it.imei2.size() ? it.imei2.at(i) : QString();
+            const QString serial = it.serials.at(i).trimmed();
+            const QString im1 = it.imei1.at(i).trimmed();
+            const QString im2 = it.imei2.at(i).trimmed();
 
             QSqlQuery serialQuery(db);
             serialQuery.prepare("INSERT INTO tblreceiptserials (receiptitemid, linenum, serialnumber, imei1, imei2) "
@@ -502,7 +515,8 @@ void ReceiptForm::on_btnPost_clicked()
             const bool found = findQuery.exec() && findQuery.next();
 
             if (found && m_editMode) {
-                // Редактирование: серийник уже был в базе — обновляем терминал.
+                // Редактирование: серийник уже был в базе — обновляем терминал
+                // вместе с его IMEI (привязка сохраняется).
                 newTermId = findQuery.value(0).toInt();
                 QSqlQuery termQuery(db);
                 termQuery.prepare("UPDATE tblterminals SET modelid = :mid, imei1 = :i1, imei2 = :i2 "
@@ -519,7 +533,6 @@ void ReceiptForm::on_btnPost_clicked()
                     return;
                 }
             } else if (found) {
-                // Новый документ: серийник уже занят в базе.
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка",
                                       QString("Серийный номер уже есть в базе: %1").arg(serial));
@@ -595,43 +608,35 @@ void ReceiptForm::on_btnPrint_clicked()
     if (!comment.isEmpty())
         html += "<p><b>Комментарий:</b> " + comment.toHtmlEscaped() + "</p>";
 
-    html += "<table><tr><th>№</th><th>Модель</th><th>Кол-во</th><th>Серийные номера</th><th>IMEI 1</th><th>IMEI 2</th></tr>";
+    html += "<table><tr><th>№</th><th>Модель</th><th>Серийный номер</th><th>IMEI 1</th><th>IMEI 2</th></tr>";
 
+    // Печатаем комплекты построчно: серийный номер и его IMEI в одной строке —
+    // привязка видна и в печатной форме.
+    int num = 0;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         const QString model = rowsModel->data(rowsModel->index(i, ColModel)).toString();
-        const int qty = rowQty(i);
+        const QStringList serials = serialsForRow(i);
+        const QStringList imei1 = imei1ForRow(i);
+        const QStringList imei2 = imei2ForRow(i);
 
-        QStringList cell;
-        for (const QString& v : listForRow(i, ColSerial))
-            cell << v.toHtmlEscaped();
-        const QString serials = cell.isEmpty() ? "&nbsp;" : cell.join("<br>");
-
-        cell.clear();
-        for (const QString& v : listForRow(i, ColImei1))
-            cell << v.toHtmlEscaped();
-        const QString imei1 = cell.isEmpty() ? "&nbsp;" : cell.join("<br>");
-
-        cell.clear();
-        for (const QString& v : listForRow(i, ColImei2))
-            cell << v.toHtmlEscaped();
-        const QString imei2 = cell.isEmpty() ? "&nbsp;" : cell.join("<br>");
-
-        html += "<tr><td>" + QString::number(i + 1) +
-                "</td>"
-                "<td>" +
-                model.toHtmlEscaped() +
-                "</td>"
-                "<td>" +
-                QString::number(qty) +
-                "</td>"
-                "<td>" +
-                serials +
-                "</td>"
-                "<td>" +
-                imei1 +
-                "</td>"
-                "<td>" +
-                imei2 + "</td></tr>";
+        for (int k = 0; k < serials.size(); ++k) {
+            if (serials.at(k).trimmed().isEmpty())
+                continue;
+            ++num;
+            html += "<tr><td>" + QString::number(num) +
+                    "</td>"
+                    "<td>" +
+                    model.toHtmlEscaped() +
+                    "</td>"
+                    "<td>" +
+                    serials.at(k).trimmed().toHtmlEscaped() +
+                    "</td>"
+                    "<td>" +
+                    (k < imei1.size() ? imei1.at(k).trimmed().toHtmlEscaped() : QString("&nbsp;")) +
+                    "</td>"
+                    "<td>" +
+                    (k < imei2.size() ? imei2.at(k).trimmed().toHtmlEscaped() : QString("&nbsp;")) + "</td></tr>";
+        }
     }
     html += "</table>";
 
@@ -689,24 +694,55 @@ void ReceiptForm::onScanFinished(const QString& raw)
         rowsModel->setItem(row, ColQty, new QStandardItem("1"));
     }
 
+    // Комплекты хранятся как три параллельных списка: imei[n] принадлежит
+    // serial[n]. Сканы серийника/IMEI не могут разорвать эту связь.
+    QStringList s = serialsForRow(row);
+    QStringList i1 = imei1ForRow(row);
+    QStringList i2 = imei2ForRow(row);
+
     if (!data.serial.isEmpty()) {
-        QStringList lst = listForRow(row, ColSerial);
-        lst.append(data.serial);
-        setListForRow(row, ColSerial, lst);
-    }
-    if (!data.imei1.isEmpty()) {
-        QStringList lst = listForRow(row, ColImei1);
-        lst.append(data.imei1);
-        setListForRow(row, ColImei1, lst);
-    }
-    if (!data.imei2.isEmpty()) {
-        QStringList lst = listForRow(row, ColImei2);
-        lst.append(data.imei2);
-        setListForRow(row, ColImei2, lst);
+        s.append(data.serial);
+        i1.append(QString());
+        i2.append(QString());
     }
 
+    if (!data.imei1.isEmpty()) {
+        int idx = -1;
+        for (int k = s.size() - 1; k >= 0; --k) {
+            if (!s.at(k).isEmpty() && i1.at(k).isEmpty()) {
+                idx = k;
+                break;
+            }
+        }
+        if (idx >= 0) {
+            i1[idx] = data.imei1;
+        } else {
+            s.append(QString());
+            i1.append(data.imei1);
+            i2.append(QString());
+        }
+    }
+
+    if (!data.imei2.isEmpty()) {
+        int idx = -1;
+        for (int k = s.size() - 1; k >= 0; --k) {
+            if (!s.at(k).isEmpty() && i2.at(k).isEmpty()) {
+                idx = k;
+                break;
+            }
+        }
+        if (idx >= 0) {
+            i2[idx] = data.imei2;
+        } else {
+            s.append(QString());
+            i1.append(QString());
+            i2.append(data.imei2);
+        }
+    }
+
+    setUnitsForRow(row, s, i1, i2);
     refreshRow(row);
-    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerial));
+    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerials));
     ui->tableView->setFocus();
 }
 

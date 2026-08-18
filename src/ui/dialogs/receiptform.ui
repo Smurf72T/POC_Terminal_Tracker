@@ -18,7 +18,7 @@
             </item>
             <item>
                 <widget class="QLabel" name="labelHint">
-                    <property name="text"><string>В строке выберите модель и укажите количество. Двойной клик по ячейке «Серийные номера» / «IMEI 1» / «IMEI 2» открывает окно ввода списка. Сканер добавляет номера в выбранную строку.</string></property>
+                    <property name="text"><string>В строке выберите модель и укажите количество. Двойной клик по ячейке «Серийные номера» открывает окно комплектов: каждый серийный номер с его IMEI 1 и IMEI 2 — в своей строке. Сканер добавляет номера в выбранную строку.</string></property>
                     <property name="wordWrap"><bool>true</bool></property>
                 </widget>
             </item>

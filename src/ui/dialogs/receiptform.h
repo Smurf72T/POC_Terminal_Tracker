@@ -33,9 +33,12 @@ protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
-    enum Column { ColModel = 0, ColQty = 1, ColSerial = 2, ColImei1 = 3, ColImei2 = 4 };
-    // В item колонки-списка (2..4) сам список лежит в UserRole+2.
-    static constexpr int ListRole = Qt::UserRole + 2;
+    enum Column { ColModel = 0, ColQty = 1, ColSerials = 2 };
+    // В item колонки ColSerials хранятся ТРИ параллельных списка (по комплекту
+    // на индекс): серийники, их IMEI 1 и их IMEI 2. Связь — по индексу списка.
+    static constexpr int RoleSerials = Qt::UserRole + 2;
+    static constexpr int RoleImei1 = Qt::UserRole + 3;
+    static constexpr int RoleImei2 = Qt::UserRole + 4;
 
     Ui::ReceiptForm* ui;
     QStandardItemModel* rowsModel;
@@ -47,15 +50,17 @@ private:
     void setupSerialScanner();
     // Кол-во в строке (минимум 1).
     int rowQty(int row) const;
-    // Списки серийников/IMEI строки.
-    QStringList listForRow(int row, int col) const;
-    void setListForRow(int row, int col, const QStringList& values);
-    // Краткое описание списка для ячейки таблицы.
+    // Параллельные списки комплектов строки (по одному на устройство).
+    QStringList serialsForRow(int row) const;
+    QStringList imei1ForRow(int row) const;
+    QStringList imei2ForRow(int row) const;
+    void setUnitsForRow(int row, const QStringList& serials, const QStringList& imei1, const QStringList& imei2);
+    // Краткое описание комплектов для ячейки таблицы.
     QString listSummary(const QStringList& values, int expected) const;
-    // Пересчитать тексты колонок-списков строки.
+    // Пересчитать текст колонки комплектов строки.
     void refreshRow(int row);
-    // Открыть окно ввода для колонки 2..4.
-    void openListDialog(int row, int col);
+    // Открыть окно ввода комплектов (серийник + его IMEI).
+    void openUnitsDialog(int row);
 
     QList<QPair<int, QString>> m_models;
     BarcodeScanner* m_scanner = nullptr;
