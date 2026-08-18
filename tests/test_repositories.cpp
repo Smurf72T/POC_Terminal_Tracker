@@ -29,6 +29,7 @@ private slots:
     void simCardLoadMethods();
     void clientLoadMethods();
     void documentModelMethods();
+    void receiptItemQueries();
 
 private:
     static void insertTerminal(int id, const QString& serial, int status, int modelId, int simId);
@@ -43,6 +44,9 @@ private:
     static void insertRentalDetail(int id, int rentalDocId, int terminalId, int simId);
     static void insertReceiptDoc(int id, const QString& docNumber, const QString& docDate);
     static void insertReceiptDetail(int id, int receiptDocId, int terminalId);
+    static void insertReceiptItem(int id, int docId, int modelId, int qty);
+    static void insertReceiptSerial(int id, int itemId, int linenum, const QString& serial, const QString& imei1,
+                                    const QString& imei2);
     static void insertReturnDoc(int id, int clientId, const QString& docNumber, const QString& docDate);
     static void insertReturnDetail(int id, int returnDocId, int terminalId);
     static void insertPayment(int id, int year, int month, double amount);
@@ -77,6 +81,10 @@ void TestRepositories::initTestCase()
            "comments TEXT)");
     q.exec("CREATE TABLE tblreceiptdetails (receiptdetailid INTEGER PRIMARY KEY, receiptdocid INTEGER, "
            "terminalid INTEGER)");
+    q.exec("CREATE TABLE tblreceiptitems (receiptitemid INTEGER PRIMARY KEY, receiptdocid INTEGER, "
+           "modelid INTEGER, qty INTEGER)");
+    q.exec("CREATE TABLE tblreceiptserials (receiptserialid INTEGER PRIMARY KEY, receiptitemid INTEGER, "
+           "linenum INTEGER, serialnumber TEXT, imei1 TEXT, imei2 TEXT)");
     q.exec("CREATE TABLE tblreturndocs (returndocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
            "clientid INTEGER, comments TEXT)");
     q.exec("CREATE TABLE tblreturndetails (returndetailid INTEGER PRIMARY KEY, returndocid INTEGER, "
@@ -247,6 +255,32 @@ void TestRepositories::insertReceiptDetail(int id, int receiptDocId, int termina
     q.exec();
 }
 
+void TestRepositories::insertReceiptItem(int id, int docId, int modelId, int qty)
+{
+    QSqlQuery q(QSqlDatabase::database(QLatin1String()));
+    q.prepare("INSERT INTO tblreceiptitems (receiptitemid, receiptdocid, modelid, qty) VALUES (?, ?, ?, ?)");
+    q.addBindValue(id);
+    q.addBindValue(docId);
+    q.addBindValue(modelId);
+    q.addBindValue(qty);
+    q.exec();
+}
+
+void TestRepositories::insertReceiptSerial(int id, int itemId, int linenum, const QString& serial,
+                                           const QString& imei1, const QString& imei2)
+{
+    QSqlQuery q(QSqlDatabase::database(QLatin1String()));
+    q.prepare("INSERT INTO tblreceiptserials (receiptserialid, receiptitemid, linenum, serialnumber, imei1, imei2) "
+              "VALUES (?, ?, ?, ?, ?, ?)");
+    q.addBindValue(id);
+    q.addBindValue(itemId);
+    q.addBindValue(linenum);
+    q.addBindValue(serial);
+    q.addBindValue(imei1);
+    q.addBindValue(imei2);
+    q.exec();
+}
+
 void TestRepositories::insertReturnDoc(int id, int clientId, const QString& docNumber, const QString& docDate)
 {
     QSqlQuery q(QSqlDatabase::database(QLatin1String()));
@@ -355,6 +389,31 @@ void TestRepositories::documentQueries()
     QCOMPARE(docs.at(0).date, QString("2026-08-02"));
     QCOMPARE(docs.at(1).docType, DocumentRepository::Rental);
     QCOMPARE(docs.at(1).number, QString("AR-2026-00002"));
+}
+
+void TestRepositories::receiptItemQueries()
+{
+    DocumentRepository repo(m_db);
+
+    insertReceiptDoc(3, "PR-2026-00002", "2026-08-10");
+    insertReceiptItem(1, 3, 1, 2);
+    insertReceiptSerial(1, 1, 1, "SN-1001", "111111111111111", QString());
+    insertReceiptSerial(2, 1, 2, "SN-1002", "222222222222222", "333333333333333");
+
+    const auto items = repo.loadReceiptItems(3);
+    QCOMPARE(items.size(), 1);
+    QCOMPARE(items.at(0).modelId, 1);
+    QCOMPARE(items.at(0).modelName, QString("PAX-A920"));
+    QCOMPARE(items.at(0).qty, 2);
+    QCOMPARE(items.at(0).serials.size(), 2);
+    QCOMPARE(items.at(0).serials.at(0).serialNumber, QString("SN-1001"));
+    QCOMPARE(items.at(0).serials.at(0).imei1, QString("111111111111111"));
+    QCOMPARE(items.at(0).serials.at(1).serialNumber, QString("SN-1002"));
+    QCOMPARE(items.at(0).serials.at(1).imei2, QString("333333333333333"));
+
+    // Документ без строк «исходника» (легаси/свежий) и несуществующий.
+    QVERIFY(repo.loadReceiptItems(2).isEmpty());
+    QVERIFY(repo.loadReceiptItems(999).isEmpty());
 }
 
 void TestRepositories::paymentQueries()

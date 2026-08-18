@@ -3,6 +3,7 @@
 
 #include <QDate>
 #include <QString>
+#include <QVector>
 
 // Общая шапка документа (поступление / возврат / изменение статуса).
 // Наполняется через DocumentRepository. Для документов без клиента
@@ -25,6 +26,25 @@ struct ReceiptRow {
     QString modelName;
     QString imei1;
     QString imei2;
+};
+
+// Комплект серийника строки поступления (tblreceiptserials): linenum — номер
+// по порядку внутри строки документа.
+struct ReceiptSerial {
+    int linenum = 0;
+    QString serialNumber;
+    QString imei1;
+    QString imei2;
+};
+
+// Строка «исходника» документа поступления (tblreceiptitems):
+// модель + кол-во + списки серийников/IMEI, как их вводил пользователь.
+struct ReceiptItem {
+    int itemId = 0;
+    int modelId = 0;
+    QString modelName;
+    int qty = 0;
+    QVector<ReceiptSerial> serials;
 };
 
 } // namespace models

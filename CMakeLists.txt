@@ -72,6 +72,7 @@ set(SOURCES
         src/ui/dialogs/terminaleditform.cpp
         resources.qrc
         src/ui/dialogs/receiptform.cpp
+        src/ui/dialogs/seriallistdialog.cpp
         src/ui/dialogs/rentalform.cpp
         src/ui/dialogs/returnform.cpp
         src/ui/dialogs/statuschangeform.cpp
@@ -133,6 +134,7 @@ set(HEADERS
         src/ui/dialogs/terminaleditform.h
         src/ui/delegates/readonlydelegate.h
         src/ui/dialogs/receiptform.h
+        src/ui/dialogs/seriallistdialog.h
         src/ui/delegates/comboboxdelegate.h
         src/ui/delegates/comboboxmodel.h
         src/ui/delegates/CheckBoxDelegate.h
@@ -180,6 +182,7 @@ set(UI_FILES
         src/ui/dialogs/terminalsform.ui
         src/ui/dialogs/terminaleditform.ui
         src/ui/dialogs/receiptform.ui
+        src/ui/dialogs/seriallistdialog.ui
         src/ui/dialogs/rentalform.ui
         src/ui/dialogs/returnform.ui
         src/ui/dialogs/statuschangeform.ui

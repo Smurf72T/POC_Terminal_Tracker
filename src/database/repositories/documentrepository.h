@@ -42,6 +42,8 @@ public:
     QVector<models::RentalDocument> loadRentalDocumentsByClient(int clientId) const;
     // Терминалы поступления (id, serial, modelid, imei1, imei2).
     QVector<models::ReceiptRow> loadReceiptRows(int receiptDocId) const;
+    // Строки-«исходник» поступления (модель + кол-во + серийники/IMEI).
+    QVector<models::ReceiptItem> loadReceiptItems(int receiptDocId) const;
 
     // Документ аренды, к которому относится возврат (-1, если не найден).
     int rentalDocIdForReturn(int returnDocId) const;

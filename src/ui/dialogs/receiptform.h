@@ -23,17 +23,20 @@ public:
 private slots:
     void on_btnAddRow_clicked();
     void on_btnDeleteRow_clicked();
-    void on_btnGenerate_clicked();
-    void on_comboModel_currentIndexChanged(int index);
     void on_btnPost_clicked(); // Кнопка "Провести"
     void on_btnPrint_clicked();
     void on_btnClose_clicked();
     void onScanFinished(const QString& raw);
+    void onTableViewDoubleClicked(const QModelIndex& index);
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
+    enum Column { ColModel = 0, ColQty = 1, ColSerial = 2, ColImei1 = 3, ColImei2 = 4 };
+    // В item колонки-списка (2..4) сам список лежит в UserRole+2.
+    static constexpr int ListRole = Qt::UserRole + 2;
+
     Ui::ReceiptForm* ui;
     QStandardItemModel* rowsModel;
 
@@ -42,14 +45,17 @@ private:
     bool canAcceptScan() const;
     // Чтение сканера из COM-порта (раздел "scanner" в config.json).
     void setupSerialScanner();
-    // Текущий выбранный в комбобоксе ID модели (0, если не выбран).
-    int selectedModelId() const;
-    // Применить текущую модель комбобокса ко всем строкам таблицы.
-    void applyModelToAllRows();
-    // Целевая строка для серийного номера: первая с пустым серийником, иначе новая.
-    int targetRowForSerial() const;
-    // Целевая строка для IMEI: первая, где серийник заполнен, а эта колонка пуста.
-    int targetRowForImei(int imeiCol) const;
+    // Кол-во в строке (минимум 1).
+    int rowQty(int row) const;
+    // Списки серийников/IMEI строки.
+    QStringList listForRow(int row, int col) const;
+    void setListForRow(int row, int col, const QStringList& values);
+    // Краткое описание списка для ячейки таблицы.
+    QString listSummary(const QStringList& values, int expected) const;
+    // Пересчитать тексты колонок-списков строки.
+    void refreshRow(int row);
+    // Открыть окно ввода для колонки 2..4.
+    void openListDialog(int row, int col);
 
     QList<QPair<int, QString>> m_models;
     BarcodeScanner* m_scanner = nullptr;

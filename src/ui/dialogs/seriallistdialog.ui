@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>SerialListDialog</class>
+    <widget class="QDialog" name="SerialListDialog">
+        <property name="geometry">
+            <rect><x>0</x><y>0</y><width>420</width><height>380</height></rect>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <widget class="QLabel" name="labelInfo">
+                    <property name="text"><string>По одному номеру на строку.</string></property>
+                    <property name="wordWrap"><bool>true</bool></property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QPlainTextEdit" name="plainTextEdit">
+                    <property name="placeholderText"><string>Номер &#10;Номер &#10;Номер &#10;</string></property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QLabel" name="labelStatus">
+                    <property name="text"><string>Введено: 0</string></property>
+                </widget>
+            </item>
+            <item>
+                <widget class="QDialogButtonBox" name="buttonBox">
+                    <property name="standardButtons">
+                        <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+                    </property>
+                </widget>
+            </item>
+        </layout>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>

@@ -10,7 +10,7 @@
   },
   "application": {
     "name": "POC Terminal Tracker",
-    "version": "1.5.3"
+    "version": "1.5.4"
   },
   "log_directory": "",
   "backup": {

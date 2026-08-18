@@ -95,6 +95,7 @@ Per-thread пул соединений для фоновых потоков (н�
 | `loadRentalRows(int)` | Строки аренды с serial/SIM и статусами терминала/SIM |
 | `loadRentalDocumentsByClient(int)` | Документы аренды клиента (для выпадающего списка возврата) |
 | `loadReceiptRows(int)` | Терминалы поступления (serial, модель, IMEI 1/2) |
+| `loadReceiptItems(int)` | Строки-«исходник» поступления (модель + кол-во + серийники/IMEI, `tblreceiptitems`) |
 | `rentalDocIdForReturn(int)` / `returnedTerminalIds(int)` | Связь возврата с арендой и возвращённые терминалы |
 
 ### `PaymentRepository`
@@ -111,7 +112,7 @@ Header-only структуры в `namespace models`, без QObject и зави
 | `models::Client` | `id, name, inn, address, contactPhone, contactEmail` |
 | `models::SimCard` | `id, number, status, notes, createdAt` |
 | `models::RentalDocument` / `models::RentalRow` | шапка (`docNumber, date, clientId, comments`) и строки (`terminalId, simCardId, serial, simNumber, comment, terminalStatus, simStatus`) |
-| `models::DocumentHeader` / `models::ReceiptRow` | общая шапка; строка поступления (`terminalId, serialNumber, modelId, modelName, imei1, imei2`) |
+| `models::DocumentHeader` / `models::ReceiptRow` / `models::ReceiptItem` / `models::ReceiptSerial` | общая шапка; развёрнутая строка поступления (`terminalId, serialNumber, modelId, modelName, imei1, imei2`); строка-«исходник» (`itemId, modelId, modelName, qty, serials`) и комплект серийника (`linenum, serialNumber, imei1, imei2`) |
 
 **Соглашение:** SQL репозиториев переносимый (без PostgreSQL-специфики вроде
 `to_char`/`EXTRACT`/`::date`) — тот же код работает на SQLite в тестах.

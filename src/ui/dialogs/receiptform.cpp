@@ -2,10 +2,12 @@
 #include "ui_receiptform.h"
 #include "database/databasemanager.h"
 #include "database/repositories/documentrepository.h"
-#include "utils/validator.h"
 #include "utils/barcodeparser.h"
 #include "utils/barcodescanner.h"
 #include "utils/serialscanner.h"
+#include "ui/delegates/comboboxdelegate.h"
+#include "ui/delegates/readonlydelegate.h"
+#include "ui/dialogs/seriallistdialog.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QSqlQuery>
@@ -18,6 +20,9 @@
 #include <QComboBox>
 #include <QTextEdit>
 #include <QPlainTextEdit>
+#include <QTableView>
+#include <QHeaderView>
+#include <QSet>
 #include "utils/logging.h"
 #include <QJsonObject>
 #include <QPrinter>
@@ -31,27 +36,38 @@ ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptF
     setWindowTitle("Документ: Поступление терминалов");
     resize(900, 600);
 
-    // Настройка даты (сегодня)
+    // Дата по умолчанию — сегодня.
     ui->dateEdit->setDate(QDate::currentDate());
 
     // Номер документа генерируется при проведении (не здесь), чтобы не
     // сжигать значения последовательности для отменённых форм.
 
-    // Настройка модели для табличной части: серийник, IMEI 1, IMEI 2.
-    // Модель хранится в UserRole+1 элемента серийного номера, выбор — комбобокс comboModel.
-    rowsModel = new QStandardItemModel(0, 3, this);
-    rowsModel->setHorizontalHeaderLabels({"Серийный номер", "IMEI 1", "IMEI 2"});
+    // Табличная часть в стиле 1С: строка = модель + кол-во + списки серийников/IMEI.
+    rowsModel = new QStandardItemModel(0, 5, this);
+    rowsModel->setHorizontalHeaderLabels({"Модель", "Кол-во", "Серийные номера", "IMEI 1", "IMEI 2"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
+    ui->tableView->setColumnWidth(ColModel, 180);
+    ui->tableView->setColumnWidth(ColQty, 60);
+    ui->tableView->setColumnWidth(ColSerial, 220);
+    ui->tableView->setColumnWidth(ColImei1, 200);
+    ui->tableView->setColumnWidth(ColImei2, 200);
 
-    // Загружаем модели для выпадающего списка
+    // Двойной клик по колонке-списку открывает окно ввода.
+    connect(ui->tableView, &QTableView::doubleClicked, this, &ReceiptForm::onTableViewDoubleClicked);
+
+    // Колонки-списки только для чтения: вместо редактора ячейки открываем окно ввода.
+    for (int col = ColSerial; col <= ColImei2; ++col)
+        ui->tableView->setItemDelegateForColumn(col, new ReadOnlyDelegate(this));
+
+    // Загружаем модели для комбобокса в ячейке.
     loadModelsToDelegate();
 
-    // F9 для дублирования строки
+    // F9 для дублирования строки.
     ui->tableView->installEventFilter(this);
 
-    // Сканер штрих-кода: перехват ввода по всей форме, заполнение табличной части.
+    // Сканер штрих-кода: перехват ввода по всей форме.
     m_scanner = new BarcodeScanner(this);
     connect(m_scanner, &BarcodeScanner::scanFinished, this, &ReceiptForm::onScanFinished);
     qApp->installEventFilter(this);
@@ -59,8 +75,6 @@ ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptF
     // Сканер штрих-кода через COM-порт (типовые USB-сканеры в режиме RS-232).
     setupSerialScanner();
 
-    // Начальный фокус — на таблице, чтобы сканер сразу заполнял строки,
-    // а не «Номер» документа (canAcceptScan не перехватывает ввод в QLineEdit).
     QTimer::singleShot(0, this, [this]() { ui->tableView->setFocus(); });
 }
 
@@ -97,12 +111,9 @@ void ReceiptForm::loadModelsToDelegate()
 
     while (query.next()) {
         m_models.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
-        ui->comboModel->addItem(query.value(1).toString(), query.value(0).toInt());
     }
 
-    // Модель выбирается один раз комбобоксом и применяется ко всем строкам.
-    if (ui->comboModel->count() > 0)
-        ui->comboModel->setCurrentIndex(0);
+    ui->tableView->setItemDelegateForColumn(ColModel, new ComboBoxDelegate(m_models, this));
 }
 
 void ReceiptForm::loadForEdit(int docId)
@@ -113,7 +124,7 @@ void ReceiptForm::loadForEdit(int docId)
     const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
     DocumentRepository documents(db);
 
-    // Load header
+    // Заголовок документа.
     const models::DocumentHeader header = documents.loadHeader(DocumentRepository::Receipt, docId);
     if (header.id != 0) {
         ui->lineEditNumber->setText(header.docNumber);
@@ -122,27 +133,56 @@ void ReceiptForm::loadForEdit(int docId)
         ui->textEditComment->setText(header.comments);
     }
 
-    // Load details
-    const auto rows = documents.loadReceiptRows(docId);
-    for (const auto& row : rows) {
+    // Строки-«исходник». Для документов, созданных до миграции 012,
+    // их нет — восстанавливаем группировкой развёрнутых терминалов по модели.
+    QVector<models::ReceiptItem> items = documents.loadReceiptItems(docId);
+    if (items.isEmpty()) {
+        const auto rows = documents.loadReceiptRows(docId);
+        for (const auto& r : rows) {
+            int idx = -1;
+            for (int k = 0; k < items.size(); ++k) {
+                if (items.at(k).modelId == r.modelId) {
+                    idx = k;
+                    break;
+                }
+            }
+            if (idx < 0) {
+                models::ReceiptItem it;
+                it.modelId = r.modelId;
+                it.modelName = r.modelName;
+                it.qty = 0;
+                items.append(it);
+                idx = items.size() - 1;
+            }
+            models::ReceiptSerial s;
+            s.linenum = items[idx].serials.size() + 1;
+            s.serialNumber = r.serialNumber;
+            s.imei1 = r.imei1;
+            s.imei2 = r.imei2;
+            items[idx].serials.append(s);
+            items[idx].qty = items[idx].serials.size();
+        }
+    }
+
+    for (const auto& item : items) {
         int r = rowsModel->rowCount();
         rowsModel->insertRow(r);
 
-        QStandardItem* serialItem = new QStandardItem(row.serialNumber);
-        serialItem->setData(row.terminalId, Qt::UserRole);
-        serialItem->setData(row.modelId, Qt::UserRole + 1);
-        rowsModel->setItem(r, 0, serialItem);
+        QStandardItem* modelItem = new QStandardItem(item.modelName);
+        modelItem->setData(item.modelId, Qt::UserRole);
+        rowsModel->setItem(r, ColModel, modelItem);
+        rowsModel->setItem(r, ColQty, new QStandardItem(QString::number(item.qty)));
 
-        rowsModel->setItem(r, 1, new QStandardItem(row.imei1));
-        rowsModel->setItem(r, 2, new QStandardItem(row.imei2));
-    }
-
-    // Модель в комбобоксе — по первой строке документа.
-    if (rowsModel->rowCount() > 0) {
-        const int modelId = rowsModel->data(rowsModel->index(0, 0), Qt::UserRole + 1).toInt();
-        const int idx = ui->comboModel->findData(modelId);
-        if (idx >= 0)
-            ui->comboModel->setCurrentIndex(idx);
+        QStringList serials, imei1, imei2;
+        for (const auto& s : item.serials) {
+            serials << s.serialNumber;
+            imei1 << s.imei1;
+            imei2 << s.imei2;
+        }
+        setListForRow(r, ColSerial, serials);
+        setListForRow(r, ColImei1, imei1);
+        setListForRow(r, ColImei2, imei2);
+        refreshRow(r);
     }
 
     setWindowTitle(QString("Редактирование поступления ID %1").arg(docId));
@@ -153,51 +193,23 @@ void ReceiptForm::on_btnAddRow_clicked()
     int row = rowsModel->rowCount();
     rowsModel->insertRow(row);
 
-    // Значения по умолчанию: серийник-заглушка, модель из комбобокса.
-    QStandardItem* serialItem = new QStandardItem("SN-...");
-    serialItem->setData(selectedModelId(), Qt::UserRole + 1);
-    rowsModel->setItem(row, 0, serialItem);
-
-    rowsModel->setItem(row, 1, new QStandardItem("000000000000000"));
-    rowsModel->setItem(row, 2, new QStandardItem("000000000000000"));
-}
-
-void ReceiptForm::on_btnGenerate_clicked()
-{
-    const int count = ui->spinCount->value();
-    rowsModel->removeRows(0, rowsModel->rowCount());
-
-    for (int i = 0; i < count; ++i) {
-        int row = rowsModel->rowCount();
-        rowsModel->insertRow(row);
-        QStandardItem* serialItem = new QStandardItem();
-        serialItem->setData(selectedModelId(), Qt::UserRole + 1);
-        rowsModel->setItem(row, 0, serialItem);
-        rowsModel->setItem(row, 1, new QStandardItem());
-        rowsModel->setItem(row, 2, new QStandardItem());
+    QString modelName;
+    int modelId = 0;
+    if (!m_models.isEmpty()) {
+        modelId = m_models.first().first;
+        modelName = m_models.first().second;
     }
 
-    ui->tableView->setFocus();
-}
+    QStandardItem* modelItem = new QStandardItem(modelName);
+    modelItem->setData(modelId, Qt::UserRole);
+    rowsModel->setItem(row, ColModel, modelItem);
+    rowsModel->setItem(row, ColQty, new QStandardItem("1"));
+    rowsModel->setItem(row, ColSerial, new QStandardItem());
+    rowsModel->setItem(row, ColImei1, new QStandardItem());
+    rowsModel->setItem(row, ColImei2, new QStandardItem());
+    refreshRow(row);
 
-void ReceiptForm::on_comboModel_currentIndexChanged(int /*index*/)
-{
-    applyModelToAllRows();
-}
-
-int ReceiptForm::selectedModelId() const
-{
-    return ui->comboModel->currentData().toInt();
-}
-
-void ReceiptForm::applyModelToAllRows()
-{
-    const int modelId = selectedModelId();
-    for (int i = 0; i < rowsModel->rowCount(); ++i) {
-        QStandardItem* item = rowsModel->item(i, 0);
-        if (item)
-            item->setData(modelId, Qt::UserRole + 1);
-    }
+    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerial));
 }
 
 void ReceiptForm::on_btnDeleteRow_clicked()
@@ -208,11 +220,173 @@ void ReceiptForm::on_btnDeleteRow_clicked()
     }
 }
 
+int ReceiptForm::rowQty(int row) const
+{
+    QStandardItem* item = rowsModel->item(row, ColQty);
+    if (!item)
+        return 1;
+    bool ok = false;
+    const int v = item->text().toInt(&ok);
+    return (ok && v > 0) ? v : 1;
+}
+
+QStringList ReceiptForm::listForRow(int row, int col) const
+{
+    QStandardItem* item = rowsModel->item(row, col);
+    return item ? item->data(ListRole).toStringList() : QStringList();
+}
+
+void ReceiptForm::setListForRow(int row, int col, const QStringList& values)
+{
+    QStandardItem* item = rowsModel->item(row, col);
+    if (!item) {
+        item = new QStandardItem();
+        rowsModel->setItem(row, col, item);
+    }
+    item->setData(values, ListRole);
+}
+
+QString ReceiptForm::listSummary(const QStringList& values, int expected) const
+{
+    if (values.isEmpty())
+        return "—";
+    QString preview = values.join("; ");
+    if (preview.size() > 34)
+        preview = preview.left(34) + "…";
+    return QString("%1/%2 · %3").arg(values.size()).arg(expected).arg(preview);
+}
+
+void ReceiptForm::refreshRow(int row)
+{
+    const int qty = rowQty(row);
+    for (int col = ColSerial; col <= ColImei2; ++col) {
+        QStandardItem* item = rowsModel->item(row, col);
+        if (item)
+            item->setText(listSummary(listForRow(row, col), qty));
+    }
+}
+
+void ReceiptForm::openListDialog(int row, int col)
+{
+    if (col < ColSerial || col > ColImei2)
+        return;
+
+    const int qty = rowQty(row);
+    const bool imei = col >= ColImei1;
+    const SerialListDialog::Mode mode = imei ? SerialListDialog::Imei : SerialListDialog::Serial;
+    const QString title = col == ColSerial ? "Серийные номера" : (col == ColImei1 ? "IMEI 1" : "IMEI 2");
+
+    SerialListDialog dlg(mode, qty, !imei, listForRow(row, col), title, this);
+    if (dlg.exec() == QDialog::Accepted) {
+        setListForRow(row, col, dlg.values());
+        refreshRow(row);
+    }
+}
+
+void ReceiptForm::onTableViewDoubleClicked(const QModelIndex& index)
+{
+    if (!index.isValid())
+        return;
+    openListDialog(index.row(), index.column());
+}
+
 void ReceiptForm::on_btnPost_clicked()
 {
     if (rowsModel->rowCount() == 0) {
         QMessageBox::warning(this, "Внимание", "Добавьте хотя бы одну строку!");
         return;
+    }
+
+    // 0. Собираем строки и проверяем дубли в рамках документа.
+    struct ItemData {
+        int modelId;
+        int qty;
+        QStringList serials;
+        QStringList imei1;
+        QStringList imei2;
+    };
+    QList<ItemData> items;
+    QSet<QString> usedSerials, usedImei1, usedImei2;
+
+    for (int r = 0; r < rowsModel->rowCount(); ++r) {
+        ItemData it;
+        it.modelId = rowsModel->data(rowsModel->index(r, ColModel), Qt::UserRole).toInt();
+        it.qty = rowQty(r);
+        it.serials = listForRow(r, ColSerial);
+        it.imei1 = listForRow(r, ColImei1);
+        it.imei2 = listForRow(r, ColImei2);
+
+        if (it.modelId <= 0) {
+            QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите модель из списка.").arg(r + 1));
+            return;
+        }
+        if (it.serials.size() != it.qty) {
+            QMessageBox::critical(this, "Ошибка",
+                                  QString("Строка %1: введено %2 серийных номеров из %3.")
+                                      .arg(r + 1)
+                                      .arg(it.serials.size())
+                                      .arg(it.qty));
+            return;
+        }
+        if (!it.imei1.isEmpty() && it.imei1.size() != it.qty) {
+            QMessageBox::critical(this, "Ошибка",
+                                  QString("Строка %1: введено %2 значений IMEI 1 из %3.")
+                                      .arg(r + 1)
+                                      .arg(it.imei1.size())
+                                      .arg(it.qty));
+            return;
+        }
+        if (!it.imei2.isEmpty() && it.imei2.size() != it.qty) {
+            QMessageBox::critical(this, "Ошибка",
+                                  QString("Строка %1: введено %2 значений IMEI 2 из %3.")
+                                      .arg(r + 1)
+                                      .arg(it.imei2.size())
+                                      .arg(it.qty));
+            return;
+        }
+
+        for (const QString& sn : it.serials) {
+            if (usedSerials.contains(sn)) {
+                QMessageBox::critical(this, "Ошибка",
+                                      QString("Серийный номер повторяется в документе: %1").arg(sn));
+                return;
+            }
+            usedSerials.insert(sn);
+        }
+        for (const QString& im : it.imei1) {
+            if (im.isEmpty())
+                continue;
+            if (im.size() != 15) {
+                QMessageBox::critical(this, "Ошибка",
+                                      QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр (сейчас: %2)")
+                                          .arg(r + 1)
+                                          .arg(im));
+                return;
+            }
+            if (usedImei1.contains(im)) {
+                QMessageBox::critical(this, "Ошибка", QString("IMEI 1 повторяется в документе: %1").arg(im));
+                return;
+            }
+            usedImei1.insert(im);
+        }
+        for (const QString& im : it.imei2) {
+            if (im.isEmpty())
+                continue;
+            if (im.size() != 15) {
+                QMessageBox::critical(this, "Ошибка",
+                                      QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр (сейчас: %2)")
+                                          .arg(r + 1)
+                                          .arg(im));
+                return;
+            }
+            if (usedImei2.contains(im)) {
+                QMessageBox::critical(this, "Ошибка", QString("IMEI 2 повторяется в документе: %1").arg(im));
+                return;
+            }
+            usedImei2.insert(im);
+        }
+
+        items.append(it);
     }
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
@@ -224,7 +398,7 @@ void ReceiptForm::on_btnPost_clicked()
     QSqlQuery query(db);
     int docId;
 
-    // 1. Создаем или обновляем шапку документа
+    // 1. Шапка документа.
     if (m_editMode) {
         query.prepare("UPDATE tblreceiptdocs SET docdate = :date, comments = :comm WHERE receiptdocid = :id");
         query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
@@ -261,8 +435,18 @@ void ReceiptForm::on_btnPost_clicked()
         docId = query.value(0).toInt();
     }
 
-    // В режиме редактирования — удаляем старые связи
+    // 2. В режиме редактирования пересоздаём «исходник» и связи.
     if (m_editMode) {
+        QSqlQuery delItems(db);
+        delItems.prepare("DELETE FROM tblreceiptitems WHERE receiptdocid = :id");
+        delItems.bindValue(":id", docId);
+        if (!delItems.exec()) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка БД",
+                                  "Не удалось удалить старые строки: " + delItems.lastError().text());
+            return;
+        }
+
         QSqlQuery delDetails(db);
         delDetails.prepare("DELETE FROM tblreceiptdetails WHERE receiptdocid = :id");
         delDetails.bindValue(":id", docId);
@@ -274,133 +458,107 @@ void ReceiptForm::on_btnPost_clicked()
         }
     }
 
-    // 2. Обрабатываем строки
-    for (int i = 0; i < rowsModel->rowCount(); ++i) {
-        int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
-        QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
-        int modelId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole + 1).toInt();
-        QString imei1 = rowsModel->data(rowsModel->index(i, 1)).toString();
-        QString imei2 = rowsModel->data(rowsModel->index(i, 2)).toString();
-
-        // Валидация модели
-        if (modelId <= 0) {
+    // 3. Разворачиваем строки в терминалы и сохраняем «исходник».
+    for (const ItemData& it : items) {
+        QSqlQuery itemQuery(db);
+        itemQuery.prepare("INSERT INTO tblreceiptitems (receiptdocid, modelid, qty) "
+                          "VALUES (:did, :mid, :qty) RETURNING receiptitemid");
+        itemQuery.bindValue(":did", docId);
+        itemQuery.bindValue(":mid", it.modelId);
+        itemQuery.bindValue(":qty", it.qty);
+        if (!itemQuery.exec() || !itemQuery.next()) {
             db.rollback();
-            QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите модель из списка.").arg(i + 1));
+            QMessageBox::critical(this, "Ошибка БД",
+                                  "Не удалось сохранить строку документа: " + itemQuery.lastError().text());
             return;
         }
+        const int itemId = itemQuery.value(0).toInt();
 
-        // Валидация серийного номера
-        if (!Validator::validateSerialNotEmpty(serial)) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                                  QString("Строка %1: серийный номер должен содержать минимум 3 символа.").arg(i + 1));
-            return;
-        }
+        for (int i = 0; i < it.serials.size(); ++i) {
+            const QString serial = it.serials.at(i);
+            const QString im1 = i < it.imei1.size() ? it.imei1.at(i) : QString();
+            const QString im2 = i < it.imei2.size() ? it.imei2.at(i) : QString();
 
-        // Валидация IMEI (очищаем от разделителей, но показываем пользователю итог)
-        QRegularExpression digitRe("[^\\d]");
-        QString cleanImei1 = imei1;
-        QString cleanImei2 = imei2;
-        cleanImei1.remove(digitRe);
-        cleanImei2.remove(digitRe);
-
-        if (cleanImei1 != imei1 && !imei1.isEmpty()) {
-            QMessageBox::information(this, "Форматирование IMEI",
-                                     QString("Строка %1: IMEI 1 был очищен от разделителей:\n"
-                                             "Было: %2\nСтало: %3")
-                                         .arg(i + 1)
-                                         .arg(imei1, cleanImei1));
-        }
-        if (cleanImei2 != imei2 && !imei2.isEmpty()) {
-            QMessageBox::information(this, "Форматирование IMEI",
-                                     QString("Строка %1: IMEI 2 был очищен от разделителей:\n"
-                                             "Было: %2\nСтало: %3")
-                                         .arg(i + 1)
-                                         .arg(imei2, cleanImei2));
-        }
-
-        imei1 = cleanImei1;
-        imei2 = cleanImei2;
-
-        if (!imei1.isEmpty() && imei1.length() != 15) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                                  QString("Строка %1: IMEI 1 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
-                                      .arg(i + 1)
-                                      .arg(imei1)
-                                      .arg(imei1.length()));
-            return;
-        }
-
-        if (!imei2.isEmpty() && imei2.length() != 15) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка",
-                                  QString("Строка %1: IMEI 2 должен содержать ровно 15 цифр (сейчас: %2, длина: %3)")
-                                      .arg(i + 1)
-                                      .arg(imei2)
-                                      .arg(imei2.length()));
-            return;
-        }
-
-        int newTermId;
-        if (m_editMode && terminalId > 0) {
-            // Существующий терминал — UPDATE
-            QSqlQuery termQuery(db);
-            termQuery.prepare("UPDATE tblterminals SET serialnumber = :sn, modelid = :mid, "
-                              "imei1 = :i1, imei2 = :i2 WHERE terminalid = :tid");
-            termQuery.bindValue(":sn", serial);
-            termQuery.bindValue(":mid", modelId);
-            termQuery.bindValue(":i1", imei1);
-            termQuery.bindValue(":i2", imei2);
-            termQuery.bindValue(":tid", terminalId);
-
-            if (!termQuery.exec()) {
+            QSqlQuery serialQuery(db);
+            serialQuery.prepare("INSERT INTO tblreceiptserials (receiptitemid, linenum, serialnumber, imei1, imei2) "
+                                "VALUES (:iid, :ln, :sn, :i1, :i2)");
+            serialQuery.bindValue(":iid", itemId);
+            serialQuery.bindValue(":ln", i + 1);
+            serialQuery.bindValue(":sn", serial);
+            serialQuery.bindValue(":i1", im1);
+            serialQuery.bindValue(":i2", im2);
+            if (!serialQuery.exec()) {
                 db.rollback();
-                QMessageBox::critical(
-                    this, "Ошибка БД",
-                    QString("Ошибка при обновлении терминала %1:\n%2").arg(serial, termQuery.lastError().text()));
+                QMessageBox::critical(this, "Ошибка БД",
+                                      QString("Ошибка сохранения серийного номера %1:\n%2")
+                                          .arg(serial, serialQuery.lastError().text()));
                 return;
             }
-            newTermId = terminalId;
-        } else {
-            // Новый терминал — INSERT
-            QSqlQuery termQuery(db);
-            termQuery.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status) "
-                              "VALUES (:sn, :mid, :i1, :i2, 0) RETURNING terminalid");
-            termQuery.bindValue(":sn", serial);
-            termQuery.bindValue(":mid", modelId);
-            termQuery.bindValue(":i1", imei1);
-            termQuery.bindValue(":i2", imei2);
 
-            if (!termQuery.exec() || !termQuery.next()) {
+            int newTermId;
+            QSqlQuery findQuery(db);
+            findQuery.prepare("SELECT terminalid FROM tblterminals WHERE serialnumber = :sn");
+            findQuery.bindValue(":sn", serial);
+            const bool found = findQuery.exec() && findQuery.next();
+
+            if (found && m_editMode) {
+                // Редактирование: серийник уже был в базе — обновляем терминал.
+                newTermId = findQuery.value(0).toInt();
+                QSqlQuery termQuery(db);
+                termQuery.prepare("UPDATE tblterminals SET modelid = :mid, imei1 = :i1, imei2 = :i2 "
+                                  "WHERE terminalid = :tid");
+                termQuery.bindValue(":mid", it.modelId);
+                termQuery.bindValue(":i1", im1);
+                termQuery.bindValue(":i2", im2);
+                termQuery.bindValue(":tid", newTermId);
+                if (!termQuery.exec()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка БД",
+                                          QString("Ошибка при обновлении терминала %1:\n%2")
+                                              .arg(serial, termQuery.lastError().text()));
+                    return;
+                }
+            } else if (found) {
+                // Новый документ: серийник уже занят в базе.
                 db.rollback();
-                QMessageBox::critical(
-                    this, "Ошибка БД",
-                    QString("Ошибка при добавлении терминала %1:\n%2").arg(serial, termQuery.lastError().text()));
+                QMessageBox::critical(this, "Ошибка",
+                                      QString("Серийный номер уже есть в базе: %1").arg(serial));
+                return;
+            } else {
+                QSqlQuery termQuery(db);
+                termQuery.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status) "
+                                  "VALUES (:sn, :mid, :i1, :i2, 0) RETURNING terminalid");
+                termQuery.bindValue(":sn", serial);
+                termQuery.bindValue(":mid", it.modelId);
+                termQuery.bindValue(":i1", im1);
+                termQuery.bindValue(":i2", im2);
+                if (!termQuery.exec() || !termQuery.next()) {
+                    db.rollback();
+                    QMessageBox::critical(this, "Ошибка БД",
+                                          QString("Ошибка при добавлении терминала %1:\n%2")
+                                              .arg(serial, termQuery.lastError().text()));
+                    return;
+                }
+                newTermId = termQuery.value(0).toInt();
+            }
+
+            QSqlQuery detailQuery(db);
+            detailQuery.prepare("INSERT INTO tblreceiptdetails (receiptdocid, terminalid) VALUES (:did, :tid)");
+            detailQuery.bindValue(":did", docId);
+            detailQuery.bindValue(":tid", newTermId);
+            if (!detailQuery.exec()) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
                 return;
             }
-            newTermId = termQuery.value(0).toInt();
-        }
-
-        // Вставляем связь с документом
-        QSqlQuery detailQuery(db);
-        detailQuery.prepare("INSERT INTO tblreceiptdetails (receiptdocid, terminalid) VALUES (:did, :tid)");
-        detailQuery.bindValue(":did", docId);
-        detailQuery.bindValue(":tid", newTermId);
-
-        if (!detailQuery.exec()) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
-            return;
         }
     }
 
-    // 3. Фиксируем транзакцию
+    // 4. Фиксируем транзакцию.
     if (!db.commit()) {
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
-        // Логирование действия
         DatabaseManager::instance().logAction("POST", "tblreceiptdocs", docId);
 
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
@@ -425,7 +583,7 @@ void ReceiptForm::on_btnPrint_clicked()
                    "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
                    "h2 { text-align: center; }"
                    "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
-                   "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
+                   "th, td { border: 1px solid black; padding: 6px; text-align: left; vertical-align: top; }"
                    "th { background-color: #f0f0f0; }"
                    "</style></head><body>";
 
@@ -437,34 +595,43 @@ void ReceiptForm::on_btnPrint_clicked()
     if (!comment.isEmpty())
         html += "<p><b>Комментарий:</b> " + comment.toHtmlEscaped() + "</p>";
 
-    html += "<table><tr><th>№</th><th>Серийный номер</th><th>Модель</th><th>IMEI 1</th><th>IMEI 2</th></tr>";
+    html += "<table><tr><th>№</th><th>Модель</th><th>Кол-во</th><th>Серийные номера</th><th>IMEI 1</th><th>IMEI 2</th></tr>";
 
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
-        QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
-        int modelId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole + 1).toInt();
-        QString modelName;
-        for (const auto& m : m_models) {
-            if (m.first == modelId) {
-                modelName = m.second;
-                break;
-            }
-        }
-        QString imei1 = rowsModel->data(rowsModel->index(i, 1)).toString();
-        QString imei2 = rowsModel->data(rowsModel->index(i, 2)).toString();
+        const QString model = rowsModel->data(rowsModel->index(i, ColModel)).toString();
+        const int qty = rowQty(i);
+
+        QStringList cell;
+        for (const QString& v : listForRow(i, ColSerial))
+            cell << v.toHtmlEscaped();
+        const QString serials = cell.isEmpty() ? "&nbsp;" : cell.join("<br>");
+
+        cell.clear();
+        for (const QString& v : listForRow(i, ColImei1))
+            cell << v.toHtmlEscaped();
+        const QString imei1 = cell.isEmpty() ? "&nbsp;" : cell.join("<br>");
+
+        cell.clear();
+        for (const QString& v : listForRow(i, ColImei2))
+            cell << v.toHtmlEscaped();
+        const QString imei2 = cell.isEmpty() ? "&nbsp;" : cell.join("<br>");
 
         html += "<tr><td>" + QString::number(i + 1) +
                 "</td>"
                 "<td>" +
-                serial.toHtmlEscaped() +
+                model.toHtmlEscaped() +
                 "</td>"
                 "<td>" +
-                modelName.toHtmlEscaped() +
+                QString::number(qty) +
                 "</td>"
                 "<td>" +
-                imei1.toHtmlEscaped() +
+                serials +
                 "</td>"
                 "<td>" +
-                imei2.toHtmlEscaped() + "</td></tr>";
+                imei1 +
+                "</td>"
+                "<td>" +
+                imei2 + "</td></tr>";
     }
     html += "</table>";
 
@@ -506,67 +673,41 @@ void ReceiptForm::onScanFinished(const QString& raw)
     if (!data.hasData())
         return;
 
-    // Серийный номер: первая строка без серийника; если все заполнены — новая строка.
+    int row = ui->tableView->currentIndex().row();
+    if (row < 0) {
+        row = rowsModel->rowCount();
+        rowsModel->insertRow(row);
+        QString modelName;
+        int modelId = 0;
+        if (!m_models.isEmpty()) {
+            modelId = m_models.first().first;
+            modelName = m_models.first().second;
+        }
+        QStandardItem* modelItem = new QStandardItem(modelName);
+        modelItem->setData(modelId, Qt::UserRole);
+        rowsModel->setItem(row, ColModel, modelItem);
+        rowsModel->setItem(row, ColQty, new QStandardItem("1"));
+    }
+
     if (!data.serial.isEmpty()) {
-        int row = targetRowForSerial();
-        if (row < 0) {
-            row = rowsModel->rowCount();
-            rowsModel->insertRow(row);
-        }
-        QStandardItem* serialItem = new QStandardItem(data.serial);
-        serialItem->setData(selectedModelId(), Qt::UserRole + 1);
-        rowsModel->setItem(row, 0, serialItem);
-        ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
+        QStringList lst = listForRow(row, ColSerial);
+        lst.append(data.serial);
+        setListForRow(row, ColSerial, lst);
     }
-
-    // IMEI: в строку, где серийник заполнен, а нужная колонка пуста.
     if (!data.imei1.isEmpty()) {
-        int row = targetRowForImei(1);
-        if (row < 0) {
-            row = rowsModel->rowCount();
-            rowsModel->insertRow(row);
-            QStandardItem* serialItem = new QStandardItem();
-            serialItem->setData(selectedModelId(), Qt::UserRole + 1);
-            rowsModel->setItem(row, 0, serialItem);
-        }
-        rowsModel->setItem(row, 1, new QStandardItem(data.imei1));
-        ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
+        QStringList lst = listForRow(row, ColImei1);
+        lst.append(data.imei1);
+        setListForRow(row, ColImei1, lst);
     }
-
     if (!data.imei2.isEmpty()) {
-        int row = targetRowForImei(2);
-        if (row < 0) {
-            row = rowsModel->rowCount();
-            rowsModel->insertRow(row);
-            QStandardItem* serialItem = new QStandardItem();
-            serialItem->setData(selectedModelId(), Qt::UserRole + 1);
-            rowsModel->setItem(row, 0, serialItem);
-        }
-        rowsModel->setItem(row, 2, new QStandardItem(data.imei2));
-        ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
+        QStringList lst = listForRow(row, ColImei2);
+        lst.append(data.imei2);
+        setListForRow(row, ColImei2, lst);
     }
 
+    refreshRow(row);
+    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerial));
     ui->tableView->setFocus();
-}
-
-int ReceiptForm::targetRowForSerial() const
-{
-    for (int r = 0; r < rowsModel->rowCount(); ++r) {
-        if (rowsModel->data(rowsModel->index(r, 0)).toString().isEmpty())
-            return r;
-    }
-    return -1;
-}
-
-int ReceiptForm::targetRowForImei(int imeiCol) const
-{
-    for (int r = 0; r < rowsModel->rowCount(); ++r) {
-        const QString serial = rowsModel->data(rowsModel->index(r, 0)).toString();
-        const QString imei = rowsModel->data(rowsModel->index(r, imeiCol)).toString();
-        if (!serial.isEmpty() && imei.isEmpty())
-            return r;
-    }
-    return -1;
 }
 
 bool ReceiptForm::eventFilter(QObject* obj, QEvent* event)

@@ -168,6 +168,55 @@ QVector<models::ReceiptRow> DocumentRepository::loadReceiptRows(int receiptDocId
     return result;
 }
 
+QVector<models::ReceiptItem> DocumentRepository::loadReceiptItems(int receiptDocId) const
+{
+    QVector<models::ReceiptItem> result;
+    QSqlQuery itemQuery(m_db);
+    itemQuery.prepare("SELECT i.receiptitemid, i.modelid, COALESCE(m.modelname, ''), i.qty "
+                      "FROM tblreceiptitems i "
+                      "LEFT JOIN tblmodels m ON i.modelid = m.modelid "
+                      "WHERE i.receiptdocid = :id "
+                      "ORDER BY i.receiptitemid");
+    itemQuery.bindValue(":id", receiptDocId);
+    if (!itemQuery.exec())
+        return result;
+
+    while (itemQuery.next()) {
+        models::ReceiptItem item;
+        item.itemId = itemQuery.value(0).toInt();
+        item.modelId = itemQuery.value(1).toInt();
+        item.modelName = itemQuery.value(2).toString();
+        item.qty = itemQuery.value(3).toInt();
+        result.append(item);
+    }
+
+    QSqlQuery serialQuery(m_db);
+    serialQuery.prepare("SELECT rs.receiptitemid, rs.linenum, rs.serialnumber, "
+                        "COALESCE(rs.imei1, ''), COALESCE(rs.imei2, '') "
+                        "FROM tblreceiptserials rs "
+                        "WHERE rs.receiptitemid IN (SELECT t.receiptitemid FROM tblreceiptitems t "
+                        "                           WHERE t.receiptdocid = :id) "
+                        "ORDER BY rs.receiptitemid, rs.linenum");
+    serialQuery.bindValue(":id", receiptDocId);
+    if (serialQuery.exec()) {
+        while (serialQuery.next()) {
+            const int itemId = serialQuery.value(0).toInt();
+            models::ReceiptSerial s;
+            s.linenum = serialQuery.value(1).toInt();
+            s.serialNumber = serialQuery.value(2).toString();
+            s.imei1 = serialQuery.value(3).toString();
+            s.imei2 = serialQuery.value(4).toString();
+            for (auto& item : result) {
+                if (item.itemId == itemId) {
+                    item.serials.append(s);
+                    break;
+                }
+            }
+        }
+    }
+    return result;
+}
+
 int DocumentRepository::rentalDocIdForReturn(int returnDocId) const
 {
     QSqlQuery query(m_db);
