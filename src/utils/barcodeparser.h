@@ -2,6 +2,7 @@
 #define BARCODEPARSER_H
 
 #include <QString>
+#include <QStringList>
 
 // Результат разбора «сырой» строки со сканера.
 struct BarcodeScan {
@@ -26,6 +27,14 @@ public:
 
     // «Ровно 15 цифр» — эвристика «это IMEI».
     static bool isImei(const QString& value);
+
+    // Применяет данные скана к трём параллельным спискам комплектов одной
+    // строки документа (серийники/imei1/imei2 — по одному комплекту на индекс).
+    // Логика «SN → IMEI 1 → IMEI 2»: серийник открывает новый комплект, голый
+    // IMEI дописывается к последнему комплекту (сначала в IMEI 1, затем в
+    // IMEI 2), IMEI с подписью «2» — сразу в слот IMEI 2. Возвращает true,
+    // если данные изменились.
+    static bool applyScan(QStringList& serials, QStringList& imei1, QStringList& imei2, const BarcodeScan& scan);
 };
 
 #endif // BARCODEPARSER_H

@@ -7,6 +7,7 @@
 
 class BarcodeScanner;
 class SerialScanner;
+class SerialUnitsDialog;
 
 namespace Ui {
 class ReceiptForm;
@@ -65,6 +66,7 @@ private:
     QList<QPair<int, QString>> m_models;
     BarcodeScanner* m_scanner = nullptr;
     SerialScanner* m_serialScanner = nullptr;
+    SerialUnitsDialog* m_unitsDialog = nullptr;
     bool m_editMode = false;
     int m_editDocId = 0;
 };

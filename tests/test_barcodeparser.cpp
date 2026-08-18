@@ -17,6 +17,11 @@ private slots:
     void gsSeparators();
     void emptyInput();
     void labeledDuplicateImei();
+    void applyScanFullSequence();
+    void applyScanSecondImeiFillsSlot2();
+    void applyScanLabeledImei2();
+    void applyScanImeiFirstNoSerial();
+    void applyScanOneScanAllFields();
 };
 
 void TestBarcodeParser::plainSerial()
@@ -99,6 +104,81 @@ void TestBarcodeParser::labeledDuplicateImei()
     QCOMPARE(s.serial, QString("ABC-123"));
     QCOMPARE(s.imei1, QString("356938035643809"));
     QCOMPARE(s.imei2, QString("356938035643821"));
+}
+
+void TestBarcodeParser::applyScanFullSequence()
+{
+    // Полная последовательность: SN → IMEI1 → IMEI2 → следующий SN...
+    QStringList s, i1, i2;
+    QVERIFY(BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("ABC-001")));
+    QCOMPARE(s, QStringList({"ABC-001"}));
+    QVERIFY(s.size() == 1);
+
+    // Голый IMEI (15 цифр) — в первый слот текущего комплекта.
+    QVERIFY(BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("356938035643809")));
+    QCOMPARE(i1, QStringList({"356938035643809"}));
+    QVERIFY(s.size() == 1);
+
+    // Второй голый IMEI — в IMEI 2 того же комплекта, а НЕ новой строкой.
+    QVERIFY(BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("356938035643821")));
+    QCOMPARE(s, QStringList({"ABC-001"}));
+    QCOMPARE(i1, QStringList({"356938035643809"}));
+    QCOMPARE(i2, QStringList({"356938035643821"}));
+
+    // Следующий SN открывает новый комплект.
+    QVERIFY(BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("ABC-002")));
+    QCOMPARE(s, QStringList({"ABC-001", "ABC-002"}));
+    QCOMPARE(i2, QStringList({"356938035643821", ""}));
+}
+
+void TestBarcodeParser::applyScanSecondImeiFillsSlot2()
+{
+    // Регресс-тест: второй отсканированный IMEI должен попасть в IMEI 2
+    // текущего комплекта, а не создать новую строку с IMEI 1.
+    QStringList s, i1, i2;
+    BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("ABC-123"));
+    BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("111111111111111"));
+    BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("222222222222222"));
+    QCOMPARE(s.size(), 1);
+    QCOMPARE(i1.size(), 1);
+    QCOMPARE(i2.size(), 1);
+    QCOMPARE(i1.at(0), QString("111111111111111"));
+    QCOMPARE(i2.at(0), QString("222222222222222"));
+}
+
+void TestBarcodeParser::applyScanLabeledImei2()
+{
+    // Подписанный IMEI 2 сразу попадает в слот IMEI 2 текущего комплекта.
+    QStringList s, i1, i2;
+    BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("ABC-123"));
+    BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("IMEI2:222222222222222"));
+    QCOMPARE(s.size(), 1);
+    QCOMPARE(i1.at(0), QString(""));
+    QCOMPARE(i2.at(0), QString("222222222222222"));
+}
+
+void TestBarcodeParser::applyScanImeiFirstNoSerial()
+{
+    // IMEI до серийника: создаётся строка без SN, затем SN в неё дописывается.
+    QStringList s, i1, i2;
+    BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("356938035643809"));
+    QCOMPARE(s, QStringList({""}));
+    QCOMPARE(i1, QStringList({"356938035643809"}));
+
+    BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("ABC-001"));
+    QCOMPARE(s, QStringList({"ABC-001"}));
+    QCOMPARE(i1, QStringList({"356938035643809"}));
+}
+
+void TestBarcodeParser::applyScanOneScanAllFields()
+{
+    // Подписанный скан со всеми полями — один комплект целиком.
+    QStringList s, i1, i2;
+    BarcodeParser::applyScan(s, i1, i2,
+                             BarcodeParser::parse("SN:ABC-001 IMEI1:111111111111111 IMEI2:222222222222222"));
+    QCOMPARE(s, QStringList({"ABC-001"}));
+    QCOMPARE(i1, QStringList({"111111111111111"}));
+    QCOMPARE(i2, QStringList({"222222222222222"}));
 }
 
 QTEST_GUILESS_MAIN(TestBarcodeParser)

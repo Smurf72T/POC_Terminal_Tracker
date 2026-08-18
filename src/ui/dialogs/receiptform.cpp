@@ -277,7 +277,10 @@ void ReceiptForm::openUnitsDialog(int row)
 
     SerialUnitsDialog dlg(rowQty(row), serialsForRow(row), imei1ForRow(row), imei2ForRow(row),
                           "Серийные номера: комплекты (SN · IMEI 1 · IMEI 2)", this);
-    if (dlg.exec() == QDialog::Accepted) {
+    m_unitsDialog = &dlg;
+    const int result = dlg.exec();
+    m_unitsDialog = nullptr;
+    if (result == QDialog::Accepted) {
         setUnitsForRow(row, dlg.serials(), dlg.imei1(), dlg.imei2());
         refreshRow(row);
     }
@@ -659,6 +662,18 @@ void ReceiptForm::on_btnClose_clicked()
 
 bool ReceiptForm::canAcceptScan() const
 {
+    // Окно комплектов открыто — скан принимаем, если фокус не в текстовом поле
+    // этого окна (сканер пишет прямо в его таблицу).
+    if (m_unitsDialog && m_unitsDialog->isActiveWindow()) {
+        QWidget* focus = QApplication::focusWidget();
+        if (!focus)
+            return true;
+        if (qobject_cast<QLineEdit*>(focus) || qobject_cast<QTextEdit*>(focus) ||
+            qobject_cast<QPlainTextEdit*>(focus) || qobject_cast<QComboBox*>(focus))
+            return false;
+        return focus->window() == m_unitsDialog->window();
+    }
+
     if (!isActiveWindow())
         return false;
     QWidget* focus = QApplication::focusWidget();
@@ -674,6 +689,12 @@ bool ReceiptForm::canAcceptScan() const
 
 void ReceiptForm::onScanFinished(const QString& raw)
 {
+    // Если окно комплектов открыто — скан обрабатывает оно, а не форма.
+    if (m_unitsDialog) {
+        m_unitsDialog->handleScan(raw);
+        return;
+    }
+
     const BarcodeScan data = BarcodeParser::parse(raw);
     if (!data.hasData())
         return;
@@ -695,50 +716,14 @@ void ReceiptForm::onScanFinished(const QString& raw)
     }
 
     // Комплекты хранятся как три параллельных списка: imei[n] принадлежит
-    // serial[n]. Сканы серийника/IMEI не могут разорвать эту связь.
+    // serial[n]. Логика «SN → IMEI 1 → IMEI 2 → следующий SN» в BarcodeParser:
+    // серийник открывает новый комплект, голый IMEI дописывается к последнему
+    // (сначала в IMEI 1, затем в IMEI 2).
     QStringList s = serialsForRow(row);
     QStringList i1 = imei1ForRow(row);
     QStringList i2 = imei2ForRow(row);
-
-    if (!data.serial.isEmpty()) {
-        s.append(data.serial);
-        i1.append(QString());
-        i2.append(QString());
-    }
-
-    if (!data.imei1.isEmpty()) {
-        int idx = -1;
-        for (int k = s.size() - 1; k >= 0; --k) {
-            if (!s.at(k).isEmpty() && i1.at(k).isEmpty()) {
-                idx = k;
-                break;
-            }
-        }
-        if (idx >= 0) {
-            i1[idx] = data.imei1;
-        } else {
-            s.append(QString());
-            i1.append(data.imei1);
-            i2.append(QString());
-        }
-    }
-
-    if (!data.imei2.isEmpty()) {
-        int idx = -1;
-        for (int k = s.size() - 1; k >= 0; --k) {
-            if (!s.at(k).isEmpty() && i2.at(k).isEmpty()) {
-                idx = k;
-                break;
-            }
-        }
-        if (idx >= 0) {
-            i2[idx] = data.imei2;
-        } else {
-            s.append(QString());
-            i1.append(QString());
-            i2.append(data.imei2);
-        }
-    }
+    if (!BarcodeParser::applyScan(s, i1, i2, data))
+        return;
 
     setUnitsForRow(row, s, i1, i2);
     refreshRow(row);

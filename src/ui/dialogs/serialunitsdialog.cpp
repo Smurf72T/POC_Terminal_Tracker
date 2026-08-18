@@ -1,5 +1,6 @@
 #include "serialunitsdialog.h"
 #include "ui_serialunitsdialog.h"
+#include "utils/barcodeparser.h"
 
 #include <QHeaderView>
 #include <QMessageBox>
@@ -48,12 +49,27 @@ SerialUnitsDialog::~SerialUnitsDialog()
     delete ui;
 }
 
+QString SerialUnitsDialog::cellText(int row, int col) const
+{
+    const QTableWidgetItem* it = ui->tableWidget->item(row, col);
+    return it ? it->text().trimmed() : QString();
+}
+
+void SerialUnitsDialog::setCellText(int row, int col, const QString& text)
+{
+    QTableWidgetItem* it = ui->tableWidget->item(row, col);
+    if (!it) {
+        it = new QTableWidgetItem();
+        ui->tableWidget->setItem(row, col, it);
+    }
+    it->setText(text);
+}
+
 QStringList SerialUnitsDialog::serials() const
 {
     QStringList result;
     for (int r = 0; r < ui->tableWidget->rowCount(); ++r) {
-        QTableWidgetItem* it = ui->tableWidget->item(r, 0);
-        const QString s = it ? it->text().trimmed() : QString();
+        const QString s = cellText(r, 0);
         result.append(s.isEmpty() ? QString() : s);
     }
     return result;
@@ -63,8 +79,7 @@ QStringList SerialUnitsDialog::imei1() const
 {
     QStringList result;
     for (int r = 0; r < ui->tableWidget->rowCount(); ++r) {
-        QTableWidgetItem* it = ui->tableWidget->item(r, 1);
-        const QString s = it ? it->text().trimmed() : QString();
+        const QString s = cellText(r, 1);
         result.append(s.isEmpty() ? QString() : s);
     }
     return result;
@@ -74,11 +89,63 @@ QStringList SerialUnitsDialog::imei2() const
 {
     QStringList result;
     for (int r = 0; r < ui->tableWidget->rowCount(); ++r) {
-        QTableWidgetItem* it = ui->tableWidget->item(r, 2);
-        const QString s = it ? it->text().trimmed() : QString();
+        const QString s = cellText(r, 2);
         result.append(s.isEmpty() ? QString() : s);
     }
     return result;
+}
+
+bool SerialUnitsDialog::handleScan(const QString& raw)
+{
+    const BarcodeScan data = BarcodeParser::parse(raw);
+    if (!data.hasData())
+        return false;
+
+    QStringList s = serials();
+    QStringList i1 = imei1();
+    QStringList i2 = imei2();
+    if (!BarcodeParser::applyScan(s, i1, i2, data))
+        return false;
+
+    // Переносим обновлённые списки комплектов обратно в таблицу.
+    m_populating = true;
+    const int rows = qMax(s.size(), m_expectedCount);
+    ui->tableWidget->setRowCount(rows);
+    for (int r = 0; r < rows; ++r) {
+        const QString sn = r < s.size() ? s.at(r) : QString();
+        const QString a = r < i1.size() ? i1.at(r) : QString();
+        const QString b = r < i2.size() ? i2.at(r) : QString();
+        setCellText(r, 0, sn);
+        setCellText(r, 1, a);
+        setCellText(r, 2, b);
+    }
+    m_populating = false;
+
+    // Фокус на «следующую ожидаемую» ячейку после принятого скана:
+    // SN → IMEI 1 → IMEI 2 → следующий комплект.
+    int focusRow = -1;
+    for (int r = s.size() - 1; r >= 0; --r) {
+        if (!s.at(r).isEmpty()) {
+            focusRow = r;
+            break;
+        }
+    }
+    if (focusRow < 0 && !s.isEmpty())
+        focusRow = s.size() - 1;
+    if (focusRow >= 0) {
+        int focusCol = 0;
+        if (i1.at(focusRow).isEmpty())
+            focusCol = 1;
+        else if (i2.at(focusRow).isEmpty())
+            focusCol = 2;
+        else if (focusRow + 1 < rows)
+            focusRow += 1;
+        ui->tableWidget->setCurrentCell(focusRow, focusCol);
+    }
+    ui->tableWidget->setFocus();
+
+    updateStatus();
+    return true;
 }
 
 void SerialUnitsDialog::updateStatus()

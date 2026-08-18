@@ -54,6 +54,79 @@ bool BarcodeParser::isImei(const QString& value)
     return true;
 }
 
+bool BarcodeParser::applyScan(QStringList& serials, QStringList& imei1, QStringList& imei2, const BarcodeScan& scan)
+{
+    bool changed = false;
+
+    // Серийный номер: новый комплект. Если последняя строка осталась без
+    // серийника (например, первым отсканировали IMEI) — дописываем в неё.
+    if (!scan.serial.isEmpty()) {
+        const int last = serials.size() - 1;
+        if (last >= 0 && serials.at(last).isEmpty()) {
+            serials[last] = scan.serial;
+        } else {
+            serials.append(scan.serial);
+            imei1.append(QString());
+            imei2.append(QString());
+        }
+        changed = true;
+    }
+
+    // IMEI дописывается к «текущему» комплекту — последнему, у которого есть
+    // серийный номер (SN → IMEI 1 → IMEI 2 → следующий SN). Если серийник ещё
+    // не отсканирован, «текущим» считается последняя строка вообще. Если
+    // текущий комплект заполнен полностью или его нет — начинаем новый без SN.
+    auto fillImei = [&](const QString& value, bool preferSlot2) {
+        if (value.isEmpty())
+            return;
+        int idx = -1;
+        for (int k = serials.size() - 1; k >= 0; --k) {
+            if (!serials.at(k).isEmpty()) {
+                idx = k;
+                break;
+            }
+        }
+        if (idx < 0 && !serials.isEmpty())
+            idx = serials.size() - 1;
+
+        if (idx >= 0) {
+            const bool slot1Empty = imei1.at(idx).isEmpty();
+            const bool slot2Empty = imei2.at(idx).isEmpty();
+            if (preferSlot2) {
+                if (slot2Empty) {
+                    imei2[idx] = value;
+                    changed = true;
+                    return;
+                }
+                if (slot1Empty) {
+                    imei1[idx] = value;
+                    changed = true;
+                    return;
+                }
+            } else {
+                if (slot1Empty) {
+                    imei1[idx] = value;
+                    changed = true;
+                    return;
+                }
+                if (slot2Empty) {
+                    imei2[idx] = value;
+                    changed = true;
+                    return;
+                }
+            }
+        }
+        serials.append(QString());
+        imei1.append(preferSlot2 ? QString() : value);
+        imei2.append(preferSlot2 ? value : QString());
+        changed = true;
+    };
+
+    fillImei(scan.imei1, false);
+    fillImei(scan.imei2, true);
+    return changed;
+}
+
 BarcodeScan BarcodeParser::parse(const QString& raw)
 {
     BarcodeScan out;
