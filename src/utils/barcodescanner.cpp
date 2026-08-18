@@ -37,7 +37,16 @@ bool BarcodeScanner::isActive() const
 void BarcodeScanner::feed(const QString& text)
 {
     for (QChar ch : text) {
-        if (!ch.isPrint() || ch.isSpace())
+        // Разделители полей (пробел, GS1 \x1D/\x1E/\x04) сохраняем одиночным
+        // пробелом — BarcodeParser по ним раскидывает SN/IMEI1/IMEI2.
+        if (ch == QChar(0x1D) || ch == QChar(0x1E) || ch == QChar(0x04) || ch.isSpace()) {
+            if (!m_buffer.isEmpty() && !m_buffer.endsWith(' ')) {
+                m_buffer.append(' ');
+                m_timer.start(m_interCharTimeoutMs);
+            }
+            continue;
+        }
+        if (!ch.isPrint())
             continue;
         if (m_buffer.isEmpty())
             emit scanStarted();
@@ -59,7 +68,7 @@ bool BarcodeScanner::commit()
         return false;
     m_committing = true;
     m_timer.stop();
-    const QString raw = m_buffer;
+    const QString raw = m_buffer.trimmed();
     m_buffer.clear();
     m_committing = false;
     if (raw.length() < m_minLength)

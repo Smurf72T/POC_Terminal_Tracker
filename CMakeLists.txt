@@ -97,6 +97,7 @@ set(SOURCES
         src/utils/circuitbreaker.cpp
         src/utils/barcodeparser.cpp
         src/utils/barcodescanner.cpp
+        src/utils/serialscanner.cpp
         src/ops/backupmanager.cpp
         src/ops/backupworker.cpp
         src/ops/opslog.cpp
@@ -159,6 +160,7 @@ set(HEADERS
         src/utils/logging.h
         src/utils/circuitbreaker.h
         src/utils/barcodeparser.h
+        src/utils/serialscanner.h
         src/utils/barcodescanner.h
         src/utils/password_utils.h
         src/ops/backupmanager.h
@@ -206,6 +208,17 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         PostgreSQL::PostgreSQL
         QXlsx::QXlsx
 )
+
+# Диагностика сканера штрих-кода: показывает сырые KeyPress/KeyRelease,
+# задержки между нажатиями и результат BarcodeScanner+BarcodeParser.
+add_executable(scanner_probe
+        tools/scanner_probe/scanner_probe.cpp
+        src/utils/barcodescanner.cpp
+        src/utils/barcodeparser.cpp
+        src/utils/serialscanner.cpp
+)
+target_include_directories(scanner_probe PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(scanner_probe PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets)
 
 # Копируем config.json в папку сборки. config.json не коммитится (см. .gitignore,
 # версия живёт в config/config.json.example) — при его отсутствии берём шаблон.
@@ -301,7 +314,7 @@ if(BUILD_TESTS)
     target_link_libraries(test_barcodeparser PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_barcodeparser COMMAND test_barcodeparser)
 
-    add_executable(test_barcodescanner tests/test_barcodescanner.cpp src/utils/barcodescanner.cpp)
+    add_executable(test_barcodescanner tests/test_barcodescanner.cpp src/utils/barcodescanner.cpp src/utils/barcodeparser.cpp)
     target_include_directories(test_barcodescanner PRIVATE ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(test_barcodescanner PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_barcodescanner COMMAND test_barcodescanner)

@@ -3,6 +3,7 @@
 #include <QSignalSpy>
 
 #include "utils/barcodescanner.h"
+#include "utils/barcodeparser.h"
 
 class TestBarcodeScanner : public QObject {
     Q_OBJECT
@@ -13,6 +14,7 @@ private slots:
     void feedCommitByTimeout();
     void swallowedTerminator();
     void ignoresSpacesAndControls();
+    void keepsFieldSeparators();
 };
 
 void TestBarcodeScanner::feedThenTerminator()
@@ -74,10 +76,29 @@ void TestBarcodeScanner::ignoresSpacesAndControls()
     BarcodeScanner scanner;
     QSignalSpy finishedSpy(&scanner, &BarcodeScanner::scanFinished);
 
-    scanner.feed(" AB C "); // пробелы игнорируются
+    scanner.feed(" AB C "); // краевые пробелы вырезаются
     QVERIFY(scanner.feedTerminator());
     QCOMPARE(finishedSpy.count(), 1);
-    QCOMPARE(finishedSpy.first().at(0).toString(), QString("ABC"));
+    QCOMPARE(finishedSpy.first().at(0).toString(), QString("AB C"));
+}
+
+void TestBarcodeScanner::keepsFieldSeparators()
+{
+    // Подписанный payload с пробелами/GS1-разделителями не «склеивается».
+    BarcodeScanner scanner;
+    QSignalSpy finishedSpy(&scanner, &BarcodeScanner::scanFinished);
+
+    scanner.feed("SN:ABC-123 IMEI1:356938035643809" + QString(QChar(0x1D)) + "IMEI2:356938035643821");
+    QVERIFY(scanner.feedTerminator());
+    QCOMPARE(finishedSpy.count(), 1);
+    QCOMPARE(finishedSpy.first().at(0).toString(),
+             QString("SN:ABC-123 IMEI1:356938035643809 IMEI2:356938035643821"));
+
+    const BarcodeScan data = BarcodeParser::parse(finishedSpy.first().at(0).toString());
+    QVERIFY(data.hasData());
+    QCOMPARE(data.serial, QString("ABC-123"));
+    QCOMPARE(data.imei1, QString("356938035643809"));
+    QCOMPARE(data.imei2, QString("356938035643821"));
 }
 
 QTEST_GUILESS_MAIN(TestBarcodeScanner)

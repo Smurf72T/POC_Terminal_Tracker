@@ -1,11 +1,11 @@
 #include "receiptform.h"
 #include "ui_receiptform.h"
-#include "delegates/comboboxdelegate.h"
 #include "database/databasemanager.h"
 #include "database/repositories/documentrepository.h"
 #include "utils/validator.h"
 #include "utils/barcodeparser.h"
 #include "utils/barcodescanner.h"
+#include "utils/serialscanner.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <QSqlQuery>
@@ -19,9 +19,11 @@
 #include <QTextEdit>
 #include <QPlainTextEdit>
 #include "utils/logging.h"
+#include <QJsonObject>
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QTextDocument>
+#include <QTimer>
 
 ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptForm)
 {
@@ -35,9 +37,10 @@ ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptF
     // Номер документа генерируется при проведении (не здесь), чтобы не
     // сжигать значения последовательности для отменённых форм.
 
-    // Настройка модели для табличной части
-    rowsModel = new QStandardItemModel(0, 4, this); // 4 колонки
-    rowsModel->setHorizontalHeaderLabels({"Серийный номер", "Модель (ID)", "IMEI 1", "IMEI 2"});
+    // Настройка модели для табличной части: серийник, IMEI 1, IMEI 2.
+    // Модель хранится в UserRole+1 элемента серийного номера, выбор — комбобокс comboModel.
+    rowsModel = new QStandardItemModel(0, 3, this);
+    rowsModel->setHorizontalHeaderLabels({"Серийный номер", "IMEI 1", "IMEI 2"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
@@ -52,6 +55,29 @@ ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptF
     m_scanner = new BarcodeScanner(this);
     connect(m_scanner, &BarcodeScanner::scanFinished, this, &ReceiptForm::onScanFinished);
     qApp->installEventFilter(this);
+
+    // Сканер штрих-кода через COM-порт (типовые USB-сканеры в режиме RS-232).
+    setupSerialScanner();
+
+    // Начальный фокус — на таблице, чтобы сканер сразу заполнял строки,
+    // а не «Номер» документа (canAcceptScan не перехватывает ввод в QLineEdit).
+    QTimer::singleShot(0, this, [this]() { ui->tableView->setFocus(); });
+}
+
+void ReceiptForm::setupSerialScanner()
+{
+    const QJsonObject cfg = DatabaseManager::instance().configObject()["scanner"].toObject();
+    if (!cfg.value("enabled").toBool(true))
+        return;
+
+    const QString port = cfg.value("port").toString("COM8");
+    const int baud = cfg.value("baud_rate").toInt(9600);
+
+    m_serialScanner = new SerialScanner(this);
+    connect(m_serialScanner, &SerialScanner::scanFinished, this, &ReceiptForm::onScanFinished);
+    if (!m_serialScanner->start(port, baud)) {
+        qCWarning(logApp) << "Сканер: не удалось открыть" << port;
+    }
 }
 
 ReceiptForm::~ReceiptForm()
@@ -71,10 +97,12 @@ void ReceiptForm::loadModelsToDelegate()
 
     while (query.next()) {
         m_models.append(qMakePair(query.value(0).toInt(), query.value(1).toString()));
+        ui->comboModel->addItem(query.value(1).toString(), query.value(0).toInt());
     }
 
-    // Устанавливаем делегат на колонку 1 (Модель)
-    ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(m_models, this));
+    // Модель выбирается один раз комбобоксом и применяется ко всем строкам.
+    if (ui->comboModel->count() > 0)
+        ui->comboModel->setCurrentIndex(0);
 }
 
 void ReceiptForm::loadForEdit(int docId)
@@ -102,25 +130,19 @@ void ReceiptForm::loadForEdit(int docId)
 
         QStandardItem* serialItem = new QStandardItem(row.serialNumber);
         serialItem->setData(row.terminalId, Qt::UserRole);
+        serialItem->setData(row.modelId, Qt::UserRole + 1);
         rowsModel->setItem(r, 0, serialItem);
 
-        // Find model name from m_models list
-        QString modelName = row.modelName;
-        if (modelName.isEmpty()) {
-            for (const auto& pair : m_models) {
-                if (pair.first == row.modelId) {
-                    modelName = pair.second;
-                    break;
-                }
-            }
-        }
-        QStandardItem* modelItem = new QStandardItem();
-        modelItem->setText(modelName);
-        modelItem->setData(row.modelId, Qt::UserRole);
-        rowsModel->setItem(r, 1, modelItem);
+        rowsModel->setItem(r, 1, new QStandardItem(row.imei1));
+        rowsModel->setItem(r, 2, new QStandardItem(row.imei2));
+    }
 
-        rowsModel->setItem(r, 2, new QStandardItem(row.imei1));
-        rowsModel->setItem(r, 3, new QStandardItem(row.imei2));
+    // Модель в комбобоксе — по первой строке документа.
+    if (rowsModel->rowCount() > 0) {
+        const int modelId = rowsModel->data(rowsModel->index(0, 0), Qt::UserRole + 1).toInt();
+        const int idx = ui->comboModel->findData(modelId);
+        if (idx >= 0)
+            ui->comboModel->setCurrentIndex(idx);
     }
 
     setWindowTitle(QString("Редактирование поступления ID %1").arg(docId));
@@ -131,20 +153,51 @@ void ReceiptForm::on_btnAddRow_clicked()
     int row = rowsModel->rowCount();
     rowsModel->insertRow(row);
 
-    // Значения по умолчанию
-    rowsModel->setItem(row, 0, new QStandardItem("SN-..."));
+    // Значения по умолчанию: серийник-заглушка, модель из комбобокса.
+    QStandardItem* serialItem = new QStandardItem("SN-...");
+    serialItem->setData(selectedModelId(), Qt::UserRole + 1);
+    rowsModel->setItem(row, 0, serialItem);
 
-    // Модель (ID): берем первый доступный ID из БД
-    int defaultModelId = m_models.isEmpty() ? 0 : m_models.first().first;
-    QString defaultModelName = m_models.isEmpty() ? QString() : m_models.first().second;
-
-    QStandardItem* modelItem = new QStandardItem();
-    modelItem->setText(defaultModelName);
-    modelItem->setData(defaultModelId, Qt::UserRole);
-    rowsModel->setItem(row, 1, modelItem);
-
+    rowsModel->setItem(row, 1, new QStandardItem("000000000000000"));
     rowsModel->setItem(row, 2, new QStandardItem("000000000000000"));
-    rowsModel->setItem(row, 3, new QStandardItem("000000000000000"));
+}
+
+void ReceiptForm::on_btnGenerate_clicked()
+{
+    const int count = ui->spinCount->value();
+    rowsModel->removeRows(0, rowsModel->rowCount());
+
+    for (int i = 0; i < count; ++i) {
+        int row = rowsModel->rowCount();
+        rowsModel->insertRow(row);
+        QStandardItem* serialItem = new QStandardItem();
+        serialItem->setData(selectedModelId(), Qt::UserRole + 1);
+        rowsModel->setItem(row, 0, serialItem);
+        rowsModel->setItem(row, 1, new QStandardItem());
+        rowsModel->setItem(row, 2, new QStandardItem());
+    }
+
+    ui->tableView->setFocus();
+}
+
+void ReceiptForm::on_comboModel_currentIndexChanged(int /*index*/)
+{
+    applyModelToAllRows();
+}
+
+int ReceiptForm::selectedModelId() const
+{
+    return ui->comboModel->currentData().toInt();
+}
+
+void ReceiptForm::applyModelToAllRows()
+{
+    const int modelId = selectedModelId();
+    for (int i = 0; i < rowsModel->rowCount(); ++i) {
+        QStandardItem* item = rowsModel->item(i, 0);
+        if (item)
+            item->setData(modelId, Qt::UserRole + 1);
+    }
 }
 
 void ReceiptForm::on_btnDeleteRow_clicked()
@@ -225,9 +278,9 @@ void ReceiptForm::on_btnPost_clicked()
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
-        int modelId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
-        QString imei1 = rowsModel->data(rowsModel->index(i, 2)).toString();
-        QString imei2 = rowsModel->data(rowsModel->index(i, 3)).toString();
+        int modelId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole + 1).toInt();
+        QString imei1 = rowsModel->data(rowsModel->index(i, 1)).toString();
+        QString imei2 = rowsModel->data(rowsModel->index(i, 2)).toString();
 
         // Валидация модели
         if (modelId <= 0) {
@@ -388,7 +441,7 @@ void ReceiptForm::on_btnPrint_clicked()
 
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         QString serial = rowsModel->data(rowsModel->index(i, 0)).toString();
-        int modelId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
+        int modelId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole + 1).toInt();
         QString modelName;
         for (const auto& m : m_models) {
             if (m.first == modelId) {
@@ -396,8 +449,8 @@ void ReceiptForm::on_btnPrint_clicked()
                 break;
             }
         }
-        QString imei1 = rowsModel->data(rowsModel->index(i, 2)).toString();
-        QString imei2 = rowsModel->data(rowsModel->index(i, 3)).toString();
+        QString imei1 = rowsModel->data(rowsModel->index(i, 1)).toString();
+        QString imei2 = rowsModel->data(rowsModel->index(i, 2)).toString();
 
         html += "<tr><td>" + QString::number(i + 1) +
                 "</td>"
@@ -453,36 +506,67 @@ void ReceiptForm::onScanFinished(const QString& raw)
     if (!data.hasData())
         return;
 
-    // Целевая строка: текущая, если у неё ещё нет серийного номера; иначе — новая.
-    int row = -1;
-    const QModelIndex cur = ui->tableView->currentIndex();
-    if (cur.isValid()) {
-        const int r = cur.row();
-        if (rowsModel->data(rowsModel->index(r, 0)).toString().isEmpty())
-            row = r;
+    // Серийный номер: первая строка без серийника; если все заполнены — новая строка.
+    if (!data.serial.isEmpty()) {
+        int row = targetRowForSerial();
+        if (row < 0) {
+            row = rowsModel->rowCount();
+            rowsModel->insertRow(row);
+        }
+        QStandardItem* serialItem = new QStandardItem(data.serial);
+        serialItem->setData(selectedModelId(), Qt::UserRole + 1);
+        rowsModel->setItem(row, 0, serialItem);
+        ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
     }
 
-    if (row < 0) {
-        row = rowsModel->rowCount();
-        rowsModel->insertRow(row);
-        // Колонка «Модель»: дефолт — первая из справочника (остаётся ручным выбором).
-        const int defaultModelId = m_models.isEmpty() ? 0 : m_models.first().first;
-        const QString defaultModelName = m_models.isEmpty() ? QString() : m_models.first().second;
-        QStandardItem* modelItem = new QStandardItem();
-        modelItem->setText(defaultModelName);
-        modelItem->setData(defaultModelId, Qt::UserRole);
-        rowsModel->setItem(row, 1, modelItem);
+    // IMEI: в строку, где серийник заполнен, а нужная колонка пуста.
+    if (!data.imei1.isEmpty()) {
+        int row = targetRowForImei(1);
+        if (row < 0) {
+            row = rowsModel->rowCount();
+            rowsModel->insertRow(row);
+            QStandardItem* serialItem = new QStandardItem();
+            serialItem->setData(selectedModelId(), Qt::UserRole + 1);
+            rowsModel->setItem(row, 0, serialItem);
+        }
+        rowsModel->setItem(row, 1, new QStandardItem(data.imei1));
+        ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
     }
 
-    if (!data.serial.isEmpty())
-        rowsModel->setItem(row, 0, new QStandardItem(data.serial));
-    if (!data.imei1.isEmpty())
-        rowsModel->setItem(row, 2, new QStandardItem(data.imei1));
-    if (!data.imei2.isEmpty())
-        rowsModel->setItem(row, 3, new QStandardItem(data.imei2));
+    if (!data.imei2.isEmpty()) {
+        int row = targetRowForImei(2);
+        if (row < 0) {
+            row = rowsModel->rowCount();
+            rowsModel->insertRow(row);
+            QStandardItem* serialItem = new QStandardItem();
+            serialItem->setData(selectedModelId(), Qt::UserRole + 1);
+            rowsModel->setItem(row, 0, serialItem);
+        }
+        rowsModel->setItem(row, 2, new QStandardItem(data.imei2));
+        ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
+    }
 
-    ui->tableView->setCurrentIndex(rowsModel->index(row, 0));
     ui->tableView->setFocus();
+}
+
+int ReceiptForm::targetRowForSerial() const
+{
+    for (int r = 0; r < rowsModel->rowCount(); ++r) {
+        if (rowsModel->data(rowsModel->index(r, 0)).toString().isEmpty())
+            return r;
+    }
+    return -1;
+}
+
+int ReceiptForm::targetRowForImei(int imeiCol) const
+{
+    for (int r = 0; r < rowsModel->rowCount(); ++r) {
+        const QString serial = rowsModel->data(rowsModel->index(r, 0)).toString();
+        const QString imei = rowsModel->data(rowsModel->index(r, imeiCol)).toString();
+        if (!serial.isEmpty() && imei.isEmpty())
+            return r;
+    }
+    return -1;
 }
 
 bool ReceiptForm::eventFilter(QObject* obj, QEvent* event)
