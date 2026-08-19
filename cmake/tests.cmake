@@ -118,6 +118,9 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
     set_tests_properties(test_reportexporter PROPERTIES TIMEOUT 60)
 
     add_executable(test_repositories tests/test_repositories.cpp
+            tests/test_repositories_seed.cpp
+            tests/test_repositories_query.cpp
+            tests/test_repositories_load.cpp
             src/database/repositories/terminalrepository.cpp
             src/database/repositories/clientrepository.cpp
             src/database/repositories/simcardrepository.cpp
