@@ -109,6 +109,10 @@ set(SOURCES
         src/ui/base/documentdialog.cpp
         src/ui/base/clientdocdialog.cpp
         src/ui/dialogs/receiptform_post.cpp
+        src/ui/dialogs/rentalform_post.cpp
+        src/ui/dialogs/returnform_post.cpp
+        src/ui/dialogs/statuschangeform_post.cpp
+        src/ui/dialogs/paymentform_post.cpp
         src/services/documentnumbergenerator.cpp
         src/services/postactionlogger.cpp
         src/services/statuschangeservice.cpp
