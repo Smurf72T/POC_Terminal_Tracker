@@ -17,6 +17,7 @@
 #include "utils/logging.h"
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
+#include "services/simcardservice.h"
 #include "ui/base/printservice.h"
 #include "ui/base/transactionguard.h"
 #include <QSet>
@@ -300,12 +301,12 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
         // Введён новый номер SIM — создаём карточку в справочнике (или берём
         // существующую с таким же номером). Для каждого слота отдельно.
         QString simError;
-        sim1Id = resolveSimFromCell(db, sim1Id, sim1Number, &simError);
+        sim1Id = SimCardService::resolveOrCreate(db, sim1Id, sim1Number, &simError);
         if (sim1Id < 0) {
             QMessageBox::critical(this, "Ошибка", simError);
             return false;
         }
-        sim2Id = resolveSimFromCell(db, sim2Id, sim2Number, &simError);
+        sim2Id = SimCardService::resolveOrCreate(db, sim2Id, sim2Number, &simError);
         if (sim2Id < 0) {
             QMessageBox::critical(this, "Ошибка", simError);
             return false;
@@ -348,13 +349,13 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
 
         // Освобождаем прежние SIM, если привязка в слоте изменилась
         if (wasInDoc && sim1Changed && origSim1 > 0) {
-            if (!freeSimCard(db, origSim1, QString("слот 1, терминал %1").arg(terminalId), &simError)) {
+            if (!SimCardService::free(db, origSim1, QString("слот 1, терминал %1").arg(terminalId), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return false;
             }
         }
         if (wasInDoc && sim2Changed && origSim2 > 0) {
-            if (!freeSimCard(db, origSim2, QString("слот 2, терминал %1").arg(terminalId), &simError)) {
+            if (!SimCardService::free(db, origSim2, QString("слот 2, терминал %1").arg(terminalId), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return false;
             }
@@ -362,13 +363,13 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
 
         // Занимаем новые SIM (новый терминал или замена SIM в существующей строке)
         if (sim1Id > 0 && sim1Changed) {
-            if (!lockSimCard(db, sim1Id, QString("SIM-карта %1").arg(sim1Number), &simError)) {
+            if (!SimCardService::lock(db, sim1Id, QString("SIM-карта %1").arg(sim1Number), &simError)) {
                 QMessageBox::critical(this, "Ошибка", simError);
                 return false;
             }
         }
         if (sim2Id > 0 && sim2Changed) {
-            if (!lockSimCard(db, sim2Id, QString("SIM-карта %1").arg(sim2Number), &simError)) {
+            if (!SimCardService::lock(db, sim2Id, QString("SIM-карта %1").arg(sim2Number), &simError)) {
                 QMessageBox::critical(this, "Ошибка", simError);
                 return false;
             }
@@ -446,11 +447,11 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
                 continue;
 
             QString simError;
-            if (tSim1 > 0 && !freeSimCard(db, tSim1, QString("терминал %1").arg(tid), &simError)) {
+            if (tSim1 > 0 && !SimCardService::free(db, tSim1, QString("терминал %1").arg(tid), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return false;
             }
-            if (tSim2 > 0 && !freeSimCard(db, tSim2, QString("терминал %1").arg(tid), &simError)) {
+            if (tSim2 > 0 && !SimCardService::free(db, tSim2, QString("терминал %1").arg(tid), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return false;
             }
@@ -614,76 +615,4 @@ void RentalForm::on_btnPrintAct_clicked()
 
     // Печать или сохранение в PDF
     PrintService::printHtml(html, this);
-}
-
-int RentalForm::resolveSimFromCell(QSqlDatabase& db, int cellSimId, const QString& cellSimNumber, QString* error)
-{
-    if (cellSimId > 0 || cellSimNumber.isEmpty())
-        return cellSimId;
-
-    if (cellSimNumber.length() > 19) {
-        *error = QString("Номер SIM-карты «%1» слишком длинный (макс. 19 символов).").arg(cellSimNumber);
-        return -1;
-    }
-
-    QSqlQuery findSim(db);
-    findSim.prepare("SELECT simcardid, status FROM tblsimcards WHERE simnumber = :n");
-    findSim.bindValue(":n", cellSimNumber);
-    if (findSim.exec() && findSim.next()) {
-        const int simId = findSim.value(0).toInt();
-        if (findSim.value(1).toInt() != 0) {
-            *error = QString("SIM-карта %1 уже занята!").arg(cellSimNumber);
-            return -1;
-        }
-        return simId;
-    }
-
-    QSqlQuery insertSim(db);
-    insertSim.prepare("INSERT INTO tblsimcards (simnumber, status) VALUES (:n, 0) RETURNING simcardid");
-    insertSim.bindValue(":n", cellSimNumber);
-    if (!insertSim.exec() || !insertSim.next()) {
-        *error = QString("Не удалось создать SIM-карту %1: %2")
-                     .arg(cellSimNumber)
-                     .arg(insertSim.lastError().text());
-        return -1;
-    }
-    const int simId = insertSim.value(0).toInt();
-    DatabaseManager::instance().logAction("INSERT", "tblsimcards", simId, QString(), QString(),
-                                          QString("simnumber=%1").arg(cellSimNumber));
-    return simId;
-}
-
-bool RentalForm::lockSimCard(QSqlDatabase& db, int simId, const QString& context, QString* error)
-{
-    QSqlQuery simLock(db);
-    simLock.prepare("SELECT status FROM tblsimcards WHERE simcardid = :id AND status = 0 FOR UPDATE NOWAIT");
-    simLock.bindValue(":id", simId);
-    if (!simLock.exec() || !simLock.next()) {
-        *error = QString("%1 уже занята другим терминалом!").arg(context);
-        return false;
-    }
-
-    QSqlQuery simQuery(db);
-    simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
-    simQuery.bindValue(":id", simId);
-    if (!simQuery.exec()) {
-        *error = QString("Не удалось обновить %1: %2").arg(context).arg(simQuery.lastError().text());
-        return false;
-    }
-    return true;
-}
-
-bool RentalForm::freeSimCard(QSqlDatabase& db, int simId, const QString& context, QString* error)
-{
-    QSqlQuery freeOld(db);
-    freeOld.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
-    freeOld.bindValue(":id", simId);
-    if (!freeOld.exec()) {
-        *error = QString("Не удалось освободить SIM-карту %1 (%2): %3")
-                     .arg(simId)
-                     .arg(context)
-                     .arg(freeOld.lastError().text());
-        return false;
-    }
-    return true;
 }

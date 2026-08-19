@@ -47,15 +47,6 @@ private:
 
     void loadFreeTerminalsToDelegate();
     void loadFreeSIMsToDelegate();
-
-    // Находит в справочнике SIM по введённому в ячейку номеру или создаёт карточку.
-    // cellSimId — выбранное значение из делегата (Qt::UserRole), cellSimNumber — текст.
-    // Возвращает id SIM (>0), 0 если SIM не указана, -1 при ошибке (сообщение в *error).
-    int resolveSimFromCell(QSqlDatabase& db, int cellSimId, const QString& cellSimNumber, QString* error);
-    // Проверяет и занимает SIM: статус должен быть 0 (свободна). true — успех.
-    bool lockSimCard(QSqlDatabase& db, int simId, const QString& context, QString* error);
-    // Освобождает SIM (status = 0).
-    bool freeSimCard(QSqlDatabase& db, int simId, const QString& context, QString* error);
 };
 
 #endif // RENTALFORM_H
