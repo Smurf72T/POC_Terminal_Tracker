@@ -156,6 +156,11 @@ set(HEADERS
         src/ui/dialogs/freedevicesreportdialog.h
         src/ui/dialogs/clientrentalreportdialog.h
         src/ui/dialogs/updatesettingsdialog.h
+        src/ui/base/documentdialog.h
+        src/ui/base/printservice.h
+        src/ui/base/transactionguard.h
+        src/services/documentnumbergenerator.h
+        src/services/postactionlogger.h
         src/utils/reportexporter.h
         src/utils/validator.h
         src/utils/registration_ratelimiter.h
