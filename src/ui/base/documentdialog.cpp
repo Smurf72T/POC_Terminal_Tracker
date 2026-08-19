@@ -5,7 +5,8 @@
 #include <QLineEdit>
 #include <QMessageBox>
 
-DocumentDialog::DocumentDialog(QWidget* parent) : QDialog(parent)
+DocumentDialog::DocumentDialog(QWidget* parent)
+    : QDialog(parent), rowsModel(new QStandardItemModel(this))
 {
 }
 

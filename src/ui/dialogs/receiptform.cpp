@@ -47,7 +47,6 @@ ReceiptForm::ReceiptForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::R
 
     // Табличная часть в стиле 1С: строка = модель + кол-во + комплекты
     // «серийный номер и его IMEI 1 / IMEI 2» (колонка ColSerials).
-    rowsModel = new QStandardItemModel(0, 3, this);
     rowsModel->setHorizontalHeaderLabels({"Модель", "Кол-во", "Серийные номера (SN · IMEI 1 · IMEI 2)"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
