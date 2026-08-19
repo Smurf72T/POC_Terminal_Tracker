@@ -23,7 +23,10 @@ ALTER TABLE tblsimassignments ADD COLUMN IF NOT EXISTS simslot SMALLINT NOT NULL
     CHECK (simslot IN (1, 2));
 
 -- Представление полной информации о терминалах: оба слота SIM.
-CREATE OR REPLACE VIEW vwterminalsfull AS
+-- CREATE OR REPLACE VIEW не может изменить список колонок существующего
+-- представления, поэтому при переходе с 000–012 представление пересоздаётся.
+DROP VIEW IF EXISTS vwterminalsfull;
+CREATE VIEW vwterminalsfull AS
 SELECT t.terminalid,
        t.serialnumber,
        t.imei1,
@@ -52,7 +55,8 @@ LEFT JOIN tblsimcards s2 ON t.currentsimcardid2 = s2.simcardid;
 
 -- Представление терминалов, находящихся в аренде в данный момент,
 -- с SIM обоих слотов.
-CREATE OR REPLACE VIEW vwcurrentrentals AS
+DROP VIEW IF EXISTS vwcurrentrentals;
+CREATE VIEW vwcurrentrentals AS
 SELECT t.terminalid,
        t.serialnumber,
        t.imei1,

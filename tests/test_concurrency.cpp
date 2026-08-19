@@ -826,7 +826,7 @@ void TestConcurrency::test_concurrent_migrations()
     t2.join();
 
     QCOMPARE(okCount.load(), 2);
-    QCOMPARE(countOnTest("SELECT count(*) FROM schema_migrations"), 13);
+    QCOMPARE(countOnTest("SELECT count(*) FROM schema_migrations"), 14);
 
     // Триггер уведомлений на месте и функция определена
     QCOMPARE(countOnTest("SELECT count(*) FROM pg_trigger "

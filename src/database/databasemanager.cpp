@@ -133,7 +133,7 @@ bool DatabaseManager::openConnection()
     QFileInfo configInfo(m_configPath);
     QString appDir = QCoreApplication::applicationDirPath();
     QStringList envCandidates = {appDir + "/.env", appDir + "/../.env", configInfo.absolutePath() + "/.env",
-                                 configInfo.absolutePath() + "/../../.env"};
+                                 configInfo.absolutePath() + "/../.env"};
 
     QMap<QString, QString> env;
     QString loadedEnvPath;
