@@ -87,19 +87,11 @@ bool SerialScanner::start(const QString& portName, int baudRate)
     m_stop = false;
     m_started = false;
 
-    m_thread = new QThread(this);
-    connect(m_thread, &QThread::finished, this, [this]() {
-        if (m_portHandle) {
-            CloseHandle(m_portHandle);
-            m_portHandle = nullptr;
-        }
-        m_thread = nullptr;
-    });
-
-    // Запускаем рабочий поток.
-    QThread* worker = QThread::create([this]() { readLoop(this, m_portHandle, &m_started); });
-    worker->setParent(this);
-    m_thread = worker;
+    // Запускаем рабочий поток. Хэндл захватываем по значению — поток не читает
+    // m_portHandle параллельно с основным (порт освобождается только в stop()
+    // после wait()).
+    m_thread = QThread::create([this, h]() { readLoop(this, h, &m_started); });
+    m_thread->setParent(this);
     m_thread->start();
     // Ожидаем, пока поток не начнёт чтение (установит m_started), но без deadlock.
     while (!m_started && m_thread->isRunning())
@@ -111,19 +103,23 @@ bool SerialScanner::start(const QString& portName, int baudRate)
 
 void SerialScanner::stop()
 {
-    if (!m_thread)
+    QThread* worker = m_thread;
+    if (!worker)
         return;
     m_stop = true;
-    // Прерываем блокирующее ReadFile: закрываем хэндл — ReadFile вернёт ошибку.
+    // Прерываем блокирующее ReadFile — ReadFile вернёт ERROR_OPERATION_ABORTED.
     if (m_portHandle)
         CancelIoEx(m_portHandle, nullptr);
-    m_thread->quit();
-    if (!m_thread->wait(2000)) {
+    worker->quit();
+    if (!worker->wait(2000)) {
         qWarning() << "SerialScanner: поток не остановился за 2с";
     }
-    delete m_thread;
+    delete worker;
     m_thread = nullptr;
-    m_portHandle = nullptr;
+    if (m_portHandle) {
+        CloseHandle(m_portHandle);
+        m_portHandle = nullptr;
+    }
 }
 
 void SerialScanner::readLoop(SerialScanner* self, void* hPort, std::atomic<bool>* started)

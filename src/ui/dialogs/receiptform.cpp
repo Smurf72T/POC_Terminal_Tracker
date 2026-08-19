@@ -78,8 +78,10 @@ ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptF
 void ReceiptForm::setupSerialScanner()
 {
     const QJsonObject cfg = DatabaseManager::instance().configObject()["scanner"].toObject();
-    if (!cfg.value("enabled").toBool(true))
+    if (!cfg.value("enabled").toBool(true)) {
+        ui->labelScannerStatus->setText("Сканер: отключен в config.json");
         return;
+    }
 
     const QString port = cfg.value("port").toString("COM8");
     const int baud = cfg.value("baud_rate").toInt(9600);
@@ -87,7 +89,12 @@ void ReceiptForm::setupSerialScanner()
     m_serialScanner = new SerialScanner(this);
     connect(m_serialScanner, &SerialScanner::scanFinished, this, &ReceiptForm::onScanFinished);
     if (!m_serialScanner->start(port, baud)) {
+        ui->labelScannerStatus->setText(QString("Сканер: не удалось открыть %1 (%2 бод) — проверьте, что порт свободен")
+                                            .arg(port)
+                                            .arg(baud));
         qCWarning(logApp) << "Сканер: не удалось открыть" << port;
+    } else {
+        ui->labelScannerStatus->setText(QString("Сканер: %1 (%2 бод) — готов").arg(port).arg(baud));
     }
 }
 
