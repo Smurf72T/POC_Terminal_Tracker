@@ -529,9 +529,7 @@ void ReturnForm::on_btnPrint_clicked()
         if (item && item->data(Qt::UserRole).toInt() > 0)
             terminalIds.append(item->data(Qt::UserRole).toInt());
     }
-    QHash<int, models::Terminal> termById;
-    for (const auto& t : TerminalRepository(db).loadByIds(terminalIds))
-        termById.insert(t.id, t);
+    QHash<int, models::Terminal> termById = PrintService::loadTerminalsBatch(terminalIds, db);
 
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         auto* item = rowsModel->item(i, 0);

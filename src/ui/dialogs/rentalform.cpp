@@ -563,12 +563,8 @@ void RentalForm::on_btnPrintAct_clicked()
             simIds.append(sim2Id);
     }
 
-    QHash<int, models::Terminal> termById;
-    for (const auto& t : TerminalRepository(db).loadByIds(terminalIds))
-        termById.insert(t.id, t);
-    QHash<int, models::SimCard> simById;
-    for (const auto& s : SimCardRepository(db).loadByIds(simIds))
-        simById.insert(s.id, s);
+    QHash<int, models::Terminal> termById = PrintService::loadTerminalsBatch(terminalIds, db);
+    QHash<int, models::SimCard> simById = PrintService::loadSimsBatch(simIds, db);
 
     int num = 1;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {

@@ -1,4 +1,6 @@
 #include "ui/base/printservice.h"
+#include "database/repositories/simcardrepository.h"
+#include "database/repositories/terminalrepository.h"
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QTextDocument>
@@ -37,4 +39,20 @@ QString PrintService::docFooter()
 QString PrintService::escapeHtml(const QString& s)
 {
     return s.toHtmlEscaped();
+}
+
+QHash<int, models::Terminal> PrintService::loadTerminalsBatch(const QList<int>& ids, const QSqlDatabase& db)
+{
+    QHash<int, models::Terminal> result;
+    for (const auto& t : TerminalRepository(db).loadByIds(ids))
+        result.insert(t.id, t);
+    return result;
+}
+
+QHash<int, models::SimCard> PrintService::loadSimsBatch(const QList<int>& ids, const QSqlDatabase& db)
+{
+    QHash<int, models::SimCard> result;
+    for (const auto& s : SimCardRepository(db).loadByIds(ids))
+        result.insert(s.id, s);
+    return result;
 }
