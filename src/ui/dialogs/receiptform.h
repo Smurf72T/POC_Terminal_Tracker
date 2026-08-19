@@ -66,6 +66,8 @@ private:
     QList<UnitData> m_units;
 
     void loadModelsToDelegate();
+    // Добавляет строку с моделью по умолчанию (первой в списке) и кол-вом 1.
+    int appendRowWithFirstModel();
     // Можно ли принять скан: форма активна, фокус не в текстовом редакторе.
     bool canAcceptScan() const;
     // Чтение сканера из COM-порта (раздел "scanner" в config.json).

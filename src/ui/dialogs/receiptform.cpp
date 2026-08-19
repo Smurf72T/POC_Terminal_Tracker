@@ -2,6 +2,7 @@
 #include "ui_receiptform.h"
 #include "database/databasemanager.h"
 #include "database/repositories/documentrepository.h"
+#include "database/repositories/terminalrepository.h"
 #include "utils/barcodeparser.h"
 #include "utils/barcodescanner.h"
 #include "utils/serialscanner.h"
@@ -216,6 +217,15 @@ void ReceiptForm::loadSpecificEditData(int docId)
 
 void ReceiptForm::on_btnAddRow_clicked()
 {
+    int row = appendRowWithFirstModel();
+    rowsModel->setItem(row, ColSerials, new QStandardItem());
+    refreshRow(row);
+
+    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerials));
+}
+
+int ReceiptForm::appendRowWithFirstModel()
+{
     int row = rowsModel->rowCount();
     rowsModel->insertRow(row);
 
@@ -230,10 +240,7 @@ void ReceiptForm::on_btnAddRow_clicked()
     modelItem->setData(modelId, Qt::UserRole);
     rowsModel->setItem(row, ColModel, modelItem);
     rowsModel->setItem(row, ColQty, new QStandardItem("1"));
-    rowsModel->setItem(row, ColSerials, new QStandardItem());
-    refreshRow(row);
-
-    ui->tableView->setCurrentIndex(rowsModel->index(row, ColSerials));
+    return row;
 }
 
 void ReceiptForm::on_btnDeleteRow_clicked()
@@ -331,6 +338,27 @@ bool ReceiptForm::validateBeforePost()
     m_units.clear();
     QSet<QString> usedSerials, usedImei1, usedImei2;
 
+    // Проверка одного IMEI: ровно 15 цифр и отсутствие дублей в документе.
+    const auto checkImei = [this](const QString& imei, QSet<QString>& used, const QString& label, int r, int k) -> bool {
+        if (imei.isEmpty())
+            return true;
+        if (!SerialUnitsService::isValidImei(imei)) {
+            QMessageBox::critical(this, "Ошибка",
+                                  QString("Строка %1, комплект %2: %3 должен содержать ровно 15 цифр (сейчас: %4)")
+                                      .arg(r + 1)
+                                      .arg(k + 1)
+                                      .arg(label)
+                                      .arg(imei));
+            return false;
+        }
+        if (used.contains(imei)) {
+            QMessageBox::critical(this, "Ошибка", QString("%1 повторяется в документе: %2").arg(label).arg(imei));
+            return false;
+        }
+        used.insert(imei);
+        return true;
+    };
+
     for (int r = 0; r < rowsModel->rowCount(); ++r) {
         UnitData it;
         it.modelId = rowsModel->data(rowsModel->index(r, ColModel), Qt::UserRole).toInt();
@@ -381,39 +409,10 @@ bool ReceiptForm::validateBeforePost()
             }
             usedSerials.insert(sn);
 
-            if (!im1.isEmpty()) {
-                if (!SerialUnitsService::isValidImei(im1)) {
-                    QMessageBox::critical(this, "Ошибка",
-                                          QString("Строка %1, комплект %2: IMEI 1 должен содержать ровно 15 цифр "
-                                                  "(сейчас: %3)")
-                                              .arg(r + 1)
-                                              .arg(k + 1)
-                                              .arg(im1));
-                    return false;
-                }
-                if (usedImei1.contains(im1)) {
-                    QMessageBox::critical(this, "Ошибка", QString("IMEI 1 повторяется в документе: %1").arg(im1));
-                    return false;
-                }
-                usedImei1.insert(im1);
-            }
-
-            if (!im2.isEmpty()) {
-                if (!SerialUnitsService::isValidImei(im2)) {
-                    QMessageBox::critical(this, "Ошибка",
-                                          QString("Строка %1, комплект %2: IMEI 2 должен содержать ровно 15 цифр "
-                                                  "(сейчас: %3)")
-                                              .arg(r + 1)
-                                              .arg(k + 1)
-                                              .arg(im2));
-                    return false;
-                }
-                if (usedImei2.contains(im2)) {
-                    QMessageBox::critical(this, "Ошибка", QString("IMEI 2 повторяется в документе: %1").arg(im2));
-                    return false;
-                }
-                usedImei2.insert(im2);
-            }
+            if (!checkImei(im1, usedImei1, "IMEI 1", r, k))
+                return false;
+            if (!checkImei(im2, usedImei2, "IMEI 2", r, k))
+                return false;
         }
 
         m_units.append(it);
@@ -515,15 +514,13 @@ bool ReceiptForm::postDetails(QSqlDatabase& db, int docId)
             }
 
             int newTermId;
-            QSqlQuery findQuery(db);
-            findQuery.prepare("SELECT terminalid FROM tblterminals WHERE serialnumber = :sn");
-            findQuery.bindValue(":sn", serial);
-            const bool found = findQuery.exec() && findQuery.next();
+            const int foundId = TerminalRepository(db).findIdBySerial(serial);
+            const bool found = foundId > 0;
 
             if (found && m_editMode) {
                 // Редактирование: серийник уже был в базе — обновляем терминал
                 // вместе с его IMEI (привязка сохраняется).
-                newTermId = findQuery.value(0).toInt();
+                newTermId = foundId;
                 QSqlQuery termQuery(db);
                 termQuery.prepare("UPDATE tblterminals SET modelid = :mid, imei1 = :i1, imei2 = :i2 "
                                   "WHERE terminalid = :tid");
@@ -678,20 +675,8 @@ void ReceiptForm::onScanFinished(const QString& raw)
         return;
 
     int row = ui->tableView->currentIndex().row();
-    if (row < 0) {
-        row = rowsModel->rowCount();
-        rowsModel->insertRow(row);
-        QString modelName;
-        int modelId = 0;
-        if (!m_models.isEmpty()) {
-            modelId = m_models.first().first;
-            modelName = m_models.first().second;
-        }
-        QStandardItem* modelItem = new QStandardItem(modelName);
-        modelItem->setData(modelId, Qt::UserRole);
-        rowsModel->setItem(row, ColModel, modelItem);
-        rowsModel->setItem(row, ColQty, new QStandardItem("1"));
-    }
+    if (row < 0)
+        row = appendRowWithFirstModel();
 
     // Комплекты хранятся как три параллельных списка: imei[n] принадлежит
     // serial[n]. Логика «SN → IMEI 1 → IMEI 2 → следующий SN» в BarcodeParser:
