@@ -70,7 +70,7 @@ void ReportsForm::generateRevenueByClient()
                   "COUNT(DISTINCT rd.terminalid) AS \"Терминалов в аренде\" "
                   "FROM tblclients c "
                   "LEFT JOIN tblpayments p ON c.clientid = p.clientid "
-                  "AND p.paymentdate BETWEEN :dateFrom AND :dateTo "
+                  "AND p.paymentdate >= :dateFrom::date AND p.paymentdate < :dateTo::date + interval '1 day' "
                   "LEFT JOIN tblrentaldocs r ON c.clientid = r.clientid "
                   "LEFT JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
                   "GROUP BY c.clientid, c.clientname "
@@ -131,7 +131,7 @@ void ReportsForm::generateRentalConversion()
                   "NULLIF(COUNT(DISTINCT r.rentaldocid), 0), 1) AS \"Конвертация %\" "
                   "FROM tblclients c "
                   "JOIN tblrentaldocs r ON c.clientid = r.clientid "
-                  "AND r.docdate BETWEEN :dateFrom AND :dateTo "
+                  "AND r.docdate >= :dateFrom::date AND r.docdate < :dateTo::date + interval '1 day' "
                   "LEFT JOIN tblpayment_rental_links pl ON r.rentaldocid = pl.rentaldocid "
                   "GROUP BY c.clientid, c.clientname "
                   "ORDER BY COUNT(DISTINCT r.rentaldocid) DESC");

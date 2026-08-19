@@ -92,7 +92,7 @@ void ArchiveDocumentsForm::applyFilter()
                            "docdate AS \"Дата\", "
                            "comments AS \"Комментарий\" "
                            "FROM tblreceiptdocs "
-                           "WHERE docdate BETWEEN :dateFrom AND :dateTo "
+                           "WHERE docdate >= :dateFrom::date AND docdate < :dateTo::date + interval '1 day' "
                            "ORDER BY docdate DESC");
     } else if (m_docType == 2) { // Аренда — с возвратом и оплатой
         queryStr =
@@ -113,7 +113,7 @@ void ArchiveDocumentsForm::applyFilter()
                     "          GROUP BY rd.rentaldocid) ret ON r.rentaldocid = ret.rentaldocid "
                     "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS payment_cnt FROM tblpayment_rental_links GROUP BY "
                     "rentaldocid) pay ON r.rentaldocid = pay.rentaldocid "
-                    "WHERE r.docdate BETWEEN :dateFrom AND :dateTo "
+                    "WHERE r.docdate >= :dateFrom::date AND r.docdate < :dateTo::date + interval '1 day' "
                     "AND (:clientId = 0 OR r.clientid = :clientId) "
                     "ORDER BY r.docdate DESC");
     } else if (m_docType == 3) { // Возврат
@@ -124,7 +124,7 @@ void ArchiveDocumentsForm::applyFilter()
                            "r.comments AS \"Комментарий\" "
                            "FROM tblreturndocs r "
                            "LEFT JOIN tblclients c ON r.clientid = c.clientid "
-                           "WHERE r.docdate BETWEEN :dateFrom AND :dateTo "
+                           "WHERE r.docdate >= :dateFrom::date AND r.docdate < :dateTo::date + interval '1 day' "
                            "AND (:clientId = 0 OR r.clientid = :clientId) "
                            "ORDER BY r.docdate DESC");
     } else if (m_docType == 4) { // Оплата
@@ -142,7 +142,7 @@ void ArchiveDocumentsForm::applyFilter()
                            "(5, 'Май'), (6, 'Июнь'), (7, 'Июль'), (8, 'Август'), "
                            "(9, 'Сентябрь'), (10, 'Октябрь'), (11, 'Ноябрь'), (12, 'Декабрь') "
                            ") AS pm(monthnum, monthname) ON p.periodmonth = pm.monthnum "
-                           "WHERE p.paymentdate BETWEEN :dateFrom AND :dateTo "
+                           "WHERE p.paymentdate >= :dateFrom::date AND p.paymentdate < :dateTo::date + interval '1 day' "
                            "AND (:clientId = 0 OR p.clientid = :clientId) "
                            "ORDER BY p.paymentdate DESC");
     } else if (m_docType == 5) { // Изменение статусов
@@ -158,7 +158,7 @@ void ArchiveDocumentsForm::applyFilter()
                     "LEFT JOIN (SELECT statuschangedocid, COUNT(*) AS cnt "
                     "          FROM tblstatuschangedetails GROUP BY statuschangedocid) det "
                     "ON sc.statuschangedocid = det.statuschangedocid "
-                    "WHERE sc.docdate BETWEEN :dateFrom AND :dateTo "
+                    "WHERE sc.docdate >= :dateFrom::date AND sc.docdate < :dateTo::date + interval '1 day' "
                     "ORDER BY sc.docdate DESC");
     }
 
