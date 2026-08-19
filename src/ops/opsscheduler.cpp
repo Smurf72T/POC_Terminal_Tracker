@@ -297,19 +297,19 @@ void OpsScheduler::runIntegrityCheck()
     countProblem(db, "Терминал свободен, но SIM в аренде",
                  "SELECT t.terminalid, t.serialnumber, s.simcardid, s.simnumber "
                  "FROM tblterminals t "
-                 "JOIN tblsimcards s ON t.currentsimcardid = s.simcardid "
+                 "JOIN tblsimcards s ON (t.currentsimcardid = s.simcardid OR t.currentsimcardid2 = s.simcardid) "
                  "WHERE t.status = 0 AND s.status = 1",
                  issues[0]);
     countProblem(db, "SIM в аренде, но не привязана к терминалу",
                  "SELECT s.simcardid, s.simnumber "
                  "FROM tblsimcards s "
-                 "LEFT JOIN tblterminals t ON s.simcardid = t.currentsimcardid "
+                 "LEFT JOIN tblterminals t ON (s.simcardid = t.currentsimcardid OR s.simcardid = t.currentsimcardid2) "
                  "WHERE s.status = 1 AND t.terminalid IS NULL",
                  issues[1]);
     countProblem(db, "Терминал в аренде, но нет SIM",
                  "SELECT t.terminalid, t.serialnumber "
                  "FROM tblterminals t "
-                 "WHERE t.status = 1 AND t.currentsimcardid IS NULL",
+                 "WHERE t.status = 1 AND t.currentsimcardid IS NULL AND t.currentsimcardid2 IS NULL",
                  issues[2]);
 
     QString summary;

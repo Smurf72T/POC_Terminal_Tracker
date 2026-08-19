@@ -27,6 +27,7 @@
 - **Эксплуатация (v1.3.0):** автоматические бэкапы по расписанию (интервал + retention), журнал операций `ops.log`, автоматическая проверка целостности БД (терминалы/SIM), статус бэкапа в статусбаре — подробности в [docs/OPS.md](docs/OPS.md)
 - **Доставка (v1.4.0):** портативный ZIP-дистрибутив (`cmake --build build --target deploy` + `cpack`) с Qt runtime и PostgreSQL DLL; автообновление по манифесту-URL (проверка при старте и «Сервис → Проверка обновлений») — подробности в [docs/OPS.md](docs/OPS.md)
 - **Многопользовательский режим (v1.5.0):** защита от гонок — миграции под `pg_advisory_lock`, выдача SIM под блокировкой `FOR UPDATE NOWAIT`, атомарный rate limiting, межэкземплярное обновление через `NOTIFY`; конкуренто-тесты `test_concurrency` — подробности в [docs/OPS.md](docs/OPS.md)
+- **Двухслотовые терминалы (v1.6.0):** терминал с двумя IMEI может получать в аренду две SIM-карты (слот 1 по IMEI1, слот 2 по IMEI2); слот фиксируется в истории привязок; полная информация об обоих слотах — в `vwterminalsfull` и `vwcurrentrentals` (миграция `013_sim_slots.sql`)
 - **CI/CD (v1.5.1):** GitHub Actions — сборка (Qt 6.11 MSVC), все тесты против реального PostgreSQL, сборка портативного ZIP; артефакт в Actions → Run → Artifacts
 
 ## Требования
@@ -126,6 +127,8 @@ psql -U postgres -d pocbase -f sql/migrations/008_cleanup_legacy.sql
 psql -U postgres -d pocbase -f sql/migrations/009_security_hardening.sql
 psql -U postgres -d pocbase -f sql/migrations/010_statuschange_old_status.sql
 psql -U postgres -d pocbase -f sql/migrations/011_terminals_deactivated.sql
+psql -U postgres -d pocbase -f sql/migrations/012_receipt_items_serials.sql
+psql -U postgres -d pocbase -f sql/migrations/013_sim_slots.sql
 ```
 
 ## Логирование
@@ -211,7 +214,7 @@ src/
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/
-  migrations/               — Миграции БД 000–011 (применяются автоматически)
+  migrations/               — Миграции БД 000–013 (применяются автоматически)
   legacy/                   — Архивные SQL-скрипты, заменённые миграциями (не применять вручную)
   add_trigger.sql           — Опциональный DB-триггер синхронизации статусов SIM (не миграция)
   diagnostics.sql           — Диагностика рассинхрона терминалов и SIM (ops, см. OPS.md)

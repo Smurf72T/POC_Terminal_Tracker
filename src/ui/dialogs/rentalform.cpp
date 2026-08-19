@@ -34,8 +34,9 @@ RentalForm::RentalForm(QWidget* parent) : QDialog(parent), ui(new Ui::RentalForm
     // сжигать значения последовательности для отменённых форм.
 
     // Настройка модели для табличной части
-    rowsModel = new QStandardItemModel(0, 3, this); // 3 колонки
-    rowsModel->setHorizontalHeaderLabels({"Терминал", "SIM-карта", "Примечание"});
+    rowsModel = new QStandardItemModel(0, 4, this);
+    // Колонки: 0 — Терминал, 1 — SIM слота 1 (imei1), 2 — SIM слота 2 (imei2), 3 — Примечание.
+    rowsModel->setHorizontalHeaderLabels({"Терминал", "SIM (IMEI 1)", "SIM (IMEI 2)", "Примечание"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
@@ -86,8 +87,9 @@ void RentalForm::loadFreeSIMsToDelegate()
         sims.append(qMakePair(s.id, s.number));
 
     // Устанавливаем делегат на колонку SIM (редактируемый: можно выбрать
-    // существующую SIM-карту или ввести новый номер)
+    // существующую SIM-карту или ввести новый номер). Обе колонки — слот 1 и слот 2.
     ui->tableView->setItemDelegateForColumn(1, new ComboBoxDelegate(sims, this, true));
+    ui->tableView->setItemDelegateForColumn(2, new ComboBoxDelegate(sims, this, true));
 }
 
 void RentalForm::loadForEdit(int docId)
@@ -118,7 +120,7 @@ void RentalForm::loadForEdit(int docId)
 
     const auto rows = documents.loadRentalRows(docId);
     for (const auto& row : rows) {
-        m_originalDetails.insert(row.terminalId, row.simCardId);
+        m_originalDetails.insert(row.terminalId, qMakePair(row.simCardId, row.simCard2Id));
 
         int r = rowsModel->rowCount();
         rowsModel->insertRow(r);
@@ -131,11 +133,16 @@ void RentalForm::loadForEdit(int docId)
         simItem->setData(row.simCardId, Qt::UserRole);
         simItem->setData(row.simCardId > 0 ? row.simNumber : QString(), Qt::DisplayRole);
 
+        QStandardItem* sim2Item = new QStandardItem();
+        sim2Item->setData(row.simCard2Id, Qt::UserRole);
+        sim2Item->setData(row.simCard2Id > 0 ? row.simNumber2 : QString(), Qt::DisplayRole);
+
         QStandardItem* commentItem = new QStandardItem(row.comment);
 
         rowsModel->setItem(r, 0, terminalItem);
         rowsModel->setItem(r, 1, simItem);
-        rowsModel->setItem(r, 2, commentItem);
+        rowsModel->setItem(r, 2, sim2Item);
+        rowsModel->setItem(r, 3, commentItem);
     }
 
     setWindowTitle(QString("Редактирование аренды ID %1").arg(docId));
@@ -155,11 +162,16 @@ void RentalForm::on_btnAddRow_clicked()
     simItem->setData(0, Qt::UserRole);     // ID SIM
     simItem->setData("", Qt::DisplayRole); // Текст для отображения
 
+    QStandardItem* sim2Item = new QStandardItem();
+    sim2Item->setData(0, Qt::UserRole);     // ID SIM (слот 2)
+    sim2Item->setData("", Qt::DisplayRole); // Текст для отображения
+
     QStandardItem* commentItem = new QStandardItem("");
 
     rowsModel->setItem(row, 0, terminalItem);
     rowsModel->setItem(row, 1, simItem);
-    rowsModel->setItem(row, 2, commentItem);
+    rowsModel->setItem(row, 2, sim2Item);
+    rowsModel->setItem(row, 3, commentItem);
 }
 
 void RentalForm::on_btnDeleteRow_clicked()
@@ -251,9 +263,11 @@ void RentalForm::on_btnPost_clicked()
 
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         int terminalId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
-        int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
-        QString simNumber = rowsModel->data(rowsModel->index(i, 1), Qt::DisplayRole).toString().trimmed();
-        QString comment = rowsModel->data(rowsModel->index(i, 2), Qt::DisplayRole).toString();
+        int sim1Id = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
+        QString sim1Number = rowsModel->data(rowsModel->index(i, 1), Qt::DisplayRole).toString().trimmed();
+        int sim2Id = rowsModel->data(rowsModel->index(i, 2), Qt::UserRole).toInt();
+        QString sim2Number = rowsModel->data(rowsModel->index(i, 2), Qt::DisplayRole).toString().trimmed();
+        QString comment = rowsModel->data(rowsModel->index(i, 3), Qt::DisplayRole).toString();
 
         if (terminalId <= 0) {
             db.rollback();
@@ -262,46 +276,33 @@ void RentalForm::on_btnPost_clicked()
         }
 
         bool wasInDoc = previousTerminals.contains(terminalId);
-        int originalSimId = m_editMode ? m_originalDetails.value(terminalId, 0) : 0;
+        const QPair<int, int> original =
+            m_editMode ? m_originalDetails.value(terminalId, qMakePair(0, 0)) : qMakePair(0, 0);
+        int origSim1 = original.first;
+        int origSim2 = original.second;
 
         // Введён новый номер SIM — создаём карточку в справочнике (или берём
-        // существующую с таким же номером)
-        if (simId == 0 && !simNumber.isEmpty()) {
-            if (simNumber.length() > 19) {
-                db.rollback();
-                QMessageBox::critical(
-                    this, "Ошибка",
-                    QString("Номер SIM-карты «%1» слишком длинный (макс. 19 символов).").arg(simNumber));
-                return;
-            }
+        // существующую с таким же номером). Для каждого слота отдельно.
+        QString simError;
+        sim1Id = resolveSimFromCell(db, sim1Id, sim1Number, &simError);
+        if (sim1Id < 0) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка", simError);
+            return;
+        }
+        sim2Id = resolveSimFromCell(db, sim2Id, sim2Number, &simError);
+        if (sim2Id < 0) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка", simError);
+            return;
+        }
 
-            QSqlQuery findSim(db);
-            findSim.prepare("SELECT simcardid, status FROM tblsimcards WHERE simnumber = :n");
-            findSim.bindValue(":n", simNumber);
-            if (findSim.exec() && findSim.next()) {
-                simId = findSim.value(0).toInt();
-                if (findSim.value(1).toInt() != 0) {
-                    db.rollback();
-                    QMessageBox::critical(this, "Ошибка", QString("SIM-карта %1 уже занята!").arg(simNumber));
-                    return;
-                }
-            } else {
-                QSqlQuery insertSim(db);
-                insertSim.prepare("INSERT INTO tblsimcards (simnumber, status) VALUES (:n, 0) RETURNING simcardid");
-                insertSim.bindValue(":n", simNumber);
-                if (!insertSim.exec() || !insertSim.next()) {
-                    db.rollback();
-                    QMessageBox::critical(this, "Ошибка БД",
-                                          QString("Не удалось создать SIM-карту %1: %2")
-                                              .arg(simNumber)
-                                              .arg(insertSim.lastError().text()));
-                    return;
-                }
-                simId = insertSim.value(0).toInt();
-                DatabaseManager::instance().logAction("INSERT", "tblsimcards", simId, QString(), QString(),
-                                                      QString("simnumber=%1").arg(simNumber));
-                rowsModel->setData(rowsModel->index(i, 1), simId, Qt::UserRole);
-            }
+        // Одна и та же SIM не может стоять в двух слотах одного терминала.
+        if (sim1Id > 0 && sim1Id == sim2Id) {
+            db.rollback();
+            QMessageBox::critical(this, "Ошибка",
+                                  QString("Строка %1: одна и та же SIM-карта указана в слотах 1 и 2.").arg(i + 1));
+            return;
         }
 
         // Блокируем терминал и проверяем его состояние
@@ -332,52 +333,49 @@ void RentalForm::on_btnPost_clicked()
             return;
         }
 
-        bool simChanged = simId != originalSimId;
+        bool sim1Changed = sim1Id != origSim1;
+        bool sim2Changed = sim2Id != origSim2;
 
-        // Освобождаем прежнюю SIM, если привязка в строке изменилась
-        if (wasInDoc && simChanged && originalSimId > 0) {
-            QSqlQuery freeOld(db);
-            freeOld.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
-            freeOld.bindValue(":id", originalSimId);
-            if (!freeOld.exec()) {
+        // Освобождаем прежние SIM, если привязка в слоте изменилась
+        if (wasInDoc && sim1Changed && origSim1 > 0) {
+            if (!freeSimCard(db, origSim1, QString("слот 1, терминал %1").arg(terminalId), &simError)) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка БД",
-                                      QString("Не удалось освободить SIM-карту %1: %2")
-                                          .arg(originalSimId)
-                                          .arg(freeOld.lastError().text()));
+                QMessageBox::critical(this, "Ошибка БД", simError);
+                return;
+            }
+        }
+        if (wasInDoc && sim2Changed && origSim2 > 0) {
+            if (!freeSimCard(db, origSim2, QString("слот 2, терминал %1").arg(terminalId), &simError)) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", simError);
                 return;
             }
         }
 
-        // Занимаем новую SIM (новый терминал или замена SIM в существующей строке)
-        if (simId > 0 && simChanged) {
-            QSqlQuery simLock(db);
-            simLock.prepare("SELECT status FROM tblsimcards WHERE simcardid = :id AND status = 0 FOR UPDATE NOWAIT");
-            simLock.bindValue(":id", simId);
-            if (!simLock.exec() || !simLock.next()) {
+        // Занимаем новые SIM (новый терминал или замена SIM в существующей строке)
+        if (sim1Id > 0 && sim1Changed) {
+            if (!lockSimCard(db, sim1Id, QString("SIM-карта %1").arg(sim1Number), &simError)) {
                 db.rollback();
-                QMessageBox::critical(this, "Ошибка", QString("SIM-карта %1 уже занята другим терминалом!").arg(simId));
+                QMessageBox::critical(this, "Ошибка", simError);
                 return;
             }
-
-            QSqlQuery simQuery(db);
-            simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
-            simQuery.bindValue(":id", simId);
-            if (!simQuery.exec()) {
+        }
+        if (sim2Id > 0 && sim2Changed) {
+            if (!lockSimCard(db, sim2Id, QString("SIM-карта %1").arg(sim2Number), &simError)) {
                 db.rollback();
-                QMessageBox::critical(
-                    this, "Ошибка БД",
-                    QString("Не удалось обновить SIM-карту %1: %2").arg(simId).arg(simQuery.lastError().text()));
+                QMessageBox::critical(this, "Ошибка", simError);
                 return;
             }
         }
 
         if (!wasInDoc) {
-            // Новый терминал — переводим в аренду и привязываем SIM
+            // Новый терминал — переводим в аренду и привязываем SIM обоих слотов
             QSqlQuery updateQuery(db);
-            updateQuery.prepare("UPDATE tblterminals SET status = 1, currentsimcardid = :simid WHERE terminalid = :id");
+            updateQuery.prepare("UPDATE tblterminals SET status = 1, currentsimcardid = :sim1, "
+                                "currentsimcardid2 = :sim2 WHERE terminalid = :id");
             updateQuery.bindValue(":id", terminalId);
-            updateQuery.bindValue(":simid", simId > 0 ? QVariant(simId) : QVariant());
+            updateQuery.bindValue(":sim1", sim1Id > 0 ? QVariant(sim1Id) : QVariant());
+            updateQuery.bindValue(":sim2", sim2Id > 0 ? QVariant(sim2Id) : QVariant());
             if (!updateQuery.exec()) {
                 db.rollback();
                 QMessageBox::critical(
@@ -385,12 +383,14 @@ void RentalForm::on_btnPost_clicked()
                     QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
                 return;
             }
-        } else if (simChanged) {
-            // Существующий терминал — обновляем только привязку SIM
+        } else if (sim1Changed || sim2Changed) {
+            // Существующий терминал — обновляем только привязки SIM
             QSqlQuery updateQuery(db);
-            updateQuery.prepare("UPDATE tblterminals SET currentsimcardid = :simid WHERE terminalid = :id");
+            updateQuery.prepare("UPDATE tblterminals SET currentsimcardid = :sim1, "
+                                "currentsimcardid2 = :sim2 WHERE terminalid = :id");
             updateQuery.bindValue(":id", terminalId);
-            updateQuery.bindValue(":simid", simId > 0 ? QVariant(simId) : QVariant());
+            updateQuery.bindValue(":sim1", sim1Id > 0 ? QVariant(sim1Id) : QVariant());
+            updateQuery.bindValue(":sim2", sim2Id > 0 ? QVariant(sim2Id) : QVariant());
             if (!updateQuery.exec()) {
                 db.rollback();
                 QMessageBox::critical(
@@ -401,11 +401,12 @@ void RentalForm::on_btnPost_clicked()
         }
 
         QSqlQuery detailQuery(db);
-        detailQuery.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid, simcardid, comment) "
-                            "VALUES (:did, :tid, :sid, :comm)");
+        detailQuery.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid, simcardid, simcardid2, comment) "
+                            "VALUES (:did, :tid, :sid, :sid2, :comm)");
         detailQuery.bindValue(":did", docId);
         detailQuery.bindValue(":tid", terminalId);
-        detailQuery.bindValue(":sid", simId > 0 ? QVariant(simId) : QVariant());
+        detailQuery.bindValue(":sid", sim1Id > 0 ? QVariant(sim1Id) : QVariant());
+        detailQuery.bindValue(":sid2", sim2Id > 0 ? QVariant(sim2Id) : QVariant());
         detailQuery.bindValue(":comm", comment);
 
         if (!detailQuery.exec()) {
@@ -429,32 +430,33 @@ void RentalForm::on_btnPost_clicked()
                 continue;
 
             QSqlQuery lockQuery(db);
-            lockQuery.prepare(
-                "SELECT status, currentsimcardid FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+            lockQuery.prepare("SELECT status, currentsimcardid, currentsimcardid2 "
+                              "FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
             lockQuery.bindValue(":id", tid);
             if (!lockQuery.exec() || !lockQuery.next())
                 continue;
 
             int tStatus = lockQuery.value(0).toInt();
-            int tSim = lockQuery.value(1).toInt();
+            int tSim1 = lockQuery.value(1).toInt();
+            int tSim2 = lockQuery.value(2).toInt();
             if (tStatus != 1)
                 continue;
 
-            if (tSim > 0) {
-                QSqlQuery freeSim(db);
-                freeSim.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
-                freeSim.bindValue(":id", tSim);
-                if (!freeSim.exec()) {
-                    db.rollback();
-                    QMessageBox::critical(
-                        this, "Ошибка БД",
-                        QString("Не удалось освободить SIM-карту %1: %2").arg(tSim).arg(freeSim.lastError().text()));
-                    return;
-                }
+            QString simError;
+            if (tSim1 > 0 && !freeSimCard(db, tSim1, QString("терминал %1").arg(tid), &simError)) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", simError);
+                return;
+            }
+            if (tSim2 > 0 && !freeSimCard(db, tSim2, QString("терминал %1").arg(tid), &simError)) {
+                db.rollback();
+                QMessageBox::critical(this, "Ошибка БД", simError);
+                return;
             }
 
             QSqlQuery upd(db);
-            upd.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = NULL WHERE terminalid = :id");
+            upd.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = NULL, currentsimcardid2 = NULL "
+                        "WHERE terminalid = :id");
             upd.bindValue(":id", tid);
             if (!upd.exec()) {
                 db.rollback();
@@ -549,7 +551,8 @@ void RentalForm::on_btnPrintAct_clicked()
     html +=
         "<p>Настоящий акт составлен о том, что Арендодатель передал, а Арендатор принял следующие POC-терминалы:</p>";
 
-    html += "<table><tr><th>№</th><th>Серийный номер</th><th>IMEI 1</th><th>SIM-карта</th></tr>";
+    html += "<table><tr><th>№</th><th>Серийный номер</th><th>IMEI 1</th><th>SIM (IMEI 1)</th>"
+            "<th>IMEI 2</th><th>SIM (IMEI 2)</th></tr>";
 
     // Собираем данные из таблицы (батч-загрузка вместо запросов по каждой строке)
     QList<int> terminalIds;
@@ -562,6 +565,9 @@ void RentalForm::on_btnPrintAct_clicked()
         int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
         if (simId > 0)
             simIds.append(simId);
+        int sim2Id = rowsModel->data(rowsModel->index(i, 2), Qt::UserRole).toInt();
+        if (sim2Id > 0)
+            simIds.append(sim2Id);
     }
 
     QHash<int, models::Terminal> termById;
@@ -575,17 +581,22 @@ void RentalForm::on_btnPrintAct_clicked()
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         int termId = rowsModel->data(rowsModel->index(i, 0), Qt::UserRole).toInt();
         int simId = rowsModel->data(rowsModel->index(i, 1), Qt::UserRole).toInt();
+        int sim2Id = rowsModel->data(rowsModel->index(i, 2), Qt::UserRole).toInt();
 
         if (termId == 0)
             continue;
 
         const models::Terminal term = termById.value(termId);
         QString serial = term.serialNumber;
-        QString imei = term.imei1;
+        QString imei1 = term.imei1;
+        QString imei2 = term.imei2;
 
         QString simNumber;
         if (simId > 0)
             simNumber = simById.value(simId).number;
+        QString sim2Number;
+        if (sim2Id > 0)
+            sim2Number = simById.value(sim2Id).number;
 
         html += "<tr><td>" + QString::number(num++) +
                 "</td>"
@@ -593,10 +604,16 @@ void RentalForm::on_btnPrintAct_clicked()
                 serial.toHtmlEscaped() +
                 "</td>"
                 "<td>" +
-                imei.toHtmlEscaped() +
+                imei1.toHtmlEscaped() +
                 "</td>"
                 "<td>" +
-                simNumber.toHtmlEscaped() + "</td></tr>";
+                simNumber.toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                imei2.toHtmlEscaped() +
+                "</td>"
+                "<td>" +
+                sim2Number.toHtmlEscaped() + "</td></tr>";
     }
     html += "</table>";
 
@@ -614,4 +631,76 @@ void RentalForm::on_btnPrintAct_clicked()
         doc.setHtml(html);
         doc.print(&printer);
     }
+}
+
+int RentalForm::resolveSimFromCell(QSqlDatabase& db, int cellSimId, const QString& cellSimNumber, QString* error)
+{
+    if (cellSimId > 0 || cellSimNumber.isEmpty())
+        return cellSimId;
+
+    if (cellSimNumber.length() > 19) {
+        *error = QString("Номер SIM-карты «%1» слишком длинный (макс. 19 символов).").arg(cellSimNumber);
+        return -1;
+    }
+
+    QSqlQuery findSim(db);
+    findSim.prepare("SELECT simcardid, status FROM tblsimcards WHERE simnumber = :n");
+    findSim.bindValue(":n", cellSimNumber);
+    if (findSim.exec() && findSim.next()) {
+        const int simId = findSim.value(0).toInt();
+        if (findSim.value(1).toInt() != 0) {
+            *error = QString("SIM-карта %1 уже занята!").arg(cellSimNumber);
+            return -1;
+        }
+        return simId;
+    }
+
+    QSqlQuery insertSim(db);
+    insertSim.prepare("INSERT INTO tblsimcards (simnumber, status) VALUES (:n, 0) RETURNING simcardid");
+    insertSim.bindValue(":n", cellSimNumber);
+    if (!insertSim.exec() || !insertSim.next()) {
+        *error = QString("Не удалось создать SIM-карту %1: %2")
+                     .arg(cellSimNumber)
+                     .arg(insertSim.lastError().text());
+        return -1;
+    }
+    const int simId = insertSim.value(0).toInt();
+    DatabaseManager::instance().logAction("INSERT", "tblsimcards", simId, QString(), QString(),
+                                          QString("simnumber=%1").arg(cellSimNumber));
+    return simId;
+}
+
+bool RentalForm::lockSimCard(QSqlDatabase& db, int simId, const QString& context, QString* error)
+{
+    QSqlQuery simLock(db);
+    simLock.prepare("SELECT status FROM tblsimcards WHERE simcardid = :id AND status = 0 FOR UPDATE NOWAIT");
+    simLock.bindValue(":id", simId);
+    if (!simLock.exec() || !simLock.next()) {
+        *error = QString("%1 уже занята другим терминалом!").arg(context);
+        return false;
+    }
+
+    QSqlQuery simQuery(db);
+    simQuery.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
+    simQuery.bindValue(":id", simId);
+    if (!simQuery.exec()) {
+        *error = QString("Не удалось обновить %1: %2").arg(context).arg(simQuery.lastError().text());
+        return false;
+    }
+    return true;
+}
+
+bool RentalForm::freeSimCard(QSqlDatabase& db, int simId, const QString& context, QString* error)
+{
+    QSqlQuery freeOld(db);
+    freeOld.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
+    freeOld.bindValue(":id", simId);
+    if (!freeOld.exec()) {
+        *error = QString("Не удалось освободить SIM-карту %1 (%2): %3")
+                     .arg(simId)
+                     .arg(context)
+                     .arg(freeOld.lastError().text());
+        return false;
+    }
+    return true;
 }

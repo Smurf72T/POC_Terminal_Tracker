@@ -97,12 +97,13 @@ QVector<models::RentalRow> DocumentRepository::loadRentalRows(int rentalDocId) c
 {
     QVector<models::RentalRow> result;
     QSqlQuery query(m_db);
-    query.prepare("SELECT rd.rentaldetailid, rd.terminalid, rd.simcardid, "
-                  "t.serialnumber, COALESCE(s.simnumber, ''), rd.comment, "
-                  "t.status AS terminal_status, s.status AS sim_status "
+    query.prepare("SELECT rd.rentaldetailid, rd.terminalid, rd.simcardid, rd.simcardid2, "
+                  "t.serialnumber, COALESCE(s.simnumber, ''), COALESCE(s2.simnumber, ''), rd.comment, "
+                  "t.status AS terminal_status, s.status AS sim_status, COALESCE(s2.status, 0) AS sim2_status "
                   "FROM tblrentaldetails rd "
                   "JOIN tblterminals t ON rd.terminalid = t.terminalid "
                   "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
+                  "LEFT JOIN tblsimcards s2 ON rd.simcardid2 = s2.simcardid "
                   "WHERE rd.rentaldocid = :docid "
                   "ORDER BY t.serialnumber");
     query.bindValue(":docid", rentalDocId);
@@ -113,11 +114,14 @@ QVector<models::RentalRow> DocumentRepository::loadRentalRows(int rentalDocId) c
         row.rentalDetailId = query.value(0).toInt();
         row.terminalId = query.value(1).toInt();
         row.simCardId = query.value(2).toInt();
-        row.terminalSerialNumber = query.value(3).toString();
-        row.simNumber = query.value(4).toString();
-        row.comment = query.value(5).toString();
-        row.terminalStatus = query.value(6).toInt();
-        row.simStatus = query.value(7).toInt();
+        row.simCard2Id = query.value(3).toInt();
+        row.terminalSerialNumber = query.value(4).toString();
+        row.simNumber = query.value(5).toString();
+        row.simNumber2 = query.value(6).toString();
+        row.comment = query.value(7).toString();
+        row.terminalStatus = query.value(8).toInt();
+        row.simStatus = query.value(9).toInt();
+        row.sim2Status = query.value(10).toInt();
         result.append(row);
     }
     return result;

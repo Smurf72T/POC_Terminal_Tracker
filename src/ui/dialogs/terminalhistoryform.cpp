@@ -40,12 +40,13 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
     rentalModel = new QSqlQueryModel(this);
     QSqlQuery rentalQuery(db);
     rentalQuery.prepare("SELECT rdo.rentaldocid, rdo.docnumber, rdo.docdate, t.serialnumber, c.clientname, "
-                        "s.simnumber "
+                        "s.simnumber, s2.simnumber "
                         "FROM tblrentaldocs rdo "
                         "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
                         "JOIN tblterminals t ON rdet.terminalid = t.terminalid "
                         "LEFT JOIN tblclients c ON rdo.clientid = c.clientid "
                         "LEFT JOIN tblsimcards s ON rdet.simcardid = s.simcardid "
+                        "LEFT JOIN tblsimcards s2 ON rdet.simcardid2 = s2.simcardid "
                         "WHERE t.terminalid = :tid "
                         "ORDER BY rdo.docdate DESC");
     rentalQuery.bindValue(":tid", terminalId);
@@ -101,14 +102,16 @@ TerminalHistoryForm::TerminalHistoryForm(int terminalId, QString serialNumber, Q
     rentalModel->setHeaderData(2, Qt::Horizontal, "Дата");
     rentalModel->setHeaderData(3, Qt::Horizontal, "Серийный номер");
     rentalModel->setHeaderData(4, Qt::Horizontal, "Клиент");
-    rentalModel->setHeaderData(5, Qt::Horizontal, "SIM-карта");
+    rentalModel->setHeaderData(5, Qt::Horizontal, "SIM (IMEI 1)");
+    rentalModel->setHeaderData(6, Qt::Horizontal, "SIM (IMEI 2)");
     ui->tableViewRental->setModel(rentalModel);
     ui->tableViewRental->hideColumn(0);
     ui->tableViewRental->setColumnWidth(1, 180);
     ui->tableViewRental->setColumnWidth(2, 120);
     ui->tableViewRental->setColumnWidth(3, 150);
     ui->tableViewRental->setColumnWidth(4, 250);
-    ui->tableViewRental->setColumnWidth(5, 200);
+    ui->tableViewRental->setColumnWidth(5, 190);
+    ui->tableViewRental->setColumnWidth(6, 190);
 
     returnModel->setHeaderData(0, Qt::Horizontal, "ID");
     returnModel->setHeaderData(1, Qt::Horizontal, "Номер документа");

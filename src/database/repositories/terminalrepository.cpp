@@ -46,10 +46,11 @@ QVector<TerminalRepository::FreeTerminal> TerminalRepository::loadFreeTerminals(
     QVector<FreeTerminal> result;
     QSqlQuery query = makeQuery();
     if (query.exec("SELECT t.serialnumber, m.modelname, "
-                   "COALESCE(s.simnumber, 'SIM не назначена') AS simstatus "
+                   "COALESCE(NULLIF(s.simnumber, '') || CASE WHEN s2.simnumber IS NOT NULL THEN '; ' || s2.simnumber ELSE '' END, 'SIM не назначена') AS simstatus "
                    "FROM tblterminals t "
                    "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                    "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid "
+                   "LEFT JOIN tblsimcards s2 ON t.currentsimcardid2 = s2.simcardid "
                    "WHERE t.status = 0 "
                    "ORDER BY t.serialnumber")) {
         while (query.next())
@@ -84,27 +85,14 @@ models::Terminal TerminalRepository::loadById(int terminalId) const
     QSqlQuery query = makeQuery();
     query.prepare("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
                   "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
-                  "t.purchasedate, t.notes, t.was_repaired "
+                  "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired "
                   "FROM tblterminals t "
                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                   "WHERE t.terminalid = :id");
     query.bindValue(":id", terminalId);
     if (!query.exec() || !query.next())
         return {};
-    models::Terminal t;
-    t.id = query.value(0).toInt();
-    t.serialNumber = query.value(1).toString();
-    t.modelId = query.value(2).toInt();
-    t.modelName = query.value(3).toString();
-    t.imei1 = query.value(4).toString();
-    t.imei2 = query.value(5).toString();
-    t.status = query.value(6).toInt();
-    t.deactivated = query.value(7).toBool();
-    t.currentSimCardId = query.value(8).toInt();
-    t.purchaseDate = query.value(9).toDate();
-    t.notes = query.value(10).toString();
-    t.wasRepaired = query.value(11).toBool();
-    return t;
+    return makeTerminal(query, 0);
 }
 
 models::Terminal TerminalRepository::makeTerminal(const QSqlQuery& query, int startColumn) const
@@ -119,9 +107,10 @@ models::Terminal TerminalRepository::makeTerminal(const QSqlQuery& query, int st
     t.status = query.value(startColumn + 6).toInt();
     t.deactivated = query.value(startColumn + 7).toBool();
     t.currentSimCardId = query.value(startColumn + 8).toInt();
-    t.purchaseDate = query.value(startColumn + 9).toDate();
-    t.notes = query.value(startColumn + 10).toString();
-    t.wasRepaired = query.value(startColumn + 11).toBool();
+    t.currentSimCard2Id = query.value(startColumn + 9).toInt();
+    t.purchaseDate = query.value(startColumn + 10).toDate();
+    t.notes = query.value(startColumn + 11).toString();
+    t.wasRepaired = query.value(startColumn + 12).toBool();
     return t;
 }
 
@@ -139,7 +128,7 @@ QVector<models::Terminal> TerminalRepository::loadByIds(const QList<int>& ids) c
     QSqlQuery query = makeQuery();
     query.prepare(QString("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
                           "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
-                          "t.purchasedate, t.notes, t.was_repaired "
+                          "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired "
                           "FROM tblterminals t "
                           "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                           "WHERE t.terminalid IN (%1) ")
@@ -167,7 +156,7 @@ QVector<models::Terminal> TerminalRepository::loadFreeForSelection() const
     QSqlQuery query = makeQuery();
     if (query.exec("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
                    "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
-                   "t.purchasedate, t.notes, t.was_repaired "
+                   "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired "
                    "FROM tblterminals t "
                    "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                    "WHERE t.status = 0 AND t.is_deactivated = FALSE "
@@ -210,10 +199,11 @@ bool TerminalRepository::update(int terminalId, const TerminalUpdate& data) cons
 void TerminalRepository::populateFreeTerminals(QSqlQueryModel* model) const
 {
     QString queryStr = "SELECT t.serialnumber, m.modelname, "
-                       "COALESCE(s.simnumber, 'SIM не назначена') AS simstatus "
+                       "COALESCE(NULLIF(s.simnumber, '') || CASE WHEN s2.simnumber IS NOT NULL THEN '; ' || s2.simnumber ELSE '' END, 'SIM не назначена') AS simstatus "
                        "FROM tblterminals t "
                        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                        "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid "
+                       "LEFT JOIN tblsimcards s2 ON t.currentsimcardid2 = s2.simcardid "
                        "WHERE t.status = 0 "
                        "ORDER BY t.serialnumber";
     model->setQuery(queryStr, m_db);

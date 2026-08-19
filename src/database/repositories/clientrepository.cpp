@@ -90,13 +90,15 @@ QVector<ClientRepository::RentalTerminal> ClientRepository::loadRentedTerminals(
     QSqlQuery query(m_db);
     query.prepare("SELECT m.modelname AS \"Модель\", "
                   "t.serialnumber AS \"Серийный номер\", "
-                  "COALESCE(s.simnumber, '—') AS \"SIM-карта\", "
+                  "TRIM(COALESCE(s.simnumber, '') || CASE WHEN s2.simnumber IS NOT NULL "
+                  "      THEN '; ' || s2.simnumber ELSE '' END) AS \"SIM-карта\", "
                   "CAST(r.docdate AS DATE) AS \"Дата передачи\" "
                   "FROM tblrentaldocs r "
                   "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
                   "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                   "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
+                  "LEFT JOIN tblsimcards s2 ON rd.simcardid2 = s2.simcardid "
                   "WHERE r.clientid = :clientId "
                   "ORDER BY r.docdate DESC, t.serialnumber");
     query.bindValue(":clientId", clientId);
@@ -114,13 +116,15 @@ void ClientRepository::populateRentedTerminals(QSqlQueryModel* model, int client
     QSqlQuery query(m_db);
     query.prepare("SELECT m.modelname AS \"Модель\", "
                   "t.serialnumber AS \"Серийный номер\", "
-                  "COALESCE(s.simnumber, '—') AS \"SIM-карта\", "
+                  "TRIM(COALESCE(s.simnumber, '') || CASE WHEN s2.simnumber IS NOT NULL "
+                  "      THEN '; ' || s2.simnumber ELSE '' END) AS \"SIM-карта\", "
                   "CAST(r.docdate AS DATE) AS \"Дата передачи\" "
                   "FROM tblrentaldocs r "
                   "JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
                   "JOIN tblterminals t ON rd.terminalid = t.terminalid AND t.status = 1 "
                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                   "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
+                  "LEFT JOIN tblsimcards s2 ON rd.simcardid2 = s2.simcardid "
                   "WHERE r.clientid = :clientId "
                   "ORDER BY r.docdate DESC, t.serialnumber");
     query.bindValue(":clientId", clientId);

@@ -22,7 +22,7 @@ int SimCardRepository::countFree() const
                     "WHERE s.status = 0 "
                     "OR EXISTS ("
                     "    SELECT 1 FROM tblterminals t "
-                    "    WHERE t.currentsimcardid = s.simcardid "
+                    "    WHERE (t.currentsimcardid = s.simcardid OR t.currentsimcardid2 = s.simcardid) "
                     "    AND t.status = 0"
                     ")") ||
         !query.next())
@@ -40,6 +40,9 @@ QVector<SimCardRepository::FreeSimCard> SimCardRepository::loadFreeSimCards() co
                     "AND s.simcardid NOT IN ("
                     "    SELECT t.currentsimcardid FROM tblterminals t WHERE t.currentsimcardid IS NOT NULL"
                     ") "
+                    "AND s.simcardid NOT IN ("
+                    "    SELECT t.currentsimcardid2 FROM tblterminals t WHERE t.currentsimcardid2 IS NOT NULL"
+                    ") "
                     "ORDER BY s.simnumber"))
         return result;
     while (query.next()) {
@@ -55,6 +58,9 @@ void SimCardRepository::populateFreeSimCards(QSqlQueryModel* model) const
                     "WHERE s.status = 0 "
                     "AND s.simcardid NOT IN ("
                     "    SELECT t.currentsimcardid FROM tblterminals t WHERE t.currentsimcardid IS NOT NULL"
+                    ") "
+                    "AND s.simcardid NOT IN ("
+                    "    SELECT t.currentsimcardid2 FROM tblterminals t WHERE t.currentsimcardid2 IS NOT NULL"
                     ") "
                     "ORDER BY s.simnumber",
                     m_db);
@@ -122,7 +128,7 @@ QVector<models::SimCard> SimCardRepository::loadFreeForSelection() const
                    "WHERE s.status = 0 "
                    "OR EXISTS ("
                    "    SELECT 1 FROM tblterminals t "
-                   "    WHERE t.currentsimcardid = s.simcardid "
+                   "    WHERE (t.currentsimcardid = s.simcardid OR t.currentsimcardid2 = s.simcardid) "
                    "    AND t.status = 0"
                    ")"
                    "ORDER BY s.simnumber")) {

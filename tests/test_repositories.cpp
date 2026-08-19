@@ -66,7 +66,7 @@ void TestRepositories::initTestCase()
     q.exec("CREATE TABLE tblsimcards (simcardid INTEGER PRIMARY KEY, simnumber TEXT, status INTEGER, notes TEXT, "
            "createdat TEXT)");
     q.exec("CREATE TABLE tblterminals (terminalid INTEGER PRIMARY KEY, serialnumber TEXT, status INTEGER, "
-           "modelid INTEGER, currentsimcardid INTEGER, imei1 TEXT, imei2 TEXT, "
+           "modelid INTEGER, currentsimcardid INTEGER, currentsimcardid2 INTEGER, imei1 TEXT, imei2 TEXT, "
            "is_deactivated INTEGER NOT NULL DEFAULT 0, purchasedate TEXT, notes TEXT, "
            "was_repaired INTEGER NOT NULL DEFAULT 0)");
     q.exec("CREATE TABLE tblclients (clientid INTEGER PRIMARY KEY, clientname TEXT, inn TEXT, address TEXT, "
@@ -74,7 +74,7 @@ void TestRepositories::initTestCase()
     q.exec("CREATE TABLE tblrentaldocs (rentaldocid INTEGER PRIMARY KEY, clientid INTEGER, docnumber TEXT, "
            "docdate TEXT, comments TEXT)");
     q.exec("CREATE TABLE tblrentaldetails (rentaldetailid INTEGER PRIMARY KEY, rentaldocid INTEGER, "
-           "terminalid INTEGER, simcardid INTEGER, comment TEXT)");
+           "terminalid INTEGER, simcardid INTEGER, simcardid2 INTEGER, comment TEXT)");
     q.exec("CREATE TABLE tblpayments (paymentid INTEGER PRIMARY KEY, periodyear INTEGER, periodmonth INTEGER, "
            "amount REAL)");
     q.exec("CREATE TABLE tblreceiptdocs (receiptdocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
