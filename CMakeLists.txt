@@ -110,6 +110,7 @@ set(SOURCES
         src/ui/base/clientdocdialog.cpp
         src/services/documentnumbergenerator.cpp
         src/services/postactionlogger.cpp
+        src/services/statuschangeservice.cpp
 )
 
 set(HEADERS
@@ -168,6 +169,7 @@ set(HEADERS
         src/ui/base/transactionguard.h
         src/services/documentnumbergenerator.h
         src/services/postactionlogger.h
+        src/services/statuschangeservice.h
         src/utils/reportexporter.h
         src/utils/validator.h
         src/utils/registration_ratelimiter.h

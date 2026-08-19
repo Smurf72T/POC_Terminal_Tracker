@@ -5,6 +5,7 @@
 #include "utils/terminal_status.h"
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
+#include "services/statuschangeservice.h"
 #include "ui/base/printservice.h"
 #include "ui/base/transactionguard.h"
 #include <QMessageBox>
@@ -79,53 +80,9 @@ QString StatusChangeForm::actionType() const
     return ui->comboBoxActionType->currentData().toString();
 }
 
-QString StatusChangeForm::actionTitle() const
-{
-    if (actionType() == "repair")
-        return "В ремонт";
-    if (actionType() == "repair_return")
-        return "Возврат из ремонта";
-    if (actionType() == "writeoff")
-        return "Списан";
-    if (actionType() == "lost")
-        return "Утерян";
-    return "Изменение статуса";
-}
-
 void StatusChangeForm::updateWindowTitle()
 {
-    setWindowTitle(QString("Документ: %1").arg(actionTitle()));
-}
-
-int StatusChangeForm::targetStatus() const
-{
-    if (actionType() == "repair")
-        return 2;
-    if (actionType() == "repair_return")
-        return 0;
-    if (actionType() == "writeoff")
-        return 3;
-    if (actionType() == "lost")
-        return 4;
-    return 0;
-}
-
-bool StatusChangeForm::expectStatus(int status) const
-{
-    if (actionType() == "repair")
-        return status == 0;
-    if (actionType() == "repair_return")
-        return status == 2;
-    if (actionType() == "writeoff")
-        return status == 0 || status == 2;
-    if (actionType() == "lost")
-        return status == 1 || status == 2;
-    return false;
-}
-
-QString StatusChangeForm::statusText(int status) const
-{
-    return TerminalStatus::name(status);
+    setWindowTitle(QString("Документ: %1").arg(StatusChangeService::actionTitle(actionType())));
 }
 
 void StatusChangeForm::loadRepairDocs()
@@ -367,7 +324,7 @@ int StatusChangeForm::postHeader(QSqlDatabase& db)
 
 bool StatusChangeForm::postDetails(QSqlDatabase& db, int docId)
 {
-    int target = targetStatus();
+    int target = StatusChangeService::targetStatus(actionType());
 
     // Терминалы, убранные из документа при редактировании, должны быть
     // возвращены в прежний статус (откат операции).
@@ -396,7 +353,7 @@ bool StatusChangeForm::postDetails(QSqlDatabase& db, int docId)
         }
 
         int currentStatus = checkQuery.value(0).toInt();
-        bool ok = expectStatus(currentStatus);
+        bool ok = StatusChangeService::expectStatus(actionType(), currentStatus);
         // При редактировании терминал может уже стоять в целевом статусе —
         // это допустимо (повторное применение идемпотентно).
         if (m_editMode)
@@ -405,8 +362,8 @@ bool StatusChangeForm::postDetails(QSqlDatabase& db, int docId)
             QMessageBox::critical(this, "Ошибка",
                                   QString("Терминал %1 имеет статус «%2», операция «%3» для него недоступна.")
                                       .arg(termId)
-                                      .arg(statusText(currentStatus))
-                                      .arg(actionTitle()));
+                                      .arg(StatusChangeService::statusText(currentStatus))
+                                      .arg(StatusChangeService::actionTitle(actionType())));
             return false;
         }
 
@@ -462,7 +419,7 @@ bool StatusChangeForm::postDetails(QSqlDatabase& db, int docId)
                                   QString("Статус терминала %1 («%2») уже изменён другим документом, "
                                           "откат невозможен. Уберите его вручную.")
                                       .arg(termId)
-                                      .arg(statusText(currentStatus)));
+                                      .arg(StatusChangeService::statusText(currentStatus)));
             return false;
         }
 
@@ -501,7 +458,7 @@ void StatusChangeForm::onPostSuccess(int docId)
     PostActionLogger::log(m_editMode ? "UPDATE" : "POST", "tblstatuschangedocs", docId);
     PostActionLogger::notify();
     QMessageBox::information(
-        this, "Успех", QString("Документ «%1» успешно %2!").arg(actionTitle(), m_editMode ? "обновлён" : "проведён"));
+        this, "Успех", QString("Документ «%1» успешно %2!").arg(StatusChangeService::actionTitle(actionType()), m_editMode ? "обновлён" : "проведён"));
     this->close();
 }
 void StatusChangeForm::loadSpecificEditData(int docId)

@@ -52,15 +52,11 @@ private:
     QString m_originalActionType;
 
     QString actionType() const;
-    QString actionTitle() const;
     void updateWindowTitle();
     void loadRepairDocs();
     void loadTerminals();
     void loadTerminalsFromRepairDoc(int repairDocId);
     QList<int> checkedTerminalIds() const;
-    bool expectStatus(int status) const;
-    int targetStatus() const;
-    QString statusText(int status) const;
 };
 
 #endif // STATUSCHANGEFORM_H
