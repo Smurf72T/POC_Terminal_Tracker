@@ -1,7 +1,7 @@
 #ifndef PAYMENTFORM_H
 #define PAYMENTFORM_H
 
-#include "ui/base/documentdialog.h"
+#include "ui/base/clientdocdialog.h"
 
 namespace Ui {
 class PaymentForm;
@@ -9,7 +9,7 @@ class PaymentForm;
 
 class QSqlDatabase;
 
-class PaymentForm : public DocumentDialog {
+class PaymentForm : public ClientDocumentDialog {
     Q_OBJECT
 
 public:
@@ -25,7 +25,6 @@ private slots:
 private:
     Ui::PaymentForm* ui;
 
-    void loadClients();
     void loadMonths();
     void loadYears();
     void loadRentalDocsForClient(int clientId);

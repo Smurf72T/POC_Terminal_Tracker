@@ -23,7 +23,7 @@
 #include <QHash>
 #include <QSqlDatabase>
 
-RentalForm::RentalForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::RentalForm)
+RentalForm::RentalForm(QWidget* parent) : ClientDocumentDialog(parent), ui(new Ui::RentalForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Передача в аренду");
@@ -43,7 +43,7 @@ RentalForm::RentalForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::Ren
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
 
     // Загружаем данные для выпадающих списков
-    loadClientsToDelegate();
+    loadClientsToDelegate(ui->comboBoxClient);
     loadFreeTerminalsToDelegate();
     loadFreeSIMsToDelegate();
 
@@ -81,18 +81,6 @@ QTableView* RentalForm::tableView() const
     return ui->tableView;
 }
 
-
-void RentalForm::loadClientsToDelegate()
-{
-    QList<QPair<int, QString>> clients;
-    const auto all = ClientRepository(DatabaseManager::instance().getDatabase()).loadAll();
-    for (const auto& c : all)
-        clients.append(qMakePair(c.id, c.name));
-
-    // Устанавливаем делегат для колонки клиента
-    ui->comboBoxClient->setItemDelegate(new ComboBoxDelegate(clients, this));
-    ui->comboBoxClient->setModel(new ComboBoxModel(clients, this));
-}
 
 void RentalForm::loadFreeTerminalsToDelegate()
 {

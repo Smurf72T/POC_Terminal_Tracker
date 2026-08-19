@@ -1,7 +1,7 @@
 #ifndef RENTALFORM_H
 #define RENTALFORM_H
 
-#include "ui/base/documentdialog.h"
+#include "ui/base/clientdocdialog.h"
 #include <QMap>
 #include <QPair>
 
@@ -11,7 +11,7 @@ class RentalForm;
 
 class QSqlDatabase; // forward declaration (методы принимают ссылку)
 
-class RentalForm : public DocumentDialog {
+class RentalForm : public ClientDocumentDialog {
     Q_OBJECT
 
 public:
@@ -45,7 +45,6 @@ private:
     void onPostSuccess(int docId) override;
     void loadSpecificEditData(int docId) override;
 
-    void loadClientsToDelegate();
     void loadFreeTerminalsToDelegate();
     void loadFreeSIMsToDelegate();
 

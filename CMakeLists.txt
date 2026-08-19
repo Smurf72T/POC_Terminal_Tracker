@@ -107,6 +107,7 @@ set(SOURCES
         src/ui/base/printservice.cpp
         src/ui/base/transactionguard.cpp
         src/ui/base/documentdialog.cpp
+        src/ui/base/clientdocdialog.cpp
         src/services/documentnumbergenerator.cpp
         src/services/postactionlogger.cpp
 )
@@ -162,6 +163,7 @@ set(HEADERS
         src/ui/dialogs/clientrentalreportdialog.h
         src/ui/dialogs/updatesettingsdialog.h
         src/ui/base/documentdialog.h
+        src/ui/base/clientdocdialog.h
         src/ui/base/printservice.h
         src/ui/base/transactionguard.h
         src/services/documentnumbergenerator.h

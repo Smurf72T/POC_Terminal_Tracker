@@ -14,14 +14,14 @@
 #include <QDebug>
 #include "utils/logging.h"
 
-PaymentForm::PaymentForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::PaymentForm)
+PaymentForm::PaymentForm(QWidget* parent) : ClientDocumentDialog(parent), ui(new Ui::PaymentForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Отметка оплаты за аренду");
     resize(500, 450);
 
     ui->dateEdit->setDate(QDate::currentDate());
-    loadClients();
+    loadClientsToComboBox(ui->comboBoxClient, true);
     loadMonths();
     loadYears();
 
@@ -66,24 +66,6 @@ QTableView* PaymentForm::tableView() const
     return nullptr;
 }
 
-
-void PaymentForm::loadClients()
-{
-    if (!DatabaseManager::instance().isConnected()) {
-        qCWarning(logDB) << "PaymentForm: база данных не подключена";
-        return;
-    }
-
-    ui->comboBoxClient->clear();
-    ui->comboBoxClient->addItem("-- Выберите клиента --", 0);
-
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.exec("SELECT clientid, clientname FROM tblclients ORDER BY clientname");
-
-    while (query.next()) {
-        ui->comboBoxClient->addItem(query.value(1).toString(), query.value(0).toInt());
-    }
-}
 
 void PaymentForm::loadSpecificEditData(int docId)
 {

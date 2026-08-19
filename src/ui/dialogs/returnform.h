@@ -1,7 +1,7 @@
 #ifndef RETURNFORM_H
 #define RETURNFORM_H
 
-#include "ui/base/documentdialog.h"
+#include "ui/base/clientdocdialog.h"
 #include <QSet>
 
 namespace Ui {
@@ -10,7 +10,7 @@ class ReturnForm;
 
 class QSqlDatabase;
 
-class ReturnForm : public DocumentDialog {
+class ReturnForm : public ClientDocumentDialog {
     Q_OBJECT
 
 public:
@@ -27,8 +27,6 @@ private slots:
 private:
     Ui::ReturnForm* ui;
 
-    void loadClientsToComboBox();
-    void loadRentalDocs(int clientId);
     void loadRentalDetails(int rentalDocId);
 
     // --- DocumentDialog ---

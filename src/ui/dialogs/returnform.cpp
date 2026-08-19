@@ -18,7 +18,7 @@
 #include "ui/base/transactionguard.h"
 #include <QHash>
 
-ReturnForm::ReturnForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::ReturnForm)
+ReturnForm::ReturnForm(QWidget* parent) : ClientDocumentDialog(parent), ui(new Ui::ReturnForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Возврат из аренды");
@@ -37,7 +37,7 @@ ReturnForm::ReturnForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::Ret
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
 
     // Загружаем клиентов
-    loadClientsToComboBox();
+    loadClientsToComboBox(ui->comboBoxClient);
 }
 
 ReturnForm::~ReturnForm()
@@ -70,31 +70,6 @@ QTableView* ReturnForm::tableView() const
     return ui->tableView;
 }
 
-
-void ReturnForm::loadClientsToComboBox()
-{
-    const auto clients = ClientRepository(DatabaseManager::instance().getDatabase()).loadAll();
-    for (const auto& c : clients)
-        ui->comboBoxClient->addItem(c.name, c.id);
-}
-
-void ReturnForm::loadRentalDocs(int clientId)
-{
-    // Очищаем ComboBox документов
-    ui->comboBoxRentalDoc->clear();
-    rowsModel->removeRows(0, rowsModel->rowCount());
-
-    if (clientId == 0)
-        return;
-
-    // Загружаем документы аренды для этого клиента
-    const auto docs =
-        DocumentRepository(DatabaseManager::instance().getDatabase()).loadRentalDocumentsByClient(clientId);
-    for (const auto& d : docs) {
-        QString displayText = QString("%1 от %2").arg(d.docNumber, d.date.toString("dd.MM.yyyy"));
-        ui->comboBoxRentalDoc->addItem(displayText, d.id);
-    }
-}
 
 void ReturnForm::loadRentalDetails(int rentalDocId)
 {
@@ -139,7 +114,7 @@ void ReturnForm::loadRentalDetails(int rentalDocId)
 void ReturnForm::on_comboBoxClient_currentIndexChanged(int index)
 {
     int clientId = ui->comboBoxClient->itemData(index).toInt();
-    loadRentalDocs(clientId);
+    loadRentalDocsForClient(ui->comboBoxRentalDoc, clientId);
 }
 
 void ReturnForm::on_comboBoxRentalDoc_currentIndexChanged(int index)
