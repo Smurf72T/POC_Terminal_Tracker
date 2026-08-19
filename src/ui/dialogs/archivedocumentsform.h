@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QSqlQueryModel>
+#include <QDate>
 
 namespace Ui {
 class ArchiveDocumentsForm;
@@ -27,6 +28,10 @@ private:
     Ui::ArchiveDocumentsForm* ui;
     QSqlQueryModel* model;
     int m_docType;
+    // Исходные даты фильтра (при открытии). Пока даты не изменялись —
+    // датами не фильтруем и показываем все документы.
+    QDate m_initialFrom;
+    QDate m_initialTo;
 
     void setupUI();
     void loadClients();

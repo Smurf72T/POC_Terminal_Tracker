@@ -21,10 +21,13 @@ ArchiveDocumentsForm::ArchiveDocumentsForm(int docType, QWidget* parent) :
     ui->setupUi(this);
     setupUI();
 
-    // Устанавливаем даты по умолчанию (текущий месяц)
+    // Устанавливаем даты по умолчанию (текущий месяц). Пока даты не изменены,
+    // в архиве показываются ВСЕ документы.
     QDate today = QDate::currentDate();
     ui->dateEditFrom->setDate(QDate(today.year(), today.month(), 1));
     ui->dateEditTo->setDate(today);
+    m_initialFrom = ui->dateEditFrom->date();
+    m_initialTo = ui->dateEditTo->date();
 
     // Загружаем клиентов (если это не Поступление и не Изменение статусов)
     if (m_docType != 1 && m_docType != 5) {
@@ -81,19 +84,33 @@ void ArchiveDocumentsForm::loadClients()
 
 void ArchiveDocumentsForm::applyFilter()
 {
-    QString queryStr;
     QString dateFrom = ui->dateEditFrom->date().toString("yyyy-MM-dd");
     QString dateTo = ui->dateEditTo->date().toString("yyyy-MM-dd");
     int clientId = ui->comboBoxClient->currentData().toInt();
 
+    // При открытии показываем ВСЕ документы. Фильтр по датам применяется только
+    // когда пользователь изменил хотя бы одну дату и нажал «Фильтр».
+    const bool useDateFilter = (ui->dateEditFrom->date() != m_initialFrom) ||
+                               (ui->dateEditTo->date() != m_initialTo);
+
+    // Условие по диапазону дат (верхняя граница включает весь день «до»).
+    auto dateRange = [useDateFilter](const char* column) {
+        if (!useDateFilter)
+            return QString();
+        return QString("%1 >= :dateFrom::date AND %1 < :dateTo::date + interval '1 day' ").arg(QLatin1String(column));
+    };
+
+    QString queryStr;
     if (m_docType == 1) { // Поступление
         queryStr = QString("SELECT receiptdocid, "
                            "docnumber AS \"Номер\", "
                            "docdate AS \"Дата\", "
                            "comments AS \"Комментарий\" "
-                           "FROM tblreceiptdocs "
-                           "WHERE docdate >= :dateFrom::date AND docdate < :dateTo::date + interval '1 day' "
-                           "ORDER BY docdate DESC");
+                           "FROM tblreceiptdocs ");
+        const QString d = dateRange("docdate");
+        if (!d.isEmpty())
+            queryStr += "WHERE " + d;
+        queryStr += "ORDER BY docdate DESC";
     } else if (m_docType == 2) { // Аренда — с возвратом и оплатой
         queryStr =
             QString("SELECT r.rentaldocid, "
@@ -113,9 +130,12 @@ void ArchiveDocumentsForm::applyFilter()
                     "          GROUP BY rd.rentaldocid) ret ON r.rentaldocid = ret.rentaldocid "
                     "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS payment_cnt FROM tblpayment_rental_links GROUP BY "
                     "rentaldocid) pay ON r.rentaldocid = pay.rentaldocid "
-                    "WHERE r.docdate >= :dateFrom::date AND r.docdate < :dateTo::date + interval '1 day' "
-                    "AND (:clientId = 0 OR r.clientid = :clientId) "
-                    "ORDER BY r.docdate DESC");
+                    "WHERE ");
+        const QString d = dateRange("r.docdate");
+        if (!d.isEmpty())
+            queryStr += d + "AND ";
+        queryStr += "(:clientId = 0 OR r.clientid = :clientId) "
+                    "ORDER BY r.docdate DESC";
     } else if (m_docType == 3) { // Возврат
         queryStr = QString("SELECT r.returndocid, "
                            "r.docnumber AS \"Номер\", "
@@ -124,9 +144,12 @@ void ArchiveDocumentsForm::applyFilter()
                            "r.comments AS \"Комментарий\" "
                            "FROM tblreturndocs r "
                            "LEFT JOIN tblclients c ON r.clientid = c.clientid "
-                           "WHERE r.docdate >= :dateFrom::date AND r.docdate < :dateTo::date + interval '1 day' "
-                           "AND (:clientId = 0 OR r.clientid = :clientId) "
-                           "ORDER BY r.docdate DESC");
+                           "WHERE ");
+        const QString d = dateRange("r.docdate");
+        if (!d.isEmpty())
+            queryStr += d + "AND ";
+        queryStr += "(:clientId = 0 OR r.clientid = :clientId) "
+                    "ORDER BY r.docdate DESC";
     } else if (m_docType == 4) { // Оплата
         queryStr = QString("SELECT p.paymentid, "
                            "p.paymentdate AS \"Дата\", "
@@ -142,9 +165,12 @@ void ArchiveDocumentsForm::applyFilter()
                            "(5, 'Май'), (6, 'Июнь'), (7, 'Июль'), (8, 'Август'), "
                            "(9, 'Сентябрь'), (10, 'Октябрь'), (11, 'Ноябрь'), (12, 'Декабрь') "
                            ") AS pm(monthnum, monthname) ON p.periodmonth = pm.monthnum "
-                           "WHERE p.paymentdate >= :dateFrom::date AND p.paymentdate < :dateTo::date + interval '1 day' "
-                           "AND (:clientId = 0 OR p.clientid = :clientId) "
-                           "ORDER BY p.paymentdate DESC");
+                           "WHERE ");
+        const QString d = dateRange("p.paymentdate");
+        if (!d.isEmpty())
+            queryStr += d + "AND ";
+        queryStr += "(:clientId = 0 OR p.clientid = :clientId) "
+                    "ORDER BY p.paymentdate DESC";
     } else if (m_docType == 5) { // Изменение статусов
         queryStr =
             QString("SELECT sc.statuschangedocid, "
@@ -157,15 +183,19 @@ void ArchiveDocumentsForm::applyFilter()
                     "FROM tblstatuschangedocs sc "
                     "LEFT JOIN (SELECT statuschangedocid, COUNT(*) AS cnt "
                     "          FROM tblstatuschangedetails GROUP BY statuschangedocid) det "
-                    "ON sc.statuschangedocid = det.statuschangedocid "
-                    "WHERE sc.docdate >= :dateFrom::date AND sc.docdate < :dateTo::date + interval '1 day' "
-                    "ORDER BY sc.docdate DESC");
+                    "ON sc.statuschangedocid = det.statuschangedocid ");
+        const QString d = dateRange("sc.docdate");
+        if (!d.isEmpty())
+            queryStr += "WHERE " + d;
+        queryStr += "ORDER BY sc.docdate DESC";
     }
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare(queryStr);
-    query.bindValue(":dateFrom", dateFrom);
-    query.bindValue(":dateTo", dateTo);
+    if (useDateFilter) {
+        query.bindValue(":dateFrom", dateFrom);
+        query.bindValue(":dateTo", dateTo);
+    }
     query.bindValue(":clientId", clientId);
 
     if (!query.exec()) {
