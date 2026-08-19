@@ -84,7 +84,7 @@ POC_DB_PASSWORD=postgres
 
 Подробное руководство по эксплуатации — [docs/OPS.md](docs/OPS.md).
 Внутренняя документация для разработчиков — [docs/API.md](docs/API.md),
-архитектурные решения — [docs/adr/ADR-0001.md](docs/adr/ADR-0001.md) (5 записей ADR-0001…0005).
+архитектурные решения — [docs/adr/ADR-0001.md](docs/adr/ADR-0001.md) (6 записей ADR-0001…0006).
 
 ### Обновление и дистрибутив
 
@@ -197,6 +197,23 @@ src/
       batchstatusform.*       — Массовая смена статусов
       usermanagementform.*    — Управление пользователями
       reportsform.*           — Отчёты по периодам
+      receiptform_post.cpp    — Проведение поступления (вынесено из формы)
+      receiptform_scan.cpp    — Логика сканера в поступлении (вынесено из формы)
+      rentalform_post.cpp     — Проведение/редактирование аренды
+      returnform_post.cpp     — Проведение/редактирование возврата
+      statuschangeform_post.cpp — Проведение изменения статуса
+      paymentform_post.cpp    — Проведение оплаты
+    base/
+      documentdialog.*        — Базовый класс форм документов (пост, загрузка, печать)
+      clientdocdialog.*       — Базовый класс клиентских форм (аренда/возврат/оплата)
+      printservice.*          — Печать HTML → QPrinter, batch-загрузка для печати
+      transactionguard.*      — RAII-обёртка транзакций в on_btnPost
+  services/
+    documentnumbergenerator.* — Генерация номера документа (без Qt-объектов)
+    postactionlogger.*        — Аудит + NOTIFY после проведения
+    simcardservice.*          — Привязка/освобождение SIM (слоты 1/2)
+    statuschangeservice.*     — Правила смены статусов терминалов
+    serialunitsservice.*      — Комплекты «серийник + IMEI 1/2»
   utils/
     password_utils.h          — PBKDF2-HMAC-SHA256 (100k итераций), constant-time проверка, обратная совместимость
     validator.*               — Валидация ИНН, IMEI (Luhn), данных
@@ -253,7 +270,10 @@ tests/
    `models::DocumentHeader`/`ReceiptRow` (header-only, без QObject).
 3. **Формы** (`src/ui/dialogs/`) — читают/пишут документы (приёмка, аренда, возврат)
    через репозитории; write-логика (проведение, транзакции `FOR UPDATE NOWAIT`)
-   остаётся в формах.
+   остаётся в формах (отдельные файлы `*_post.cpp`/`*_scan.cpp`), но дублирование
+   убрано в базовые классы `DocumentDialog`/`ClientDocumentDialog` (`src/ui/base/`)
+   и в сервисы (`src/services/`: генерация номеров, аудит после проведения,
+   привязка SIM, смена статусов, комплекты «серийник + IMEI»).
 
 Репозитории и модели покрыты `tests/test_repositories.cpp` (SQLite in-memory, подмножественная схема).
 
