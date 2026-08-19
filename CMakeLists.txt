@@ -108,6 +108,7 @@ set(SOURCES
         src/ui/base/transactionguard.cpp
         src/ui/base/documentdialog.cpp
         src/ui/base/clientdocdialog.cpp
+        src/ui/dialogs/receiptform_post.cpp
         src/services/documentnumbergenerator.cpp
         src/services/postactionlogger.cpp
         src/services/statuschangeservice.cpp
