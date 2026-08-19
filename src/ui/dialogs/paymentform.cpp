@@ -14,7 +14,7 @@
 #include <QDebug>
 #include "utils/logging.h"
 
-PaymentForm::PaymentForm(QWidget* parent) : QDialog(parent), ui(new Ui::PaymentForm)
+PaymentForm::PaymentForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::PaymentForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Отметка оплаты за аренду");
@@ -41,6 +41,32 @@ PaymentForm::~PaymentForm()
     delete ui;
 }
 
+QString PaymentForm::docType() const
+{
+    return "payment";
+}
+
+QLineEdit* PaymentForm::headerNumberEdit() const
+{
+    return nullptr;
+}
+
+QDateEdit* PaymentForm::headerDateEdit() const
+{
+    return ui->dateEdit;
+}
+
+QTextEdit* PaymentForm::headerCommentEdit() const
+{
+    return ui->textEditComment;
+}
+
+QTableView* PaymentForm::tableView() const
+{
+    return nullptr;
+}
+
+
 void PaymentForm::loadClients()
 {
     if (!DatabaseManager::instance().isConnected()) {
@@ -59,15 +85,13 @@ void PaymentForm::loadClients()
     }
 }
 
-void PaymentForm::loadForEdit(int paymentId)
+void PaymentForm::loadSpecificEditData(int docId)
 {
-    m_editMode = true;
-    m_editPaymentId = paymentId;
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("SELECT clientid, paymentdate, periodmonth, periodyear, amount, comment "
                   "FROM tblpayments WHERE paymentid = :id");
-    query.bindValue(":id", paymentId);
+    query.bindValue(":id", docId);
     if (!query.exec() || !query.next()) {
         QMessageBox::critical(this, "Ошибка", "Не удалось загрузить платёж");
         reject();
@@ -105,7 +129,7 @@ void PaymentForm::loadForEdit(int paymentId)
     // Загружаем привязанные документы аренды и отмечаем их
     QSqlQuery linkQuery(DatabaseManager::instance().getDatabase());
     linkQuery.prepare("SELECT rentaldocid FROM tblpayment_rental_links WHERE paymentid = :id");
-    linkQuery.bindValue(":id", paymentId);
+    linkQuery.bindValue(":id", docId);
     if (!linkQuery.exec()) {
         QMessageBox::warning(this, "Ошибка БД",
                              "Не удалось загрузить привязанные документы аренды:\n" + linkQuery.lastError().text());
@@ -127,7 +151,7 @@ void PaymentForm::loadForEdit(int paymentId)
         }
     }
 
-    setWindowTitle(QString("Редактирование оплаты ID %1").arg(paymentId));
+    setWindowTitle(QString("Редактирование оплаты ID %1").arg(docId));
 }
 
 void PaymentForm::loadMonths()
@@ -210,6 +234,11 @@ bool PaymentForm::checkExistingPayment(int clientId, int month, int year)
 
 void PaymentForm::on_btnSave_clicked()
 {
+    executePost();
+}
+
+bool PaymentForm::validateBeforePost()
+{
     int clientId = ui->comboBoxClient->currentData().toInt();
     int month = ui->comboBoxMonth->currentData().toInt();
     int year = ui->spinBoxYear->value();
@@ -217,29 +246,34 @@ void PaymentForm::on_btnSave_clicked()
 
     if (clientId == 0) {
         QMessageBox::warning(this, "Внимание", "Выберите клиента!");
-        return;
+        return false;
     }
     if (amount <= 0) {
         QMessageBox::warning(this, "Внимание", "Сумма оплаты должна быть больше нуля!");
-        return;
+        return false;
     }
 
     // Собираем выбранные документы аренды
-    QList<int> selectedRentalIds;
+    QList<int> m_selectedRentalIds;
     QStandardItemModel* listModel = qobject_cast<QStandardItemModel*>(ui->listViewRentals->model());
     if (listModel) {
         for (int i = 0; i < listModel->rowCount(); ++i) {
             QStandardItem* item = listModel->item(i);
             if (item && item->checkState() == Qt::Checked) {
-                selectedRentalIds.append(item->data(Qt::UserRole).toInt());
+                m_selectedRentalIds.append(item->data(Qt::UserRole).toInt());
             }
         }
     }
+    return true;
+}
 
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    TransactionGuard guard(db);
-
-    int paymentId = m_editPaymentId;
+int PaymentForm::postHeader(QSqlDatabase& db)
+{
+    int clientId = ui->comboBoxClient->currentData().toInt();
+    int month = ui->comboBoxMonth->currentData().toInt();
+    int year = ui->spinBoxYear->value();
+    double amount = ui->doubleSpinBoxAmount->value();
+    int paymentId = m_editDocId;
 
     if (m_editMode) {
         // Режим редактирования — UPDATE существующего платежа
@@ -257,7 +291,7 @@ void PaymentForm::on_btnSave_clicked()
 
         if (!updateQuery.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить платёж: " + updateQuery.lastError().text());
-            return;
+            return -1;
         }
 
         // Удаляем старые связи
@@ -266,7 +300,7 @@ void PaymentForm::on_btnSave_clicked()
         deleteLinks.bindValue(":id", paymentId);
         if (!deleteLinks.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить связи: " + deleteLinks.lastError().text());
-            return;
+            return -1;
         }
     } else {
         // Режим создания — проверка дубликата
@@ -278,7 +312,7 @@ void PaymentForm::on_btnSave_clicked()
                 QMessageBox::Yes | QMessageBox::No);
 
             if (reply != QMessageBox::Yes) {
-                return;
+                return -1;
             }
 
             QSqlQuery deleteQuery(db);
@@ -291,7 +325,7 @@ void PaymentForm::on_btnSave_clicked()
             if (!deleteQuery.exec()) {
                 QMessageBox::critical(this, "Ошибка БД",
                                       "Не удалось удалить старую запись: " + deleteQuery.lastError().text());
-                return;
+                return -1;
             }
         }
 
@@ -308,34 +342,38 @@ void PaymentForm::on_btnSave_clicked()
 
         if (!query.exec() || !query.next()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось сохранить оплату: " + query.lastError().text());
-            return;
+            return -1;
         }
         paymentId = query.value(0).toInt();
     }
-    for (int rentalId : selectedRentalIds) {
+    return paymentId;
+}
+
+bool PaymentForm::postDetails(QSqlDatabase& db, int docId)
+{
+    for (int rentalId : m_selectedRentalIds) {
+
         QSqlQuery linkQuery(db);
         linkQuery.prepare("INSERT INTO tblpayment_rental_links (paymentid, rentaldocid) VALUES (:pid, :rid)");
-        linkQuery.bindValue(":pid", paymentId);
+        linkQuery.bindValue(":pid", docId);
         linkQuery.bindValue(":rid", rentalId);
 
         if (!linkQuery.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать связь: " + linkQuery.lastError().text());
-            return;
+            return false;
         }
     }
+    return true;
+}
 
-    // 4. Фиксируем
-    if (!guard.commit())
-        return;
-
-    // Логирование действия
-    PostActionLogger::log("POST", "tblpayments", paymentId);
+void PaymentForm::onPostSuccess(int docId)
+{
+    PostActionLogger::log("POST", "tblpayments", docId);
 
     QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
     PostActionLogger::notify();
     this->close();
 }
-
 void PaymentForm::on_btnPrint_clicked()
 {
     int clientId = ui->comboBoxClient->currentData().toInt();

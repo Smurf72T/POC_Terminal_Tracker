@@ -15,7 +15,7 @@
 #include <QDebug>
 
 StatusChangeForm::StatusChangeForm(QWidget* parent) :
-    QDialog(parent), ui(new Ui::StatusChangeForm), rowsModel(new QStandardItemModel(0, 6, this))
+    DocumentDialog(parent), ui(new Ui::StatusChangeForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Изменение статуса терминалов");
@@ -31,6 +31,7 @@ StatusChangeForm::StatusChangeForm(QWidget* parent) :
     // Номер документа генерируется при проведении (не здесь), чтобы не
     // сжигать значения последовательности для отменённых форм.
 
+    rowsModel->setColumnCount(6);
     rowsModel->setHorizontalHeaderLabels({"Выбрать", "Серийный номер", "Модель", "IMEI 1", "Статус", "Был в ремонте"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -46,6 +47,32 @@ StatusChangeForm::~StatusChangeForm()
 {
     delete ui;
 }
+
+QString StatusChangeForm::docType() const
+{
+    return "statuschange";
+}
+
+QLineEdit* StatusChangeForm::headerNumberEdit() const
+{
+    return ui->lineEditNumber;
+}
+
+QDateEdit* StatusChangeForm::headerDateEdit() const
+{
+    return ui->dateEdit;
+}
+
+QTextEdit* StatusChangeForm::headerCommentEdit() const
+{
+    return ui->textEditComment;
+}
+
+QTableView* StatusChangeForm::tableView() const
+{
+    return ui->tableView;
+}
+
 
 QString StatusChangeForm::actionType() const
 {
@@ -259,32 +286,38 @@ QList<int> StatusChangeForm::checkedTerminalIds() const
 
 void StatusChangeForm::on_btnPost_clicked()
 {
-    QString comment = ui->textEditComment->toPlainText().trimmed();
-    if (comment.isEmpty()) {
+    executePost();
+}
+
+bool StatusChangeForm::validateBeforePost()
+{
+    m_comment = ui->textEditComment->toPlainText().trimmed();
+    if (m_comment.isEmpty()) {
         QMessageBox::warning(this, "Внимание", "Укажите комментарий: что ремонтируется или причина списания/утери.");
-        return;
+        return false;
     }
 
-    QList<int> terminalIds = checkedTerminalIds();
-    if (terminalIds.isEmpty()) {
+    m_terminalIds = checkedTerminalIds();
+    if (m_terminalIds.isEmpty()) {
         QMessageBox::warning(this, "Внимание", "Отметьте хотя бы один терминал!");
-        return;
+        return false;
     }
+    return true;
+}
 
+int StatusChangeForm::postHeader(QSqlDatabase& db)
+{
     int basedocid = (actionType() == "repair_return") ? ui->comboBoxRepairDoc->currentData().toInt() : 0;
-
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    TransactionGuard guard(db);
 
     QSqlQuery query(db);
     int docId = m_editDocId;
 
     if (m_editMode) {
         query.prepare("UPDATE tblstatuschangedocs SET docdate = :date, actiontype = :type, "
-                      "comment = :comm, basedocid = :base WHERE statuschangedocid = :id");
+                      "m_comment = :comm, basedocid = :base WHERE statuschangedocid = :id");
         query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":type", actionType());
-        query.bindValue(":comm", comment);
+        query.bindValue(":comm", m_comment);
         if (basedocid > 0) {
             query.bindValue(":base", basedocid);
         } else {
@@ -293,30 +326,30 @@ void StatusChangeForm::on_btnPost_clicked()
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
-            return;
+            return -1;
         }
 
         query.prepare("DELETE FROM tblstatuschangedetails WHERE statuschangedocid = :id");
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить строки: " + query.lastError().text());
-            return;
+            return -1;
         }
     } else {
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
             QString num = DocumentNumberGenerator::generate("statuschange", db);
             if (num.isEmpty()) {
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
-                return;
+                return -1;
             }
             ui->lineEditNumber->setText(num);
         }
-        query.prepare("INSERT INTO tblstatuschangedocs (docnumber, docdate, actiontype, comment, basedocid) "
+        query.prepare("INSERT INTO tblstatuschangedocs (docnumber, docdate, actiontype, m_comment, basedocid) "
                       "VALUES (:num, :date, :type, :comm, :base) RETURNING statuschangedocid");
         query.bindValue(":num", ui->lineEditNumber->text());
         query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":type", actionType());
-        query.bindValue(":comm", comment);
+        query.bindValue(":comm", m_comment);
         if (basedocid > 0) {
             query.bindValue(":base", basedocid);
         } else {
@@ -325,17 +358,21 @@ void StatusChangeForm::on_btnPost_clicked()
 
         if (!query.exec() || !query.next()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать документ: " + query.lastError().text());
-            return;
+            return -1;
         }
         docId = query.value(0).toInt();
     }
+    return docId;
+}
 
+bool StatusChangeForm::postDetails(QSqlDatabase& db, int docId)
+{
     int target = targetStatus();
 
     // Терминалы, убранные из документа при редактировании, должны быть
     // возвращены в прежний статус (откат операции).
     QSet<int> checked;
-    for (int tid : terminalIds)
+    for (int tid : m_terminalIds)
         checked.insert(tid);
     QList<int> removed;
     if (m_editMode) {
@@ -345,7 +382,7 @@ void StatusChangeForm::on_btnPost_clicked()
         }
     }
 
-    for (int termId : terminalIds) {
+    for (int termId : m_terminalIds) {
         QSqlQuery checkQuery(db);
         checkQuery.prepare("SELECT status FROM tblterminals "
                            "WHERE terminalid = :id FOR UPDATE NOWAIT");
@@ -355,7 +392,7 @@ void StatusChangeForm::on_btnPost_clicked()
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
-            return;
+            return false;
         }
 
         int currentStatus = checkQuery.value(0).toInt();
@@ -370,7 +407,7 @@ void StatusChangeForm::on_btnPost_clicked()
                                       .arg(termId)
                                       .arg(statusText(currentStatus))
                                       .arg(actionTitle()));
-            return;
+            return false;
         }
 
         // Прежний статус: для терминалов из исходного документа берём снимок,
@@ -390,7 +427,7 @@ void StatusChangeForm::on_btnPost_clicked()
                                   QString("Не удалось обновить статус терминала %1:\n%2")
                                       .arg(termId)
                                       .arg(updateQuery.lastError().text()));
-            return;
+            return false;
         }
 
         QSqlQuery detailQuery(db);
@@ -401,7 +438,7 @@ void StatusChangeForm::on_btnPost_clicked()
         detailQuery.bindValue(":old", oldStatus);
         if (!detailQuery.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
-            return;
+            return false;
         }
     }
 
@@ -416,7 +453,7 @@ void StatusChangeForm::on_btnPost_clicked()
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
-            return;
+            return false;
         }
 
         int currentStatus = checkQuery.value(0).toInt();
@@ -426,7 +463,7 @@ void StatusChangeForm::on_btnPost_clicked()
                                           "откат невозможен. Уберите его вручную.")
                                       .arg(termId)
                                       .arg(statusText(currentStatus)));
-            return;
+            return false;
         }
 
         int oldStatus = m_originalStatus.value(termId, -1);
@@ -440,7 +477,7 @@ void StatusChangeForm::on_btnPost_clicked()
                                       QString("Прежний статус терминала %1 неизвестен (документ проведён до "
                                               "введения снимков статусов). Верните его вручную.")
                                           .arg(termId));
-                return;
+                return false;
             }
         }
 
@@ -453,24 +490,22 @@ void StatusChangeForm::on_btnPost_clicked()
                                   QString("Не удалось восстановить статус терминала %1:\n%2")
                                       .arg(termId)
                                       .arg(updateQuery.lastError().text()));
-            return;
+            return false;
         }
     }
+    return true;
+}
 
-    if (!guard.commit())
-        return;
-
+void StatusChangeForm::onPostSuccess(int docId)
+{
     PostActionLogger::log(m_editMode ? "UPDATE" : "POST", "tblstatuschangedocs", docId);
     PostActionLogger::notify();
     QMessageBox::information(
         this, "Успех", QString("Документ «%1» успешно %2!").arg(actionTitle(), m_editMode ? "обновлён" : "проведён"));
     this->close();
 }
-
-void StatusChangeForm::loadForEdit(int docId)
+void StatusChangeForm::loadSpecificEditData(int docId)
 {
-    m_editMode = true;
-    m_editDocId = docId;
     m_originalTerminals.clear();
     m_originalStatus.clear();
     m_originalActionType.clear();

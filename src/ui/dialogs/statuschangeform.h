@@ -1,8 +1,7 @@
 #ifndef STATUSCHANGEFORM_H
 #define STATUSCHANGEFORM_H
 
-#include <QDialog>
-#include <QStandardItemModel>
+#include "ui/base/documentdialog.h"
 #include <QHash>
 #include <QSet>
 
@@ -10,14 +9,14 @@ namespace Ui {
 class StatusChangeForm;
 }
 
-class StatusChangeForm : public QDialog {
+class QSqlDatabase;
+
+class StatusChangeForm : public DocumentDialog {
     Q_OBJECT
 
 public:
     explicit StatusChangeForm(QWidget* parent = nullptr);
     ~StatusChangeForm();
-
-    void loadForEdit(int docId);
 
 private slots:
     void on_comboBoxActionType_currentIndexChanged(int index);
@@ -29,9 +28,23 @@ private slots:
 
 private:
     Ui::StatusChangeForm* ui;
-    QStandardItemModel* rowsModel;
-    bool m_editMode = false;
-    int m_editDocId = 0;
+
+    // --- DocumentDialog ---
+    QString docType() const override;
+    QLineEdit* headerNumberEdit() const override;
+    QDateEdit* headerDateEdit() const override;
+    QTextEdit* headerCommentEdit() const override;
+    QTableView* tableView() const override;
+    bool validateBeforePost() override;
+    int postHeader(QSqlDatabase& db) override;
+    bool postDetails(QSqlDatabase& db, int docId) override;
+    void onPostSuccess(int docId) override;
+    void loadSpecificEditData(int docId) override;
+
+    // Заполняется в validateBeforePost и используется в postHeader/postDetails.
+    QString m_comment;
+    QList<int> m_terminalIds;
+
     // Снимок состава и прежних статусов терминалов документа для корректного
     // отката статусов при редактировании проведённого документа.
     QSet<int> m_originalTerminals;

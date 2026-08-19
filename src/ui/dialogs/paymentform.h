@@ -1,20 +1,20 @@
 #ifndef PAYMENTFORM_H
 #define PAYMENTFORM_H
 
-#include <QDialog>
+#include "ui/base/documentdialog.h"
 
 namespace Ui {
 class PaymentForm;
 }
 
-class PaymentForm : public QDialog {
+class QSqlDatabase;
+
+class PaymentForm : public DocumentDialog {
     Q_OBJECT
 
 public:
     explicit PaymentForm(QWidget* parent = nullptr);
     ~PaymentForm();
-
-    void loadForEdit(int paymentId);
 
 private slots:
     void on_btnSave_clicked();
@@ -31,8 +31,22 @@ private:
     void loadRentalDocsForClient(int clientId);
     bool checkExistingPayment(int clientId, int month, int year);
 
-    bool m_editMode = false;
-    int m_editPaymentId = 0;
+    // --- DocumentDialog ---
+    // У оплаты нет табличной части и поля номера, поэтому tableView() и
+    // headerNumberEdit() возвращают nullptr (базовый класс их не использует).
+    QString docType() const override;
+    QLineEdit* headerNumberEdit() const override;
+    QDateEdit* headerDateEdit() const override;
+    QTextEdit* headerCommentEdit() const override;
+    QTableView* tableView() const override;
+    bool validateBeforePost() override;
+    int postHeader(QSqlDatabase& db) override;
+    bool postDetails(QSqlDatabase& db, int docId) override;
+    void onPostSuccess(int docId) override;
+    void loadSpecificEditData(int docId) override;
+
+    // Выбранные документы аренды (заполняется в validateBeforePost).
+    QList<int> m_selectedRentalIds;
 };
 
 #endif // PAYMENTFORM_H

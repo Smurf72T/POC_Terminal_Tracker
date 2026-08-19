@@ -31,7 +31,7 @@
 #include <QJsonObject>
 #include <QTimer>
 
-ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptForm)
+ReceiptForm::ReceiptForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::ReceiptForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Поступление терминалов");
@@ -105,6 +105,31 @@ ReceiptForm::~ReceiptForm()
     delete ui;
 }
 
+QString ReceiptForm::docType() const
+{
+    return "receipt";
+}
+
+QLineEdit* ReceiptForm::headerNumberEdit() const
+{
+    return ui->lineEditNumber;
+}
+
+QDateEdit* ReceiptForm::headerDateEdit() const
+{
+    return ui->dateEdit;
+}
+
+QTextEdit* ReceiptForm::headerCommentEdit() const
+{
+    return ui->textEditComment;
+}
+
+QTableView* ReceiptForm::tableView() const
+{
+    return ui->tableView;
+}
+
 void ReceiptForm::loadModelsToDelegate()
 {
     m_models.clear();
@@ -121,11 +146,8 @@ void ReceiptForm::loadModelsToDelegate()
     ui->tableView->setItemDelegateForColumn(ColModel, new ComboBoxDelegate(m_models, this));
 }
 
-void ReceiptForm::loadForEdit(int docId)
+void ReceiptForm::loadSpecificEditData(int docId)
 {
-    m_editMode = true;
-    m_editDocId = docId;
-
     const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
     DocumentRepository documents(db);
 
@@ -304,24 +326,22 @@ void ReceiptForm::onTableViewDoubleClicked(const QModelIndex& index)
 
 void ReceiptForm::on_btnPost_clicked()
 {
+    executePost();
+}
+
+bool ReceiptForm::validateBeforePost()
+{
     if (rowsModel->rowCount() == 0) {
         QMessageBox::warning(this, "Внимание", "Добавьте хотя бы одну строку!");
-        return;
+        return false;
     }
 
     // 0. Собираем строки и проверяем дубли в рамках документа.
-    struct ItemData {
-        int modelId;
-        int qty;
-        QStringList serials;
-        QStringList imei1;
-        QStringList imei2;
-    };
-    QList<ItemData> items;
+    m_units.clear();
     QSet<QString> usedSerials, usedImei1, usedImei2;
 
     for (int r = 0; r < rowsModel->rowCount(); ++r) {
-        ItemData it;
+        UnitData it;
         it.modelId = rowsModel->data(rowsModel->index(r, ColModel), Qt::UserRole).toInt();
         it.qty = rowQty(r);
         it.serials = serialsForRow(r);
@@ -337,7 +357,7 @@ void ReceiptForm::on_btnPost_clicked()
 
         if (it.modelId <= 0) {
             QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите модель из списка.").arg(r + 1));
-            return;
+            return false;
         }
         if (it.serials.size() != it.qty) {
             QMessageBox::critical(this, "Ошибка",
@@ -345,7 +365,7 @@ void ReceiptForm::on_btnPost_clicked()
                                       .arg(r + 1)
                                       .arg(it.serials.size())
                                       .arg(it.qty));
-            return;
+            return false;
         }
         // Серийник в каждом комплекте обязателен.
         for (int k = 0; k < it.serials.size(); ++k) {
@@ -354,14 +374,14 @@ void ReceiptForm::on_btnPost_clicked()
                                       QString("Строка %1, комплект %2: не заполнен серийный номер.")
                                           .arg(r + 1)
                                           .arg(k + 1));
-                return;
+                return false;
             }
         }
         if (it.imei1.size() != it.serials.size() || it.imei2.size() != it.serials.size()) {
             QMessageBox::critical(this, "Ошибка",
                                   QString("Строка %1: количество IMEI не соответствует числу серийных номеров.")
                                       .arg(r + 1));
-            return;
+            return false;
         }
         for (int k = 0; k < it.serials.size(); ++k) {
             const QString sn = it.serials.at(k).trimmed();
@@ -371,7 +391,7 @@ void ReceiptForm::on_btnPost_clicked()
             if (usedSerials.contains(sn)) {
                 QMessageBox::critical(this, "Ошибка",
                                       QString("Серийный номер повторяется в документе: %1").arg(sn));
-                return;
+                return false;
             }
             usedSerials.insert(sn);
 
@@ -383,11 +403,11 @@ void ReceiptForm::on_btnPost_clicked()
                                               .arg(r + 1)
                                               .arg(k + 1)
                                               .arg(im1));
-                    return;
+                    return false;
                 }
                 if (usedImei1.contains(im1)) {
                     QMessageBox::critical(this, "Ошибка", QString("IMEI 1 повторяется в документе: %1").arg(im1));
-                    return;
+                    return false;
                 }
                 usedImei1.insert(im1);
             }
@@ -400,59 +420,58 @@ void ReceiptForm::on_btnPost_clicked()
                                               .arg(r + 1)
                                               .arg(k + 1)
                                               .arg(im2));
-                    return;
+                    return false;
                 }
                 if (usedImei2.contains(im2)) {
                     QMessageBox::critical(this, "Ошибка", QString("IMEI 2 повторяется в документе: %1").arg(im2));
-                    return;
+                    return false;
                 }
                 usedImei2.insert(im2);
             }
         }
 
-        items.append(it);
+        m_units.append(it);
     }
+    return true;
+}
 
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    TransactionGuard guard(db);
-
+int ReceiptForm::postHeader(QSqlDatabase& db)
+{
     QSqlQuery query(db);
     int docId;
 
     // 1. Шапка документа.
     if (m_editMode) {
         query.prepare("UPDATE tblreceiptdocs SET docdate = :date, comments = :comm WHERE receiptdocid = :id");
-        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
-        query.bindValue(":comm", ui->textEditComment->toPlainText());
+        query.bindValue(":date", QDateTime(headerDateEdit()->date(), QTime::currentTime()));
+        query.bindValue(":comm", headerCommentEdit()->toPlainText());
         query.bindValue(":id", m_editDocId);
 
         if (!query.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
-            return;
+            return -1;
         }
         docId = m_editDocId;
     } else {
-        if (ui->lineEditNumber->text().trimmed().isEmpty()) {
-            QString num = DocumentNumberGenerator::generate("receipt", db);
-            if (num.isEmpty()) {
-                QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
-                return;
-            }
-            ui->lineEditNumber->setText(num);
-        }
+        if (!ensureDocNumber())
+            return -1;
         query.prepare("INSERT INTO tblreceiptdocs (docnumber, docdate, comments) "
                       "VALUES (:num, :date, :comm) RETURNING receiptdocid");
-        query.bindValue(":num", ui->lineEditNumber->text());
-        query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
-        query.bindValue(":comm", ui->textEditComment->toPlainText());
+        query.bindValue(":num", headerNumberEdit()->text());
+        query.bindValue(":date", QDateTime(headerDateEdit()->date(), QTime::currentTime()));
+        query.bindValue(":comm", headerCommentEdit()->toPlainText());
 
         if (!query.exec() || !query.next()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
-            return;
+            return -1;
         }
         docId = query.value(0).toInt();
     }
+    return docId;
+}
 
+bool ReceiptForm::postDetails(QSqlDatabase& db, int docId)
+{
     // 2. В режиме редактирования пересоздаём «исходник» и связи.
     if (m_editMode) {
         QSqlQuery delItems(db);
@@ -461,7 +480,7 @@ void ReceiptForm::on_btnPost_clicked()
         if (!delItems.exec()) {
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось удалить старые строки: " + delItems.lastError().text());
-            return;
+            return false;
         }
 
         QSqlQuery delDetails(db);
@@ -470,12 +489,12 @@ void ReceiptForm::on_btnPost_clicked()
         if (!delDetails.exec()) {
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось удалить старые связи: " + delDetails.lastError().text());
-            return;
+            return false;
         }
     }
 
     // 3. Разворачиваем строки в терминалы и сохраняем «исходник».
-    for (const ItemData& it : items) {
+    for (const UnitData& it : m_units) {
         QSqlQuery itemQuery(db);
         itemQuery.prepare("INSERT INTO tblreceiptitems (receiptdocid, modelid, qty) "
                           "VALUES (:did, :mid, :qty) RETURNING receiptitemid");
@@ -485,7 +504,7 @@ void ReceiptForm::on_btnPost_clicked()
         if (!itemQuery.exec() || !itemQuery.next()) {
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось сохранить строку документа: " + itemQuery.lastError().text());
-            return;
+            return false;
         }
         const int itemId = itemQuery.value(0).toInt();
 
@@ -506,7 +525,7 @@ void ReceiptForm::on_btnPost_clicked()
                 QMessageBox::critical(this, "Ошибка БД",
                                       QString("Ошибка сохранения серийного номера %1:\n%2")
                                           .arg(serial, serialQuery.lastError().text()));
-                return;
+                return false;
             }
 
             int newTermId;
@@ -530,12 +549,12 @@ void ReceiptForm::on_btnPost_clicked()
                     QMessageBox::critical(this, "Ошибка БД",
                                           QString("Ошибка при обновлении терминала %1:\n%2")
                                               .arg(serial, termQuery.lastError().text()));
-                    return;
+                    return false;
                 }
             } else if (found) {
                 QMessageBox::critical(this, "Ошибка",
                                       QString("Серийный номер уже есть в базе: %1").arg(serial));
-                return;
+                return false;
             } else {
                 QSqlQuery termQuery(db);
                 termQuery.prepare("INSERT INTO tblterminals (serialnumber, modelid, imei1, imei2, status) "
@@ -548,7 +567,7 @@ void ReceiptForm::on_btnPost_clicked()
                     QMessageBox::critical(this, "Ошибка БД",
                                           QString("Ошибка при добавлении терминала %1:\n%2")
                                               .arg(serial, termQuery.lastError().text()));
-                    return;
+                    return false;
                 }
                 newTermId = termQuery.value(0).toInt();
             }
@@ -559,15 +578,15 @@ void ReceiptForm::on_btnPost_clicked()
             detailQuery.bindValue(":tid", newTermId);
             if (!detailQuery.exec()) {
                 QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
-                return;
+                return false;
             }
         }
     }
+    return true;
+}
 
-    // 4. Фиксируем транзакцию.
-    if (!guard.commit())
-        return;
-
+void ReceiptForm::onPostSuccess(int docId)
+{
     PostActionLogger::log("POST", "tblreceiptdocs", docId);
 
     QMessageBox::information(this, "Успех", "Документ успешно проведен!");
@@ -577,15 +596,8 @@ void ReceiptForm::on_btnPost_clicked()
 
 void ReceiptForm::on_btnPrint_clicked()
 {
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    if (!m_editMode && ui->lineEditNumber->text().trimmed().isEmpty()) {
-        QString num = DocumentNumberGenerator::generate("receipt", db);
-        if (num.isEmpty()) {
-            QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
-            return;
-        }
-        ui->lineEditNumber->setText(num);
-    }
+    if (!ensureDocNumber())
+        return;
 
     QString html = PrintService::docHeader();
 

@@ -18,7 +18,7 @@
 #include "ui/base/transactionguard.h"
 #include <QHash>
 
-ReturnForm::ReturnForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReturnForm)
+ReturnForm::ReturnForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::ReturnForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Возврат из аренды");
@@ -30,9 +30,7 @@ ReturnForm::ReturnForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReturnForm
     // сжигать значения последовательности для отменённых форм.
 
     // Настройка модели таблицы
-    rowsModel = new QStandardItemModel(0, 4, this);
-    // Колонки: 0 - Возврат (чекбокс), 1 - Терминал, 2 - SIM слота 1 (imei1),
-    //          3 - SIM слота 2 (imei2)
+    rowsModel->setColumnCount(4);
     rowsModel->setHorizontalHeaderLabels({"Возврат", "Терминал", "SIM (IMEI 1)", "SIM (IMEI 2)"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -46,6 +44,32 @@ ReturnForm::~ReturnForm()
 {
     delete ui;
 }
+
+QString ReturnForm::docType() const
+{
+    return "return";
+}
+
+QLineEdit* ReturnForm::headerNumberEdit() const
+{
+    return ui->lineEditNumber;
+}
+
+QDateEdit* ReturnForm::headerDateEdit() const
+{
+    return ui->dateEdit;
+}
+
+QTextEdit* ReturnForm::headerCommentEdit() const
+{
+    return ui->textEditComment;
+}
+
+QTableView* ReturnForm::tableView() const
+{
+    return ui->tableView;
+}
+
 
 void ReturnForm::loadClientsToComboBox()
 {
@@ -124,10 +148,8 @@ void ReturnForm::on_comboBoxRentalDoc_currentIndexChanged(int index)
     loadRentalDetails(rentalDocId);
 }
 
-void ReturnForm::loadForEdit(int docId)
+void ReturnForm::loadSpecificEditData(int docId)
 {
-    m_editMode = true;
-    m_editDocId = docId;
     m_originalReturned.clear();
     m_editRentalDocId = 0;
 
@@ -174,35 +196,44 @@ void ReturnForm::loadForEdit(int docId)
 
 void ReturnForm::on_btnPost_clicked()
 {
+    executePost();
+}
+
+bool ReturnForm::validateBeforePost()
+{
     int clientId = ui->comboBoxClient->currentData().toInt();
     int rentalDocId = ui->comboBoxRentalDoc->currentData().toInt();
 
+    m_terminalsToReturn.clear();
+
     if (clientId == 0) {
         QMessageBox::warning(this, "Внимание", "Выберите клиента!");
-        return;
+        return false;
     }
     if (rentalDocId == 0) {
         QMessageBox::warning(this, "Внимание", "Выберите документ аренды!");
-        return;
+        return false;
     }
 
     // Собираем ID терминалов, которые нужно вернуть
-    QList<int> terminalsToReturn;
+    QList<int> m_terminalsToReturn;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         QStandardItem* checkItem = rowsModel->item(i, 0);
         if (checkItem && checkItem->checkState() == Qt::Checked) {
-            terminalsToReturn.append(checkItem->data(Qt::UserRole).toInt());
+            m_terminalsToReturn.append(checkItem->data(Qt::UserRole).toInt());
         }
     }
 
-    if (terminalsToReturn.isEmpty()) {
+    if (m_terminalsToReturn.isEmpty()) {
         QMessageBox::warning(this, "Внимание", "Отметьте хотя бы один терминал для возврата!");
-        return;
+        return false;
     }
+    return true;
+}
 
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    TransactionGuard guard(db);
-
+int ReturnForm::postHeader(QSqlDatabase& db)
+{
+    int clientId = ui->comboBoxClient->currentData().toInt();
     QSqlQuery query(db);
 
     if (m_editMode) {
@@ -216,29 +247,57 @@ void ReturnForm::on_btnPost_clicked()
 
         if (!query.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
-            return;
+            return -1;
         }
 
         query.prepare("DELETE FROM tblreturndetails WHERE returndocid = :id");
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить детали: " + query.lastError().text());
-            return;
+            return -1;
         }
 
-        for (int termId : terminalsToReturn) {
+        for (int termId : m_terminalsToReturn) {
             query.prepare("INSERT INTO tblreturndetails (returndocid, terminalid) VALUES (:did, :tid)");
             query.bindValue(":did", m_editDocId);
             query.bindValue(":tid", termId);
             if (!query.exec()) {
                 QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + query.lastError().text());
-                return;
+                return -1;
             }
         }
+        return m_editDocId;
+    }
 
+    // 1. Создаем шапку документа возврата
+    if (ui->lineEditNumber->text().trimmed().isEmpty()) {
+        QString num = DocumentNumberGenerator::generate("return", db);
+        if (num.isEmpty()) {
+            QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
+            return -1;
+        }
+        ui->lineEditNumber->setText(num);
+    }
+    query.prepare("INSERT INTO tblreturndocs (docnumber, docdate, clientid, comments) "
+                  "VALUES (:num, :date, :client, :comm) RETURNING returndocid");
+    query.bindValue(":num", ui->lineEditNumber->text());
+    query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
+    query.bindValue(":client", clientId);
+    query.bindValue(":comm", ui->textEditComment->toPlainText());
+
+    if (!query.exec() || !query.next()) {
+        QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
+        return -1;
+    }
+    int docId = query.value(0).toInt();
+}
+
+bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
+{
+    if (m_editMode) {
         // ---- Статусы терминалов/SIM при редактировании проведённого возврата ----
         QSet<int> checked;
-        for (int tid : terminalsToReturn)
+        for (int tid : m_terminalsToReturn)
             checked.insert(tid);
 
         QList<int> newlyReturned;
@@ -262,11 +321,11 @@ void ReturnForm::on_btnPost_clicked()
                 QMessageBox::critical(
                     this, "Ошибка",
                     QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
-                return;
+                return false;
             }
             if (lockTerm.value(0).toInt() != 1) {
                 QMessageBox::critical(this, "Ошибка", QString("Терминал %1 уже не находится в аренде!").arg(termId));
-                return;
+                return false;
             }
             int simId = lockTerm.value(1).toInt();  // SIM слота 1 (imei1)
             int sim2Id = lockTerm.value(2).toInt(); // SIM слота 2 (imei2)
@@ -279,7 +338,7 @@ void ReturnForm::on_btnPost_clicked()
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось обновить статус терминала %1:\n%2").arg(termId).arg(upd.lastError().text()));
-                return;
+                return false;
             }
             for (int sid : {simId, sim2Id}) {
                 if (sid <= 0)
@@ -292,7 +351,7 @@ void ReturnForm::on_btnPost_clicked()
                                           QString("Не удалось обновить статус SIM-карты %1:\n%2")
                                               .arg(sid)
                                               .arg(updSim.lastError().text()));
-                    return;
+                    return false;
                 }
             }
         }
@@ -306,11 +365,11 @@ void ReturnForm::on_btnPost_clicked()
                 QMessageBox::critical(
                     this, "Ошибка",
                     QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
-                return;
+                return false;
             }
             if (lockTerm.value(0).toInt() != 0) {
                 QMessageBox::critical(this, "Ошибка", QString("Терминал %1 уже находится в аренде!").arg(termId));
-                return;
+                return false;
             }
 
             // Прежние SIM-карты из документа аренды (слот 1 и слот 2)
@@ -336,14 +395,14 @@ void ReturnForm::on_btnPost_clicked()
                     QMessageBox::critical(
                         this, "Ошибка",
                         QString("Не удалось заблокировать SIM-карту %1. Возможно, она уже обрабатывается.").arg(sid));
-                    return;
+                    return false;
                 }
                 if (lockSim.value(0).toInt() != 0) {
                     QMessageBox::critical(this, "Ошибка",
                                           QString("SIM-карта %1 занята, не удалось восстановить аренду терминала %2.")
                                               .arg(sid)
                                               .arg(termId));
-                    return;
+                    return false;
                 }
                 QSqlQuery updSim(db);
                 updSim.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
@@ -353,7 +412,7 @@ void ReturnForm::on_btnPost_clicked()
                                           QString("Не удалось обновить статус SIM-карты %1:\n%2")
                                               .arg(sid)
                                               .arg(updSim.lastError().text()));
-                    return;
+                    return false;
                 }
             }
 
@@ -367,44 +426,13 @@ void ReturnForm::on_btnPost_clicked()
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось восстановить терминал %1:\n%2").arg(termId).arg(upd.lastError().text()));
-                return;
+                return false;
             }
         }
-
-        if (!guard.commit())
-            return;
-
-        PostActionLogger::log("UPDATE", "tblreturndocs", m_editDocId);
-        QMessageBox::information(this, "Успех", "Возврат успешно обновлен!");
-        PostActionLogger::notify();
-        this->close();
-        return;
-    }
-
-    // 1. Создаем шапку документа возврата
-    if (ui->lineEditNumber->text().trimmed().isEmpty()) {
-        QString num = DocumentNumberGenerator::generate("return", db);
-        if (num.isEmpty()) {
-            QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
-            return;
-        }
-        ui->lineEditNumber->setText(num);
-    }
-    query.prepare("INSERT INTO tblreturndocs (docnumber, docdate, clientid, comments) "
-                  "VALUES (:num, :date, :client, :comm) RETURNING returndocid");
-    query.bindValue(":num", ui->lineEditNumber->text());
-    query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
-    query.bindValue(":client", clientId);
-    query.bindValue(":comm", ui->textEditComment->toPlainText());
-
-    if (!query.exec() || !query.next()) {
-        QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
-        return;
-    }
-    int docId = query.value(0).toInt();
+    } else {
 
     // 2. Обрабатываем выбранные терминалы
-    for (int termId : terminalsToReturn) {
+    for (int termId : m_terminalsToReturn) {
         // Блокируем терминал и проверяем, что он всё ещё в аренде
         QSqlQuery checkQuery(db);
         checkQuery.prepare("SELECT status, currentsimcardid, currentsimcardid2 FROM tblterminals "
@@ -415,7 +443,7 @@ void ReturnForm::on_btnPost_clicked()
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
-            return;
+            return false;
         }
 
         int status = checkQuery.value(0).toInt();
@@ -424,7 +452,7 @@ void ReturnForm::on_btnPost_clicked()
 
         if (status != 1) {
             QMessageBox::critical(this, "Ошибка", QString("Терминал %1 уже не находится в аренде!").arg(termId));
-            return;
+            return false;
         }
 
         // Меняем статус терминала на «Свободен» и очищаем привязки SIM
@@ -438,7 +466,7 @@ void ReturnForm::on_btnPost_clicked()
                                   QString("Не удалось обновить статус терминала %1:\n%2")
                                       .arg(termId)
                                       .arg(updateQuery.lastError().text()));
-            return;
+            return false;
         }
 
         // Сбрасываем статусы SIM-карт (если были привязаны)
@@ -454,7 +482,7 @@ void ReturnForm::on_btnPost_clicked()
                                       QString("Не удалось обновить статус SIM-карты %1:\n%2")
                                           .arg(simId)
                                           .arg(simUpdateQuery.lastError().text()));
-                return;
+                return false;
             }
         }
 
@@ -467,22 +495,25 @@ void ReturnForm::on_btnPost_clicked()
 
         if (!detailQuery.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
-            return;
+            return false;
         }
     }
+    }
+    return true;
+}
 
-    // 3. Фиксируем транзакцию
-    if (!guard.commit())
-        return;
-
-    // Логирование действия
-    PostActionLogger::log("POST", "tblreturndocs", docId);
-
-    QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
+void ReturnForm::onPostSuccess(int docId)
+{
+    if (m_editMode) {
+        PostActionLogger::log("UPDATE", "tblreturndocs", docId);
+        QMessageBox::information(this, "Успех", "Возврат успешно обновлен!");
+    } else {
+        PostActionLogger::log("POST", "tblreturndocs", docId);
+        QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
+    }
     PostActionLogger::notify();
     this->close();
 }
-
 void ReturnForm::on_btnPrint_clicked()
 {
     int clientId = ui->comboBoxClient->currentData().toInt();

@@ -32,7 +32,6 @@ public:
 protected:
     // --- интерфейс для потомков ---
     virtual QString docType() const = 0;
-    virtual QString docTitle() const = 0;
     virtual QLineEdit* headerNumberEdit() const = 0;
     virtual QDateEdit* headerDateEdit() const = 0;
     virtual QTextEdit* headerCommentEdit() const = 0;

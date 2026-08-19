@@ -23,7 +23,7 @@
 #include <QHash>
 #include <QSqlDatabase>
 
-RentalForm::RentalForm(QWidget* parent) : QDialog(parent), ui(new Ui::RentalForm)
+RentalForm::RentalForm(QWidget* parent) : DocumentDialog(parent), ui(new Ui::RentalForm)
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Передача в аренду");
@@ -36,8 +36,7 @@ RentalForm::RentalForm(QWidget* parent) : QDialog(parent), ui(new Ui::RentalForm
     // сжигать значения последовательности для отменённых форм.
 
     // Настройка модели для табличной части
-    rowsModel = new QStandardItemModel(0, 4, this);
-    // Колонки: 0 — Терминал, 1 — SIM слота 1 (imei1), 2 — SIM слота 2 (imei2), 3 — Примечание.
+    rowsModel->setColumnCount(4);
     rowsModel->setHorizontalHeaderLabels({"Терминал", "SIM (IMEI 1)", "SIM (IMEI 2)", "Примечание"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -56,6 +55,32 @@ RentalForm::~RentalForm()
 {
     delete ui;
 }
+
+QString RentalForm::docType() const
+{
+    return "rental";
+}
+
+QLineEdit* RentalForm::headerNumberEdit() const
+{
+    return ui->lineEditNumber;
+}
+
+QDateEdit* RentalForm::headerDateEdit() const
+{
+    return ui->dateEdit;
+}
+
+QTextEdit* RentalForm::headerCommentEdit() const
+{
+    return ui->textEditComment;
+}
+
+QTableView* RentalForm::tableView() const
+{
+    return ui->tableView;
+}
+
 
 void RentalForm::loadClientsToDelegate()
 {
@@ -94,10 +119,8 @@ void RentalForm::loadFreeSIMsToDelegate()
     ui->tableView->setItemDelegateForColumn(2, new ComboBoxDelegate(sims, this, true));
 }
 
-void RentalForm::loadForEdit(int docId)
+void RentalForm::loadSpecificEditData(int docId)
 {
-    m_editMode = true;
-    m_editDocId = docId;
     m_originalDetails.clear();
 
     const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
@@ -186,20 +209,28 @@ void RentalForm::on_btnDeleteRow_clicked()
 
 void RentalForm::on_btnPost_clicked()
 {
+    executePost();
+}
+
+bool RentalForm::validateBeforePost()
+{
     if (rowsModel->rowCount() == 0) {
         QMessageBox::warning(this, "Внимание", "Добавьте хотя бы одну строку!");
-        return;
+        return false;
     }
 
     int clientId = ui->comboBoxClient->currentData().toInt();
     if (clientId == 0) {
         QMessageBox::warning(this, "Внимание", "Выберите клиента!");
-        return;
+        return false;
     }
 
-    QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    TransactionGuard guard(db);
+    return true;
+}
 
+int RentalForm::postHeader(QSqlDatabase& db)
+{
+    int clientId = ui->comboBoxClient->currentData().toInt();
     QSqlQuery query(db);
 
     int docId;
@@ -214,7 +245,7 @@ void RentalForm::on_btnPost_clicked()
 
         if (!query.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
-            return;
+            return -1;
         }
 
         docId = m_editDocId;
@@ -225,14 +256,14 @@ void RentalForm::on_btnPost_clicked()
         if (!deleteQuery.exec()) {
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось удалить старые строки: " + deleteQuery.lastError().text());
-            return;
+            return -1;
         }
     } else {
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
             QString num = DocumentNumberGenerator::generate("rental", db);
             if (num.isEmpty()) {
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
-                return;
+                return -1;
             }
             ui->lineEditNumber->setText(num);
         }
@@ -245,11 +276,14 @@ void RentalForm::on_btnPost_clicked()
 
         if (!query.exec() || !query.next()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
-            return;
+            return -1;
         }
         docId = query.value(0).toInt();
     }
+}
 
+bool RentalForm::postDetails(QSqlDatabase& db, int docId)
+{
     // Терминалы, числившиеся в документе до редактирования
     QSet<int> previousTerminals;
     const QList<int> originalKeys = m_originalDetails.keys();
@@ -266,7 +300,7 @@ void RentalForm::on_btnPost_clicked()
 
         if (terminalId <= 0) {
             QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите терминал.").arg(i + 1));
-            return;
+            return false;
         }
 
         bool wasInDoc = previousTerminals.contains(terminalId);
@@ -281,19 +315,19 @@ void RentalForm::on_btnPost_clicked()
         sim1Id = resolveSimFromCell(db, sim1Id, sim1Number, &simError);
         if (sim1Id < 0) {
             QMessageBox::critical(this, "Ошибка", simError);
-            return;
+            return false;
         }
         sim2Id = resolveSimFromCell(db, sim2Id, sim2Number, &simError);
         if (sim2Id < 0) {
             QMessageBox::critical(this, "Ошибка", simError);
-            return;
+            return false;
         }
 
         // Одна и та же SIM не может стоять в двух слотах одного терминала.
         if (sim1Id > 0 && sim1Id == sim2Id) {
             QMessageBox::critical(this, "Ошибка",
                                   QString("Строка %1: одна и та же SIM-карта указана в слотах 1 и 2.").arg(i + 1));
-            return;
+            return false;
         }
 
         // Блокируем терминал и проверяем его состояние
@@ -305,7 +339,7 @@ void RentalForm::on_btnPost_clicked()
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже сдан в аренду.").arg(terminalId));
-            return;
+            return false;
         }
         int status = checkQuery.value(0).toInt();
 
@@ -313,12 +347,12 @@ void RentalForm::on_btnPost_clicked()
             // Новый терминал в документе: должен быть свободен
             if (status != 0) {
                 QMessageBox::critical(this, "Ошибка", QString("Терминал %1 больше не свободен!").arg(terminalId));
-                return;
+                return false;
             }
         } else if (status != 1) {
             QMessageBox::critical(this, "Ошибка",
                                   QString("Терминал %1 уже не числится в аренде по этому документу.").arg(terminalId));
-            return;
+            return false;
         }
 
         bool sim1Changed = sim1Id != origSim1;
@@ -328,13 +362,13 @@ void RentalForm::on_btnPost_clicked()
         if (wasInDoc && sim1Changed && origSim1 > 0) {
             if (!freeSimCard(db, origSim1, QString("слот 1, терминал %1").arg(terminalId), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
-                return;
+                return false;
             }
         }
         if (wasInDoc && sim2Changed && origSim2 > 0) {
             if (!freeSimCard(db, origSim2, QString("слот 2, терминал %1").arg(terminalId), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
-                return;
+                return false;
             }
         }
 
@@ -342,13 +376,13 @@ void RentalForm::on_btnPost_clicked()
         if (sim1Id > 0 && sim1Changed) {
             if (!lockSimCard(db, sim1Id, QString("SIM-карта %1").arg(sim1Number), &simError)) {
                 QMessageBox::critical(this, "Ошибка", simError);
-                return;
+                return false;
             }
         }
         if (sim2Id > 0 && sim2Changed) {
             if (!lockSimCard(db, sim2Id, QString("SIM-карта %1").arg(sim2Number), &simError)) {
                 QMessageBox::critical(this, "Ошибка", simError);
-                return;
+                return false;
             }
         }
 
@@ -364,7 +398,7 @@ void RentalForm::on_btnPost_clicked()
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
-                return;
+                return false;
             }
         } else if (sim1Changed || sim2Changed) {
             // Существующий терминал — обновляем только привязки SIM
@@ -378,7 +412,7 @@ void RentalForm::on_btnPost_clicked()
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
-                return;
+                return false;
             }
         }
 
@@ -393,7 +427,7 @@ void RentalForm::on_btnPost_clicked()
 
         if (!detailQuery.exec()) {
             QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
-            return;
+            return false;
         }
     }
 
@@ -426,11 +460,11 @@ void RentalForm::on_btnPost_clicked()
             QString simError;
             if (tSim1 > 0 && !freeSimCard(db, tSim1, QString("терминал %1").arg(tid), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
-                return;
+                return false;
             }
             if (tSim2 > 0 && !freeSimCard(db, tSim2, QString("терминал %1").arg(tid), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
-                return;
+                return false;
             }
 
             QSqlQuery upd(db);
@@ -441,14 +475,15 @@ void RentalForm::on_btnPost_clicked()
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось освободить терминал %1: %2").arg(tid).arg(upd.lastError().text()));
-                return;
+                return false;
             }
         }
     }
+    return true;
+}
 
-    if (!guard.commit())
-        return;
-
+void RentalForm::onPostSuccess(int docId)
+{
     PostActionLogger::log("POST", "tblrentaldocs", docId);
 
     isPosted = true;
@@ -456,7 +491,6 @@ void RentalForm::on_btnPost_clicked()
     PostActionLogger::notify();
     this->close();
 }
-
 void RentalForm::onTableViewDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
 {
     // Когда данные изменились, обновляем отображение

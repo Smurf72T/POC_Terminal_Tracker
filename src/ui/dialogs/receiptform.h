@@ -1,9 +1,9 @@
 #ifndef RECEIPTFORM_H
 #define RECEIPTFORM_H
 
-#include <QDialog>
-#include <QStandardItemModel>
-#include <QPair>
+#include "ui/base/documentdialog.h"
+#include <QList>
+#include <QStringList>
 
 class BarcodeScanner;
 class SerialScanner;
@@ -13,18 +13,17 @@ namespace Ui {
 class ReceiptForm;
 }
 
-class ReceiptForm : public QDialog {
+class ReceiptForm : public DocumentDialog {
     Q_OBJECT
 
 public:
     explicit ReceiptForm(QWidget* parent = nullptr);
     ~ReceiptForm();
-    void loadForEdit(int docId);
 
 private slots:
     void on_btnAddRow_clicked();
     void on_btnDeleteRow_clicked();
-    void on_btnPost_clicked(); // Кнопка "Провести"
+    void on_btnPost_clicked();
     void on_btnPrint_clicked();
     void on_btnClose_clicked();
     void onScanFinished(const QString& raw);
@@ -41,8 +40,30 @@ private:
     static constexpr int RoleImei1 = Qt::UserRole + 3;
     static constexpr int RoleImei2 = Qt::UserRole + 4;
 
+    // Одна строка документа (модель + комплекты) для проведения.
+    struct UnitData {
+        int modelId = 0;
+        int qty = 0;
+        QStringList serials;
+        QStringList imei1;
+        QStringList imei2;
+    };
+
     Ui::ReceiptForm* ui;
-    QStandardItemModel* rowsModel;
+
+    // --- DocumentDialog ---
+    QString docType() const override;
+    QLineEdit* headerNumberEdit() const override;
+    QDateEdit* headerDateEdit() const override;
+    QTextEdit* headerCommentEdit() const override;
+    QTableView* tableView() const override;
+    bool validateBeforePost() override;
+    int postHeader(QSqlDatabase& db) override;
+    bool postDetails(QSqlDatabase& db, int docId) override;
+    void onPostSuccess(int docId) override;
+    void loadSpecificEditData(int docId) override;
+
+    QList<UnitData> m_units;
 
     void loadModelsToDelegate();
     // Можно ли принять скан: форма активна, фокус не в текстовом редакторе.
@@ -67,8 +88,6 @@ private:
     BarcodeScanner* m_scanner = nullptr;
     SerialScanner* m_serialScanner = nullptr;
     SerialUnitsDialog* m_unitsDialog = nullptr;
-    bool m_editMode = false;
-    int m_editDocId = 0;
 };
 
 #endif // RECEIPTFORM_H
