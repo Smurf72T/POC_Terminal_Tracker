@@ -64,7 +64,12 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
     target_link_libraries(test_opsscheduler PRIVATE Qt6::Test Qt6::Core Qt6::Sql Qt6::Widgets Threads::Threads)
     add_test(NAME test_opsscheduler COMMAND test_opsscheduler)
 
-    add_executable(test_db_integration tests/test_db_integration.cpp
+    add_executable(test_db_integration
+            tests/test_db_integration.cpp
+            tests/test_db_integration_support.cpp
+            tests/test_db_integration_schema.cpp
+            tests/test_db_integration_flow.cpp
+            tests/test_db_integration_backup.cpp
             src/ops/backupmanager.cpp
             src/ops/backupmanager_helpers.cpp
             src/ops/backupmanager_fallback.cpp
