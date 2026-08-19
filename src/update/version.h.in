@@ -1,0 +1,9 @@
+#ifndef APP_VERSION_H
+#define APP_VERSION_H
+
+// Автоматически генерируется CMake из CHANGELOG.md (первая запись "## [x.y.z]").
+// Не редактировать вручную. Если заголовок не найден — макрос будет пустым,
+// и приложение использует версию из config.json как запасную.
+#define APP_VERSION "@POC_APP_VERSION@"
+
+#endif // APP_VERSION_H

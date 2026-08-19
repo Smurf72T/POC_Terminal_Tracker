@@ -227,7 +227,7 @@ src/
     opsscheduler.*            — Планировщик автобэкапов и проверки целостности БД
   update/
     updatemanager.*           — Автообновление: проверка манифеста, скачивание в загрузки
-    version.h                 — Утилиты сравнения версий (semver major.minor.patch)
+    version.h                 — Утилиты сравнения версий; appVersion() из APP_VERSION (генерируется CMake из CHANGELOG.md)
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/

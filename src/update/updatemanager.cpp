@@ -32,7 +32,7 @@ UpdateManager::UpdateManager(const QJsonObject& config, QObject* parent) : QObje
         m_url.clear();
     }
     m_checkOnStartup = update["check_on_startup"].toBool(true);
-    m_currentVersion = config["application"].toObject()["version"].toString("1.0.0");
+    m_currentVersion = UpdateUtils::appVersion(config["application"].toObject()["version"].toString("1.0.0"));
     m_timeoutMs = update["timeout_ms"].toInt(30000);
     if (m_timeoutMs <= 0)
         m_timeoutMs = 30000;

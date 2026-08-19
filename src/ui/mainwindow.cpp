@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 
 #include "database/databasemanager.h"
+#include "update/version.h"
 #include "panels/backuppanel.h"
 #include "panels/maintenancepanel.h"
 #include "views/dashboardview.h"
@@ -158,7 +159,8 @@ void MainWindow::setupUI()
 
 void MainWindow::updateStatusBar()
 {
-    QString version = DatabaseManager::instance().configObject()["application"].toObject()["version"].toString("1.0.0");
+    QString version = UpdateUtils::appVersion(
+        DatabaseManager::instance().configObject()["application"].toObject()["version"].toString("1.0.0"));
     QString statusText = QString("Версия %1 | Подключено к БД: ").arg(version) +
                          (DatabaseManager::instance().isConnected() ? "Да" : "Нет") + " | " +
                          QDateTime::currentDateTime().toString("dd.MM.yyyy hh:mm:ss");
@@ -236,7 +238,8 @@ void MainWindow::onTopClientActivated(int clientId, const QString& clientName)
 
 void MainWindow::onActionAbout_triggered()
 {
-    QString version = DatabaseManager::instance().configObject()["application"].toObject()["version"].toString("1.0.0");
+    QString version = UpdateUtils::appVersion(
+        DatabaseManager::instance().configObject()["application"].toObject()["version"].toString("1.0.0"));
     QMessageBox::about(this, "О программе",
                        "POC Terminal Tracker\n"
                        "Версия " +

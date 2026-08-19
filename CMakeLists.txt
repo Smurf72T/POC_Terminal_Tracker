@@ -260,6 +260,19 @@ configure_file(
         COPYONLY
 )
 
+# Версия приложения генерируется из CHANGELOG.md — первая запись "## [x.y.z]"
+# считается актуальной. Единый источник правды: изменение CHANGELOG.md
+# автоматически переконфигурирует сборку (CMAKE_CONFIGURE_DEPENDS) и новая
+# версия попадает в бинарник без ручного редактирования config.json.
+file(READ ${CMAKE_SOURCE_DIR}/CHANGELOG.md POC_CHANGELOG_TEXT)
+string(REGEX MATCH "## \\[([0-9]+\\.[0-9]+\\.[0-9]+)" POC_CHANGELOG_VERSION "${POC_CHANGELOG_TEXT}")
+set(POC_APP_VERSION "${CMAKE_MATCH_1}")
+configure_file(
+        ${CMAKE_SOURCE_DIR}/src/update/version.h.in
+        ${CMAKE_BINARY_DIR}/generated/app_version.h
+)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/CHANGELOG.md)
+
 # Копируем SQL-миграции в папку сборки
 file(COPY ${CMAKE_SOURCE_DIR}/sql/migrations/ DESTINATION ${CMAKE_BINARY_DIR}/sql/migrations/)
 
@@ -267,6 +280,7 @@ file(COPY ${CMAKE_SOURCE_DIR}/sql/migrations/ DESTINATION ${CMAKE_BINARY_DIR}/sq
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_SOURCE_DIR}/src
         ${CMAKE_SOURCE_DIR}/src/ui
+        ${CMAKE_BINARY_DIR}/generated
         ${PostgreSQL_INCLUDE_DIRS}
 )
 
@@ -331,8 +345,8 @@ if(BUILD_TESTS)
     target_link_libraries(test_loginform PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_loginform COMMAND test_loginform)
 
-    add_executable(test_update_utils tests/test_update_utils.cpp)
-    target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src)
+add_executable(test_update_utils tests/test_update_utils.cpp)
+target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
     target_link_libraries(test_update_utils PRIVATE Qt6::Test Qt6::Core)
     add_test(NAME test_update_utils COMMAND test_update_utils)
 
@@ -350,7 +364,7 @@ if(BUILD_TESTS)
             src/update/updatemanager.cpp
             src/ops/opslog.cpp
             src/utils/logging.cpp)
-    target_include_directories(test_updatemanager PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    target_include_directories(test_updatemanager PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_BINARY_DIR}/generated)
     target_link_libraries(test_updatemanager PRIVATE Qt6::Test Qt6::Core Qt6::Network)
     add_test(NAME test_updatemanager COMMAND test_updatemanager)
 

@@ -1,6 +1,7 @@
 #include "ui/mainwindow.h"
 #include "ui/dialogs/loginform.h"
 #include "database/databasemanager.h"
+#include "update/version.h"
 #include "utils/logging.h"
 #include <QApplication>
 #include <QCoreApplication>
@@ -32,13 +33,15 @@ static void applyStyle(QApplication& app)
 
 static QString readAppVersion(const QString& configPath)
 {
+    QString fromConfig;
     QFile file(configPath);
-    if (!file.open(QIODevice::ReadOnly))
-        return QString();
-    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-    if (doc.isNull())
-        return QString();
-    return doc.object()["application"].toObject()["version"].toString();
+    if (file.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (!doc.isNull())
+            fromConfig = doc.object()["application"].toObject()["version"].toString();
+    }
+    // Приоритет: версия из CHANGELOG.md (генерируется CMake) → config.json.
+    return UpdateUtils::appVersion(fromConfig);
 }
 
 // Путь к config.json независимо от рабочего каталога: рядом с exe (портативная

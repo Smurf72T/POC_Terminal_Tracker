@@ -1,6 +1,8 @@
 #ifndef VERSION_H
 #define VERSION_H
 
+#include "app_version.h"
+
 #include <QString>
 #include <QStringList>
 
@@ -61,6 +63,15 @@ inline int compareVersions(const QString& a, const QString& b)
 inline bool isVersionNewer(const QString& candidate, const QString& current)
 {
     return compareVersions(candidate, current) > 0;
+}
+
+// Текущая версия приложения. Берётся из CHANGELOG.md (первая запись "## [x.y.z]",
+// генерируется CMake в макрос APP_VERSION). Если заголовок не найден — fallback
+// (например, версия из config.json).
+inline QString appVersion(const QString& fallback = QString())
+{
+    const QString v = QString::fromUtf8(APP_VERSION).trimmed();
+    return v.isEmpty() ? fallback : v;
 }
 
 } // namespace UpdateUtils
