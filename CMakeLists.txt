@@ -112,6 +112,7 @@ set(SOURCES
         src/services/postactionlogger.cpp
         src/services/statuschangeservice.cpp
         src/services/simcardservice.cpp
+        src/services/serialunitsservice.cpp
 )
 
 set(HEADERS
@@ -172,6 +173,7 @@ set(HEADERS
         src/services/postactionlogger.h
         src/services/statuschangeservice.h
         src/services/simcardservice.h
+        src/services/serialunitsservice.h
         src/utils/reportexporter.h
         src/utils/validator.h
         src/utils/registration_ratelimiter.h

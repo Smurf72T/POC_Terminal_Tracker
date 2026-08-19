@@ -26,6 +26,7 @@
 #include "utils/logging.h"
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
+#include "services/serialunitsservice.h"
 #include "ui/base/printservice.h"
 #include "ui/base/transactionguard.h"
 #include <QJsonObject>
@@ -283,21 +284,11 @@ void ReceiptForm::setUnitsForRow(int row, const QStringList& serials, const QStr
     item->setData(imei2, RoleImei2);
 }
 
-QString ReceiptForm::listSummary(const QStringList& values, int expected) const
-{
-    if (values.isEmpty())
-        return "—";
-    QString preview = values.join("; ");
-    if (preview.size() > 34)
-        preview = preview.left(34) + "…";
-    return QString("%1/%2 · %3").arg(values.size()).arg(expected).arg(preview);
-}
-
 void ReceiptForm::refreshRow(int row)
 {
     QStandardItem* item = rowsModel->item(row, ColSerials);
     if (item)
-        item->setText(listSummary(serialsForRow(row), rowQty(row)));
+        item->setText(SerialUnitsService::summary(serialsForRow(row), rowQty(row)));
 }
 
 void ReceiptForm::openUnitsDialog(int row)
@@ -345,13 +336,8 @@ bool ReceiptForm::validateBeforePost()
         it.modelId = rowsModel->data(rowsModel->index(r, ColModel), Qt::UserRole).toInt();
         it.qty = rowQty(r);
         it.serials = serialsForRow(r);
-        QStringList imei1 = imei1ForRow(r);
-        QStringList imei2 = imei2ForRow(r);
-        // IMEI могут быть не заполнены вовсе — выравниваем под серийники.
-        if (imei1.isEmpty())
-            imei1 = QStringList(it.serials.size(), QString());
-        if (imei2.isEmpty())
-            imei2 = QStringList(it.serials.size(), QString());
+        QStringList imei1 = SerialUnitsService::alignedImei(it.serials, imei1ForRow(r));
+        QStringList imei2 = SerialUnitsService::alignedImei(it.serials, imei2ForRow(r));
         it.imei1 = imei1;
         it.imei2 = imei2;
 
@@ -369,7 +355,7 @@ bool ReceiptForm::validateBeforePost()
         }
         // Серийник в каждом комплекте обязателен.
         for (int k = 0; k < it.serials.size(); ++k) {
-            if (it.serials.at(k).trimmed().isEmpty()) {
+            if (!SerialUnitsService::isValidSerial(it.serials.at(k))) {
                 QMessageBox::critical(this, "Ошибка",
                                       QString("Строка %1, комплект %2: не заполнен серийный номер.")
                                           .arg(r + 1)
@@ -396,7 +382,7 @@ bool ReceiptForm::validateBeforePost()
             usedSerials.insert(sn);
 
             if (!im1.isEmpty()) {
-                if (im1.size() != 15) {
+                if (!SerialUnitsService::isValidImei(im1)) {
                     QMessageBox::critical(this, "Ошибка",
                                           QString("Строка %1, комплект %2: IMEI 1 должен содержать ровно 15 цифр "
                                                   "(сейчас: %3)")
@@ -413,7 +399,7 @@ bool ReceiptForm::validateBeforePost()
             }
 
             if (!im2.isEmpty()) {
-                if (im2.size() != 15) {
+                if (!SerialUnitsService::isValidImei(im2)) {
                     QMessageBox::critical(this, "Ошибка",
                                           QString("Строка %1, комплект %2: IMEI 2 должен содержать ровно 15 цифр "
                                                   "(сейчас: %3)")

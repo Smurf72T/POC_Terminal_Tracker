@@ -77,8 +77,6 @@ private:
     QStringList imei1ForRow(int row) const;
     QStringList imei2ForRow(int row) const;
     void setUnitsForRow(int row, const QStringList& serials, const QStringList& imei1, const QStringList& imei2);
-    // Краткое описание комплектов для ячейки таблицы.
-    QString listSummary(const QStringList& values, int expected) const;
     // Пересчитать текст колонки комплектов строки.
     void refreshRow(int row);
     // Открыть окно ввода комплектов (серийник + его IMEI).
