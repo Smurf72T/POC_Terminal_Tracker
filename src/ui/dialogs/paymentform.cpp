@@ -1,6 +1,8 @@
 #include "paymentform.h"
 #include "ui_paymentform.h"
 #include "database/databasemanager.h"
+#include "services/postactionlogger.h"
+#include "ui/base/printservice.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -9,10 +11,7 @@
 #include <QTime>
 #include <QStandardItemModel>
 #include <QDebug>
-#include <QPrinter>
 #include "utils/logging.h"
-#include <QPrintDialog>
-#include <QTextDocument>
 
 PaymentForm::PaymentForm(QWidget* parent) : QDialog(parent), ui(new Ui::PaymentForm)
 {
@@ -339,10 +338,10 @@ void PaymentForm::on_btnSave_clicked()
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
         // Логирование действия
-        DatabaseManager::instance().logAction("POST", "tblpayments", paymentId);
+        PostActionLogger::log("POST", "tblpayments", paymentId);
 
         QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
-        DatabaseManager::instance().notifyDataChanged();
+        PostActionLogger::notify();
         this->close();
     }
 }
@@ -370,11 +369,7 @@ void PaymentForm::on_btnPrint_clicked()
     int year = ui->spinBoxYear->value();
     double amount = ui->doubleSpinBoxAmount->value();
 
-    QString html = "<html><head><meta charset='utf-8'>"
-                   "<style>"
-                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
-                   "h2 { text-align: center; }"
-                   "</style></head><body>";
+    QString html = PrintService::docHeader();
 
     html += "<h2>КВИТАНЦИЯ ОБ ОПЛАТЕ</h2>";
     html += "<p><b>Платёж №</b> " + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + "</p>";
@@ -399,15 +394,9 @@ void PaymentForm::on_btnPrint_clicked()
             "<div><p>Кассир: ________________</p></div>"
             "<div><p>Плательщик: ________________</p></div>"
             "</div>";
-    html += "</body></html>";
+    html += PrintService::docFooter();
 
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() == QDialog::Accepted) {
-        QTextDocument doc;
-        doc.setHtml(html);
-        doc.print(&printer);
-    }
+    PrintService::printHtml(html, this);
 }
 
 void PaymentForm::on_btnClose_clicked()

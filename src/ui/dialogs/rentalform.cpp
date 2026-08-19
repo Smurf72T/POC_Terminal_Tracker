@@ -15,11 +15,12 @@
 #include <QDebug>
 #include <QSqlRecord>
 #include "utils/logging.h"
+#include "services/documentnumbergenerator.h"
+#include "services/postactionlogger.h"
+#include "ui/base/printservice.h"
 #include <QSet>
 #include <QHash>
-#include <QTextDocument>
-#include <QPrinter>
-#include <QPrintDialog>
+#include <QSqlDatabase>
 
 RentalForm::RentalForm(QWidget* parent) : QDialog(parent), ui(new Ui::RentalForm)
 {
@@ -232,7 +233,7 @@ void RentalForm::on_btnPost_clicked()
         }
     } else {
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
-            QString num = DatabaseManager::instance().generateDocNumber("rental");
+            QString num = DocumentNumberGenerator::generate("rental", db);
             if (num.isEmpty()) {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
@@ -472,11 +473,11 @@ void RentalForm::on_btnPost_clicked()
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
-        DatabaseManager::instance().logAction("POST", "tblrentaldocs", docId);
+        PostActionLogger::log("POST", "tblrentaldocs", docId);
 
         isPosted = true;
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
-        DatabaseManager::instance().notifyDataChanged();
+        PostActionLogger::notify();
         this->close();
     }
 }
@@ -528,16 +529,11 @@ void RentalForm::on_btnPrintAct_clicked()
     QString clientAddress = client.address;
 
     // Формируем HTML акта
-    QString html = "<html><head><meta charset='utf-8'>"
-                   "<style>"
-                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
-                   "h2 { text-align: center; }"
-                   "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
-                   "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
-                   "th { background-color: #f0f0f0; }"
-                   ".signature { margin-top: 50px; display: flex; justify-content: space-between; }"
-                   ".signature div { width: 45%; }"
-                   "</style></head><body>";
+    QString html = PrintService::docHeader();
+    html += "<style>"
+            ".signature { margin-top: 50px; display: flex; justify-content: space-between; }"
+            ".signature div { width: 45%; }"
+            "</style>";
 
     html += "<h2>АКТ ПРИЁМА-ПЕРЕДАЧИ ТЕРМИНАЛОВ № " + ui->lineEditNumber->text().toHtmlEscaped() + "</h2>";
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
@@ -621,16 +617,10 @@ void RentalForm::on_btnPrintAct_clicked()
             "<div><p>Передал (Арендодатель):</p><p>________________ / ____________</p></div>"
             "<div><p>Принял (Арендатор):</p><p>________________ / ____________</p></div>"
             "</div>";
-    html += "</body></html>";
+    html += PrintService::docFooter();
 
     // Печать или сохранение в PDF
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() == QDialog::Accepted) {
-        QTextDocument doc;
-        doc.setHtml(html);
-        doc.print(&printer);
-    }
+    PrintService::printHtml(html, this);
 }
 
 int RentalForm::resolveSimFromCell(QSqlDatabase& db, int cellSimId, const QString& cellSimNumber, QString* error)

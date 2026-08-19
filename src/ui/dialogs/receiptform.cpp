@@ -24,10 +24,10 @@
 #include <QHeaderView>
 #include <QSet>
 #include "utils/logging.h"
+#include "services/documentnumbergenerator.h"
+#include "services/postactionlogger.h"
+#include "ui/base/printservice.h"
 #include <QJsonObject>
-#include <QPrinter>
-#include <QPrintDialog>
-#include <QTextDocument>
 #include <QTimer>
 
 ReceiptForm::ReceiptForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReceiptForm)
@@ -436,7 +436,7 @@ void ReceiptForm::on_btnPost_clicked()
         docId = m_editDocId;
     } else {
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
-            QString num = DatabaseManager::instance().generateDocNumber("receipt");
+            QString num = DocumentNumberGenerator::generate("receipt", db);
             if (num.isEmpty()) {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
@@ -582,18 +582,19 @@ void ReceiptForm::on_btnPost_clicked()
         db.rollback();
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
-        DatabaseManager::instance().logAction("POST", "tblreceiptdocs", docId);
+        PostActionLogger::log("POST", "tblreceiptdocs", docId);
 
         QMessageBox::information(this, "Успех", "Документ успешно проведен!");
-        DatabaseManager::instance().notifyDataChanged();
+        PostActionLogger::notify();
         this->close();
     }
 }
 
 void ReceiptForm::on_btnPrint_clicked()
 {
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
     if (!m_editMode && ui->lineEditNumber->text().trimmed().isEmpty()) {
-        QString num = DatabaseManager::instance().generateDocNumber("receipt");
+        QString num = DocumentNumberGenerator::generate("receipt", db);
         if (num.isEmpty()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
             return;
@@ -601,14 +602,7 @@ void ReceiptForm::on_btnPrint_clicked()
         ui->lineEditNumber->setText(num);
     }
 
-    QString html = "<html><head><meta charset='utf-8'>"
-                   "<style>"
-                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
-                   "h2 { text-align: center; }"
-                   "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
-                   "th, td { border: 1px solid black; padding: 6px; text-align: left; vertical-align: top; }"
-                   "th { background-color: #f0f0f0; }"
-                   "</style></head><body>";
+    QString html = PrintService::docHeader();
 
     html += "<h2>ПРИХОДНАЯ НАКЛАДНАЯ № " + ui->lineEditNumber->text().toHtmlEscaped() + "</h2>";
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
@@ -651,15 +645,9 @@ void ReceiptForm::on_btnPrint_clicked()
     html += "</table>";
 
     html += "<p style='margin-top: 40px;'>Принял: ________________ / ____________</p>";
-    html += "</body></html>";
+    html += PrintService::docFooter();
 
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() == QDialog::Accepted) {
-        QTextDocument doc;
-        doc.setHtml(html);
-        doc.print(&printer);
-    }
+    PrintService::printHtml(html, this);
 }
 
 void ReceiptForm::on_btnClose_clicked()

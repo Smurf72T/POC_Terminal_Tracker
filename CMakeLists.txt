@@ -104,6 +104,9 @@ set(SOURCES
         src/ops/opslog.cpp
         src/ops/opsscheduler.cpp
         src/update/updatemanager.cpp
+        src/ui/base/printservice.cpp
+        src/services/documentnumbergenerator.cpp
+        src/services/postactionlogger.cpp
 )
 
 set(HEADERS

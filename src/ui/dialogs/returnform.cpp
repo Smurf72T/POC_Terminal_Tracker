@@ -12,8 +12,9 @@
 #include <QDebug>
 #include <QPrinter>
 #include "utils/logging.h"
-#include <QPrintDialog>
-#include <QTextDocument>
+#include "services/documentnumbergenerator.h"
+#include "services/postactionlogger.h"
+#include "ui/base/printservice.h"
 #include <QHash>
 
 ReturnForm::ReturnForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReturnForm)
@@ -389,9 +390,9 @@ void ReturnForm::on_btnPost_clicked()
             db.rollback();
             QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
         } else {
-            DatabaseManager::instance().logAction("UPDATE", "tblreturndocs", m_editDocId);
+            PostActionLogger::log("UPDATE", "tblreturndocs", m_editDocId);
             QMessageBox::information(this, "Успех", "Возврат успешно обновлен!");
-            DatabaseManager::instance().notifyDataChanged();
+            PostActionLogger::notify();
             this->close();
         }
         return;
@@ -399,7 +400,7 @@ void ReturnForm::on_btnPost_clicked()
 
     // 1. Создаем шапку документа возврата
     if (ui->lineEditNumber->text().trimmed().isEmpty()) {
-        QString num = DatabaseManager::instance().generateDocNumber("return");
+        QString num = DocumentNumberGenerator::generate("return", db);
         if (num.isEmpty()) {
             db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
@@ -500,10 +501,10 @@ void ReturnForm::on_btnPost_clicked()
         QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
     } else {
         // Логирование действия
-        DatabaseManager::instance().logAction("POST", "tblreturndocs", docId);
+        PostActionLogger::log("POST", "tblreturndocs", docId);
 
         QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
-        DatabaseManager::instance().notifyDataChanged();
+        PostActionLogger::notify();
         this->close();
     }
 }
@@ -516,8 +517,9 @@ void ReturnForm::on_btnPrint_clicked()
         return;
     }
 
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
     if (!m_editMode && ui->lineEditNumber->text().trimmed().isEmpty()) {
-        QString num = DatabaseManager::instance().generateDocNumber("return");
+        QString num = DocumentNumberGenerator::generate("return", db);
         if (num.isEmpty()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
             return;
@@ -525,20 +527,12 @@ void ReturnForm::on_btnPrint_clicked()
         ui->lineEditNumber->setText(num);
     }
 
-    QString html = "<html><head><meta charset='utf-8'>"
-                   "<style>"
-                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
-                   "h2 { text-align: center; }"
-                   "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
-                   "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
-                   "th { background-color: #f0f0f0; }"
-                   "</style></head><body>";
+    QString html = PrintService::docHeader();
 
     html += "<h2>АКТ ВОЗВРАТА ТЕРМИНАЛОВ № " + ui->lineEditNumber->text().toHtmlEscaped() + "</h2>";
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
     html += "<p><b>Арендодатель:</b> ООО «POC Terminal»</p>";
 
-    const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
     const models::Client client = ClientRepository(db).loadById(clientId);
     QString clientName = client.name;
     QString clientInn = client.inn;
@@ -587,15 +581,9 @@ void ReturnForm::on_btnPrint_clicked()
             "<div><p>Сдал (Арендатор):</p><p>________________ / ____________</p></div>"
             "<div><p>Принял (Арендодатель):</p><p>________________ / ____________</p></div>"
             "</div>";
-    html += "</body></html>";
+    html += PrintService::docFooter();
 
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() == QDialog::Accepted) {
-        QTextDocument doc;
-        doc.setHtml(html);
-        doc.print(&printer);
-    }
+    PrintService::printHtml(html, this);
 }
 
 void ReturnForm::on_btnClose_clicked()

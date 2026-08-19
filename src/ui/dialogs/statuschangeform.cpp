@@ -3,15 +3,15 @@
 #include "database/databasemanager.h"
 #include "utils/logging.h"
 #include "utils/terminal_status.h"
+#include "services/documentnumbergenerator.h"
+#include "services/postactionlogger.h"
+#include "ui/base/printservice.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDateTime>
 #include <QTime>
 #include <QDebug>
-#include <QPrinter>
-#include <QPrintDialog>
-#include <QTextDocument>
 
 StatusChangeForm::StatusChangeForm(QWidget* parent) :
     QDialog(parent), ui(new Ui::StatusChangeForm), rowsModel(new QStandardItemModel(0, 6, this))
@@ -308,7 +308,7 @@ void StatusChangeForm::on_btnPost_clicked()
         }
     } else {
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
-            QString num = DatabaseManager::instance().generateDocNumber("statuschange");
+            QString num = DocumentNumberGenerator::generate("statuschange", db);
             if (num.isEmpty()) {
                 db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
@@ -477,8 +477,8 @@ void StatusChangeForm::on_btnPost_clicked()
         return;
     }
 
-    DatabaseManager::instance().logAction(m_editMode ? "UPDATE" : "POST", "tblstatuschangedocs", docId);
-    DatabaseManager::instance().notifyDataChanged();
+    PostActionLogger::log(m_editMode ? "UPDATE" : "POST", "tblstatuschangedocs", docId);
+    PostActionLogger::notify();
     QMessageBox::information(
         this, "Успех", QString("Документ «%1» успешно %2!").arg(actionTitle(), m_editMode ? "обновлён" : "проведён"));
     this->close();
@@ -556,8 +556,9 @@ void StatusChangeForm::loadForEdit(int docId)
 
 void StatusChangeForm::on_btnPrint_clicked()
 {
+    QSqlDatabase db = DatabaseManager::instance().getDatabase();
     if (!m_editMode && ui->lineEditNumber->text().trimmed().isEmpty()) {
-        QString num = DatabaseManager::instance().generateDocNumber("statuschange");
+        QString num = DocumentNumberGenerator::generate("statuschange", db);
         if (num.isEmpty()) {
             QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
             return;
@@ -578,14 +579,7 @@ void StatusChangeForm::on_btnPrint_clicked()
     else
         return;
 
-    QString html = "<html><head><meta charset='utf-8'>"
-                   "<style>"
-                   "body { font-family: 'Times New Roman', serif; font-size: 14px; }"
-                   "h2 { text-align: center; }"
-                   "table { border-collapse: collapse; width: 100%; margin-top: 20px; }"
-                   "th, td { border: 1px solid black; padding: 6px; text-align: left; }"
-                   "th { background-color: #f0f0f0; }"
-                   "</style></head><body>";
+    QString html = PrintService::docHeader();
 
     html += "<h2>" + title.toHtmlEscaped() + " № " + ui->lineEditNumber->text().toHtmlEscaped() + "</h2>";
     html += "<p>от " + ui->dateEdit->date().toString("dd.MM.yyyy") + " г.</p>";
@@ -616,15 +610,9 @@ void StatusChangeForm::on_btnPrint_clicked()
     html += "<div style='margin-top: 40px; display: flex; justify-content: space-between;'>"
             "<div><p>Составил:</p><p>________________ / ____________</p></div>"
             "</div>";
-    html += "</body></html>";
+    html += PrintService::docFooter();
 
-    QPrinter printer(QPrinter::HighResolution);
-    QPrintDialog printDialog(&printer, this);
-    if (printDialog.exec() == QDialog::Accepted) {
-        QTextDocument doc;
-        doc.setHtml(html);
-        doc.print(&printer);
-    }
+    PrintService::printHtml(html, this);
 }
 
 void StatusChangeForm::on_btnClose_clicked()
