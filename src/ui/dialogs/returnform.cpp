@@ -15,6 +15,7 @@
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
 #include "ui/base/printservice.h"
+#include "ui/base/transactionguard.h"
 #include <QHash>
 
 ReturnForm::ReturnForm(QWidget* parent) : QDialog(parent), ui(new Ui::ReturnForm)
@@ -200,10 +201,7 @@ void ReturnForm::on_btnPost_clicked()
     }
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    if (!db.transaction()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось начать транзакцию");
-        return;
-    }
+    TransactionGuard guard(db);
 
     QSqlQuery query(db);
 
@@ -217,7 +215,6 @@ void ReturnForm::on_btnPost_clicked()
         query.bindValue(":id", m_editDocId);
 
         if (!query.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
             return;
         }
@@ -225,7 +222,6 @@ void ReturnForm::on_btnPost_clicked()
         query.prepare("DELETE FROM tblreturndetails WHERE returndocid = :id");
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось удалить детали: " + query.lastError().text());
             return;
         }
@@ -235,7 +231,6 @@ void ReturnForm::on_btnPost_clicked()
             query.bindValue(":did", m_editDocId);
             query.bindValue(":tid", termId);
             if (!query.exec()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + query.lastError().text());
                 return;
             }
@@ -264,14 +259,12 @@ void ReturnForm::on_btnPost_clicked()
                              "FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
             lockTerm.bindValue(":id", termId);
             if (!lockTerm.exec() || !lockTerm.next()) {
-                db.rollback();
                 QMessageBox::critical(
                     this, "Ошибка",
                     QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
                 return;
             }
             if (lockTerm.value(0).toInt() != 1) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка", QString("Терминал %1 уже не находится в аренде!").arg(termId));
                 return;
             }
@@ -283,7 +276,6 @@ void ReturnForm::on_btnPost_clicked()
                         "WHERE terminalid = :id");
             upd.bindValue(":id", termId);
             if (!upd.exec()) {
-                db.rollback();
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось обновить статус терминала %1:\n%2").arg(termId).arg(upd.lastError().text()));
@@ -296,7 +288,6 @@ void ReturnForm::on_btnPost_clicked()
                 updSim.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
                 updSim.bindValue(":id", sid);
                 if (!updSim.exec()) {
-                    db.rollback();
                     QMessageBox::critical(this, "Ошибка БД",
                                           QString("Не удалось обновить статус SIM-карты %1:\n%2")
                                               .arg(sid)
@@ -312,14 +303,12 @@ void ReturnForm::on_btnPost_clicked()
             lockTerm.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
             lockTerm.bindValue(":id", termId);
             if (!lockTerm.exec() || !lockTerm.next()) {
-                db.rollback();
                 QMessageBox::critical(
                     this, "Ошибка",
                     QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
                 return;
             }
             if (lockTerm.value(0).toInt() != 0) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка", QString("Терминал %1 уже находится в аренде!").arg(termId));
                 return;
             }
@@ -344,14 +333,12 @@ void ReturnForm::on_btnPost_clicked()
                 lockSim.prepare("SELECT status FROM tblsimcards WHERE simcardid = :id FOR UPDATE NOWAIT");
                 lockSim.bindValue(":id", sid);
                 if (!lockSim.exec() || !lockSim.next()) {
-                    db.rollback();
                     QMessageBox::critical(
                         this, "Ошибка",
                         QString("Не удалось заблокировать SIM-карту %1. Возможно, она уже обрабатывается.").arg(sid));
                     return;
                 }
                 if (lockSim.value(0).toInt() != 0) {
-                    db.rollback();
                     QMessageBox::critical(this, "Ошибка",
                                           QString("SIM-карта %1 занята, не удалось восстановить аренду терминала %2.")
                                               .arg(sid)
@@ -362,7 +349,6 @@ void ReturnForm::on_btnPost_clicked()
                 updSim.prepare("UPDATE tblsimcards SET status = 1 WHERE simcardid = :id");
                 updSim.bindValue(":id", sid);
                 if (!updSim.exec()) {
-                    db.rollback();
                     QMessageBox::critical(this, "Ошибка БД",
                                           QString("Не удалось обновить статус SIM-карты %1:\n%2")
                                               .arg(sid)
@@ -378,7 +364,6 @@ void ReturnForm::on_btnPost_clicked()
             upd.bindValue(":sid2", sim2Id > 0 ? QVariant(sim2Id) : QVariant());
             upd.bindValue(":tid", termId);
             if (!upd.exec()) {
-                db.rollback();
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось восстановить терминал %1:\n%2").arg(termId).arg(upd.lastError().text()));
@@ -386,15 +371,13 @@ void ReturnForm::on_btnPost_clicked()
             }
         }
 
-        if (!db.commit()) {
-            db.rollback();
-            QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
-        } else {
-            PostActionLogger::log("UPDATE", "tblreturndocs", m_editDocId);
-            QMessageBox::information(this, "Успех", "Возврат успешно обновлен!");
-            PostActionLogger::notify();
-            this->close();
-        }
+        if (!guard.commit())
+            return;
+
+        PostActionLogger::log("UPDATE", "tblreturndocs", m_editDocId);
+        QMessageBox::information(this, "Успех", "Возврат успешно обновлен!");
+        PostActionLogger::notify();
+        this->close();
         return;
     }
 
@@ -402,7 +385,6 @@ void ReturnForm::on_btnPost_clicked()
     if (ui->lineEditNumber->text().trimmed().isEmpty()) {
         QString num = DocumentNumberGenerator::generate("return", db);
         if (num.isEmpty()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
             return;
         }
@@ -416,7 +398,6 @@ void ReturnForm::on_btnPost_clicked()
     query.bindValue(":comm", ui->textEditComment->toPlainText());
 
     if (!query.exec() || !query.next()) {
-        db.rollback();
         QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
         return;
     }
@@ -431,7 +412,6 @@ void ReturnForm::on_btnPost_clicked()
         checkQuery.bindValue(":id", termId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
-            db.rollback();
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
@@ -443,7 +423,6 @@ void ReturnForm::on_btnPost_clicked()
         int actualSim2Id = checkQuery.value(2).toInt(); // SIM слота 2 (imei2)
 
         if (status != 1) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка", QString("Терминал %1 уже не находится в аренде!").arg(termId));
             return;
         }
@@ -455,7 +434,6 @@ void ReturnForm::on_btnPost_clicked()
         updateQuery.bindValue(":id", termId);
 
         if (!updateQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                                   QString("Не удалось обновить статус терминала %1:\n%2")
                                       .arg(termId)
@@ -472,7 +450,6 @@ void ReturnForm::on_btnPost_clicked()
             simUpdateQuery.bindValue(":id", simId);
 
             if (!simUpdateQuery.exec()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД",
                                       QString("Не удалось обновить статус SIM-карты %1:\n%2")
                                           .arg(simId)
@@ -489,24 +466,21 @@ void ReturnForm::on_btnPost_clicked()
         detailQuery.bindValue(":tid", termId);
 
         if (!detailQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
             return;
         }
     }
 
     // 3. Фиксируем транзакцию
-    if (!db.commit()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
-    } else {
-        // Логирование действия
-        PostActionLogger::log("POST", "tblreturndocs", docId);
+    if (!guard.commit())
+        return;
 
-        QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
-        PostActionLogger::notify();
-        this->close();
-    }
+    // Логирование действия
+    PostActionLogger::log("POST", "tblreturndocs", docId);
+
+    QMessageBox::information(this, "Успех", "Возврат успешно проведен!");
+    PostActionLogger::notify();
+    this->close();
 }
 
 void ReturnForm::on_btnPrint_clicked()

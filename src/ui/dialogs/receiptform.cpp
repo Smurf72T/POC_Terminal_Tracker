@@ -27,6 +27,7 @@
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
 #include "ui/base/printservice.h"
+#include "ui/base/transactionguard.h"
 #include <QJsonObject>
 #include <QTimer>
 
@@ -413,10 +414,7 @@ void ReceiptForm::on_btnPost_clicked()
     }
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    if (!db.transaction()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось начать транзакцию");
-        return;
-    }
+    TransactionGuard guard(db);
 
     QSqlQuery query(db);
     int docId;
@@ -429,7 +427,6 @@ void ReceiptForm::on_btnPost_clicked()
         query.bindValue(":id", m_editDocId);
 
         if (!query.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
             return;
         }
@@ -438,7 +435,6 @@ void ReceiptForm::on_btnPost_clicked()
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
             QString num = DocumentNumberGenerator::generate("receipt", db);
             if (num.isEmpty()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
                 return;
             }
@@ -451,7 +447,6 @@ void ReceiptForm::on_btnPost_clicked()
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 
         if (!query.exec() || !query.next()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
             return;
         }
@@ -464,7 +459,6 @@ void ReceiptForm::on_btnPost_clicked()
         delItems.prepare("DELETE FROM tblreceiptitems WHERE receiptdocid = :id");
         delItems.bindValue(":id", docId);
         if (!delItems.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось удалить старые строки: " + delItems.lastError().text());
             return;
@@ -474,7 +468,6 @@ void ReceiptForm::on_btnPost_clicked()
         delDetails.prepare("DELETE FROM tblreceiptdetails WHERE receiptdocid = :id");
         delDetails.bindValue(":id", docId);
         if (!delDetails.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось удалить старые связи: " + delDetails.lastError().text());
             return;
@@ -490,7 +483,6 @@ void ReceiptForm::on_btnPost_clicked()
         itemQuery.bindValue(":mid", it.modelId);
         itemQuery.bindValue(":qty", it.qty);
         if (!itemQuery.exec() || !itemQuery.next()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось сохранить строку документа: " + itemQuery.lastError().text());
             return;
@@ -511,7 +503,6 @@ void ReceiptForm::on_btnPost_clicked()
             serialQuery.bindValue(":i1", im1);
             serialQuery.bindValue(":i2", im2);
             if (!serialQuery.exec()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД",
                                       QString("Ошибка сохранения серийного номера %1:\n%2")
                                           .arg(serial, serialQuery.lastError().text()));
@@ -536,14 +527,12 @@ void ReceiptForm::on_btnPost_clicked()
                 termQuery.bindValue(":i2", im2);
                 termQuery.bindValue(":tid", newTermId);
                 if (!termQuery.exec()) {
-                    db.rollback();
                     QMessageBox::critical(this, "Ошибка БД",
                                           QString("Ошибка при обновлении терминала %1:\n%2")
                                               .arg(serial, termQuery.lastError().text()));
                     return;
                 }
             } else if (found) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка",
                                       QString("Серийный номер уже есть в базе: %1").arg(serial));
                 return;
@@ -556,7 +545,6 @@ void ReceiptForm::on_btnPost_clicked()
                 termQuery.bindValue(":i1", im1);
                 termQuery.bindValue(":i2", im2);
                 if (!termQuery.exec() || !termQuery.next()) {
-                    db.rollback();
                     QMessageBox::critical(this, "Ошибка БД",
                                           QString("Ошибка при добавлении терминала %1:\n%2")
                                               .arg(serial, termQuery.lastError().text()));
@@ -570,7 +558,6 @@ void ReceiptForm::on_btnPost_clicked()
             detailQuery.bindValue(":did", docId);
             detailQuery.bindValue(":tid", newTermId);
             if (!detailQuery.exec()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
                 return;
             }
@@ -578,16 +565,14 @@ void ReceiptForm::on_btnPost_clicked()
     }
 
     // 4. Фиксируем транзакцию.
-    if (!db.commit()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
-    } else {
-        PostActionLogger::log("POST", "tblreceiptdocs", docId);
+    if (!guard.commit())
+        return;
 
-        QMessageBox::information(this, "Успех", "Документ успешно проведен!");
-        PostActionLogger::notify();
-        this->close();
-    }
+    PostActionLogger::log("POST", "tblreceiptdocs", docId);
+
+    QMessageBox::information(this, "Успех", "Документ успешно проведен!");
+    PostActionLogger::notify();
+    this->close();
 }
 
 void ReceiptForm::on_btnPrint_clicked()

@@ -6,6 +6,7 @@
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
 #include "ui/base/printservice.h"
+#include "ui/base/transactionguard.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -273,10 +274,7 @@ void StatusChangeForm::on_btnPost_clicked()
     int basedocid = (actionType() == "repair_return") ? ui->comboBoxRepairDoc->currentData().toInt() : 0;
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    if (!db.transaction()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось начать транзакцию");
-        return;
-    }
+    TransactionGuard guard(db);
 
     QSqlQuery query(db);
     int docId = m_editDocId;
@@ -294,7 +292,6 @@ void StatusChangeForm::on_btnPost_clicked()
         }
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
             return;
         }
@@ -302,7 +299,6 @@ void StatusChangeForm::on_btnPost_clicked()
         query.prepare("DELETE FROM tblstatuschangedetails WHERE statuschangedocid = :id");
         query.bindValue(":id", m_editDocId);
         if (!query.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить строки: " + query.lastError().text());
             return;
         }
@@ -310,7 +306,6 @@ void StatusChangeForm::on_btnPost_clicked()
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
             QString num = DocumentNumberGenerator::generate("statuschange", db);
             if (num.isEmpty()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
                 return;
             }
@@ -329,7 +324,6 @@ void StatusChangeForm::on_btnPost_clicked()
         }
 
         if (!query.exec() || !query.next()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать документ: " + query.lastError().text());
             return;
         }
@@ -358,7 +352,6 @@ void StatusChangeForm::on_btnPost_clicked()
         checkQuery.bindValue(":id", termId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
-            db.rollback();
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
@@ -372,7 +365,6 @@ void StatusChangeForm::on_btnPost_clicked()
         if (m_editMode)
             ok = ok || (currentStatus == target);
         if (!ok) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка",
                                   QString("Терминал %1 имеет статус «%2», операция «%3» для него недоступна.")
                                       .arg(termId)
@@ -394,7 +386,6 @@ void StatusChangeForm::on_btnPost_clicked()
         updateQuery.bindValue(":status", target);
         updateQuery.bindValue(":id", termId);
         if (!updateQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                                   QString("Не удалось обновить статус терминала %1:\n%2")
                                       .arg(termId)
@@ -409,7 +400,6 @@ void StatusChangeForm::on_btnPost_clicked()
         detailQuery.bindValue(":tid", termId);
         detailQuery.bindValue(":old", oldStatus);
         if (!detailQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
             return;
         }
@@ -423,7 +413,6 @@ void StatusChangeForm::on_btnPost_clicked()
         checkQuery.bindValue(":id", termId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
-            db.rollback();
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже обрабатывается.").arg(termId));
@@ -432,7 +421,6 @@ void StatusChangeForm::on_btnPost_clicked()
 
         int currentStatus = checkQuery.value(0).toInt();
         if (currentStatus != target) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка",
                                   QString("Статус терминала %1 («%2») уже изменён другим документом, "
                                           "откат невозможен. Уберите его вручную.")
@@ -448,7 +436,6 @@ void StatusChangeForm::on_btnPost_clicked()
             else if (m_originalActionType == "repair_return")
                 oldStatus = 2;
             else {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка",
                                       QString("Прежний статус терминала %1 неизвестен (документ проведён до "
                                               "введения снимков статусов). Верните его вручную.")
@@ -462,7 +449,6 @@ void StatusChangeForm::on_btnPost_clicked()
         updateQuery.bindValue(":status", oldStatus);
         updateQuery.bindValue(":id", termId);
         if (!updateQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                                   QString("Не удалось восстановить статус терминала %1:\n%2")
                                       .arg(termId)
@@ -471,11 +457,8 @@ void StatusChangeForm::on_btnPost_clicked()
         }
     }
 
-    if (!db.commit()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
+    if (!guard.commit())
         return;
-    }
 
     PostActionLogger::log(m_editMode ? "UPDATE" : "POST", "tblstatuschangedocs", docId);
     PostActionLogger::notify();

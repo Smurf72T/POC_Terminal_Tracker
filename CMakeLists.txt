@@ -105,6 +105,7 @@ set(SOURCES
         src/ops/opsscheduler.cpp
         src/update/updatemanager.cpp
         src/ui/base/printservice.cpp
+        src/ui/base/transactionguard.cpp
         src/services/documentnumbergenerator.cpp
         src/services/postactionlogger.cpp
 )

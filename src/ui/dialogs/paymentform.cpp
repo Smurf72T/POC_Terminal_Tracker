@@ -3,6 +3,7 @@
 #include "database/databasemanager.h"
 #include "services/postactionlogger.h"
 #include "ui/base/printservice.h"
+#include "ui/base/transactionguard.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -236,10 +237,7 @@ void PaymentForm::on_btnSave_clicked()
     }
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    if (!db.transaction()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось начать транзакцию");
-        return;
-    }
+    TransactionGuard guard(db);
 
     int paymentId = m_editPaymentId;
 
@@ -258,7 +256,6 @@ void PaymentForm::on_btnSave_clicked()
         updateQuery.bindValue(":id", paymentId);
 
         if (!updateQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить платёж: " + updateQuery.lastError().text());
             return;
         }
@@ -268,7 +265,6 @@ void PaymentForm::on_btnSave_clicked()
         deleteLinks.prepare("DELETE FROM tblpayment_rental_links WHERE paymentid = :id");
         deleteLinks.bindValue(":id", paymentId);
         if (!deleteLinks.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить связи: " + deleteLinks.lastError().text());
             return;
         }
@@ -282,7 +278,6 @@ void PaymentForm::on_btnSave_clicked()
                 QMessageBox::Yes | QMessageBox::No);
 
             if (reply != QMessageBox::Yes) {
-                db.rollback();
                 return;
             }
 
@@ -294,7 +289,6 @@ void PaymentForm::on_btnSave_clicked()
             deleteQuery.bindValue(":year", year);
 
             if (!deleteQuery.exec()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД",
                                       "Не удалось удалить старую запись: " + deleteQuery.lastError().text());
                 return;
@@ -313,7 +307,6 @@ void PaymentForm::on_btnSave_clicked()
         query.bindValue(":comment", ui->textEditComment->toPlainText());
 
         if (!query.exec() || !query.next()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось сохранить оплату: " + query.lastError().text());
             return;
         }
@@ -326,24 +319,21 @@ void PaymentForm::on_btnSave_clicked()
         linkQuery.bindValue(":rid", rentalId);
 
         if (!linkQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать связь: " + linkQuery.lastError().text());
             return;
         }
     }
 
     // 4. Фиксируем
-    if (!db.commit()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
-    } else {
-        // Логирование действия
-        PostActionLogger::log("POST", "tblpayments", paymentId);
+    if (!guard.commit())
+        return;
 
-        QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
-        PostActionLogger::notify();
-        this->close();
-    }
+    // Логирование действия
+    PostActionLogger::log("POST", "tblpayments", paymentId);
+
+    QMessageBox::information(this, "Успех", "Оплата и связи успешно сохранены!");
+    PostActionLogger::notify();
+    this->close();
 }
 
 void PaymentForm::on_btnPrint_clicked()

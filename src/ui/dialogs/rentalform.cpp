@@ -18,6 +18,7 @@
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
 #include "ui/base/printservice.h"
+#include "ui/base/transactionguard.h"
 #include <QSet>
 #include <QHash>
 #include <QSqlDatabase>
@@ -197,10 +198,7 @@ void RentalForm::on_btnPost_clicked()
     }
 
     QSqlDatabase db = DatabaseManager::instance().getDatabase();
-    if (!db.transaction()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось начать транзакцию");
-        return;
-    }
+    TransactionGuard guard(db);
 
     QSqlQuery query(db);
 
@@ -215,7 +213,6 @@ void RentalForm::on_btnPost_clicked()
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 
         if (!query.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось обновить шапку: " + query.lastError().text());
             return;
         }
@@ -226,7 +223,6 @@ void RentalForm::on_btnPost_clicked()
         deleteQuery.prepare("DELETE FROM tblrentaldetails WHERE rentaldocid = :id");
         deleteQuery.bindValue(":id", docId);
         if (!deleteQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД",
                                   "Не удалось удалить старые строки: " + deleteQuery.lastError().text());
             return;
@@ -235,7 +231,6 @@ void RentalForm::on_btnPost_clicked()
         if (ui->lineEditNumber->text().trimmed().isEmpty()) {
             QString num = DocumentNumberGenerator::generate("rental", db);
             if (num.isEmpty()) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", "Не удалось сгенерировать номер документа.");
                 return;
             }
@@ -249,7 +244,6 @@ void RentalForm::on_btnPost_clicked()
         query.bindValue(":comm", ui->textEditComment->toPlainText());
 
         if (!query.exec() || !query.next()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Не удалось создать шапку: " + query.lastError().text());
             return;
         }
@@ -271,7 +265,6 @@ void RentalForm::on_btnPost_clicked()
         QString comment = rowsModel->data(rowsModel->index(i, 3), Qt::DisplayRole).toString();
 
         if (terminalId <= 0) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите терминал.").arg(i + 1));
             return;
         }
@@ -287,20 +280,17 @@ void RentalForm::on_btnPost_clicked()
         QString simError;
         sim1Id = resolveSimFromCell(db, sim1Id, sim1Number, &simError);
         if (sim1Id < 0) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка", simError);
             return;
         }
         sim2Id = resolveSimFromCell(db, sim2Id, sim2Number, &simError);
         if (sim2Id < 0) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка", simError);
             return;
         }
 
         // Одна и та же SIM не может стоять в двух слотах одного терминала.
         if (sim1Id > 0 && sim1Id == sim2Id) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка",
                                   QString("Строка %1: одна и та же SIM-карта указана в слотах 1 и 2.").arg(i + 1));
             return;
@@ -312,7 +302,6 @@ void RentalForm::on_btnPost_clicked()
         checkQuery.bindValue(":id", terminalId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
-            db.rollback();
             QMessageBox::critical(
                 this, "Ошибка",
                 QString("Не удалось заблокировать терминал %1. Возможно, он уже сдан в аренду.").arg(terminalId));
@@ -323,12 +312,10 @@ void RentalForm::on_btnPost_clicked()
         if (!wasInDoc) {
             // Новый терминал в документе: должен быть свободен
             if (status != 0) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка", QString("Терминал %1 больше не свободен!").arg(terminalId));
                 return;
             }
         } else if (status != 1) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка",
                                   QString("Терминал %1 уже не числится в аренде по этому документу.").arg(terminalId));
             return;
@@ -340,14 +327,12 @@ void RentalForm::on_btnPost_clicked()
         // Освобождаем прежние SIM, если привязка в слоте изменилась
         if (wasInDoc && sim1Changed && origSim1 > 0) {
             if (!freeSimCard(db, origSim1, QString("слот 1, терминал %1").arg(terminalId), &simError)) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return;
             }
         }
         if (wasInDoc && sim2Changed && origSim2 > 0) {
             if (!freeSimCard(db, origSim2, QString("слот 2, терминал %1").arg(terminalId), &simError)) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return;
             }
@@ -356,14 +341,12 @@ void RentalForm::on_btnPost_clicked()
         // Занимаем новые SIM (новый терминал или замена SIM в существующей строке)
         if (sim1Id > 0 && sim1Changed) {
             if (!lockSimCard(db, sim1Id, QString("SIM-карта %1").arg(sim1Number), &simError)) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка", simError);
                 return;
             }
         }
         if (sim2Id > 0 && sim2Changed) {
             if (!lockSimCard(db, sim2Id, QString("SIM-карта %1").arg(sim2Number), &simError)) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка", simError);
                 return;
             }
@@ -378,7 +361,6 @@ void RentalForm::on_btnPost_clicked()
             updateQuery.bindValue(":sim1", sim1Id > 0 ? QVariant(sim1Id) : QVariant());
             updateQuery.bindValue(":sim2", sim2Id > 0 ? QVariant(sim2Id) : QVariant());
             if (!updateQuery.exec()) {
-                db.rollback();
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
@@ -393,7 +375,6 @@ void RentalForm::on_btnPost_clicked()
             updateQuery.bindValue(":sim1", sim1Id > 0 ? QVariant(sim1Id) : QVariant());
             updateQuery.bindValue(":sim2", sim2Id > 0 ? QVariant(sim2Id) : QVariant());
             if (!updateQuery.exec()) {
-                db.rollback();
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось обновить терминал %1: %2").arg(terminalId).arg(updateQuery.lastError().text()));
@@ -411,7 +392,6 @@ void RentalForm::on_btnPost_clicked()
         detailQuery.bindValue(":comm", comment);
 
         if (!detailQuery.exec()) {
-            db.rollback();
             QMessageBox::critical(this, "Ошибка БД", "Ошибка связи: " + detailQuery.lastError().text());
             return;
         }
@@ -445,12 +425,10 @@ void RentalForm::on_btnPost_clicked()
 
             QString simError;
             if (tSim1 > 0 && !freeSimCard(db, tSim1, QString("терминал %1").arg(tid), &simError)) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return;
             }
             if (tSim2 > 0 && !freeSimCard(db, tSim2, QString("терминал %1").arg(tid), &simError)) {
-                db.rollback();
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return;
             }
@@ -460,7 +438,6 @@ void RentalForm::on_btnPost_clicked()
                         "WHERE terminalid = :id");
             upd.bindValue(":id", tid);
             if (!upd.exec()) {
-                db.rollback();
                 QMessageBox::critical(
                     this, "Ошибка БД",
                     QString("Не удалось освободить терминал %1: %2").arg(tid).arg(upd.lastError().text()));
@@ -469,17 +446,15 @@ void RentalForm::on_btnPost_clicked()
         }
     }
 
-    if (!db.commit()) {
-        db.rollback();
-        QMessageBox::critical(this, "Ошибка", "Не удалось зафиксировать транзакцию");
-    } else {
-        PostActionLogger::log("POST", "tblrentaldocs", docId);
+    if (!guard.commit())
+        return;
 
-        isPosted = true;
-        QMessageBox::information(this, "Успех", "Документ успешно проведен!");
-        PostActionLogger::notify();
-        this->close();
-    }
+    PostActionLogger::log("POST", "tblrentaldocs", docId);
+
+    isPosted = true;
+    QMessageBox::information(this, "Успех", "Документ успешно проведен!");
+    PostActionLogger::notify();
+    this->close();
 }
 
 void RentalForm::onTableViewDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight)
