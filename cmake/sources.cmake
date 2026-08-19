@@ -2,6 +2,10 @@
 set(SOURCES
         src/main.cpp
         src/database/databasemanager.cpp
+        src/database/databasemanager_connection.cpp
+        src/database/databasemanager_migrations.cpp
+        src/database/databasemanager_queries.cpp
+        src/database/databasemanager_session.cpp
         src/database/connectionpool.cpp
         src/database/submiterrortablemodel.cpp
         src/database/repositories/terminalrepository.cpp

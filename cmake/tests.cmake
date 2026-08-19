@@ -50,6 +50,10 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
             src/ops/backupworker.cpp
             src/ops/opslog.cpp
             src/database/databasemanager.cpp
+            src/database/databasemanager_connection.cpp
+            src/database/databasemanager_migrations.cpp
+            src/database/databasemanager_queries.cpp
+            src/database/databasemanager_session.cpp
             src/database/connectionpool.cpp
             src/utils/circuitbreaker.cpp
             src/utils/logging.cpp)
