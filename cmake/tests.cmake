@@ -75,7 +75,11 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
     target_link_libraries(test_db_integration PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_db_integration COMMAND test_db_integration)
 
-    add_executable(test_concurrency tests/test_concurrency.cpp)
+    add_executable(test_concurrency
+            tests/test_concurrency.cpp
+            tests/test_concurrency_support.cpp
+            tests/test_concurrency_rental.cpp
+            tests/test_concurrency_numbers.cpp)
     target_include_directories(test_concurrency PRIVATE ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(test_concurrency PRIVATE Qt6::Test Qt6::Core Qt6::Sql Threads::Threads)
     add_test(NAME test_concurrency COMMAND test_concurrency)
