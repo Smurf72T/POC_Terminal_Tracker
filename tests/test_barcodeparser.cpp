@@ -22,6 +22,8 @@ private slots:
     void applyScanLabeledImei2();
     void applyScanImeiFirstNoSerial();
     void applyScanOneScanAllFields();
+    void applyScanFillsFirstEmptyPlaceholder();
+    void applyScanFixedGridDoesNotGrow();
 };
 
 void TestBarcodeParser::plainSerial()
@@ -179,6 +181,42 @@ void TestBarcodeParser::applyScanOneScanAllFields()
     QCOMPARE(s, QStringList({"ABC-001"}));
     QCOMPARE(i1, QStringList({"111111111111111"}));
     QCOMPARE(i2, QStringList({"222222222222222"}));
+}
+
+void TestBarcodeParser::applyScanFillsFirstEmptyPlaceholder()
+{
+    // Сетка окна комплектов уже создана под количество (например, 3 строки).
+    // Серийник должен лечь в ПЕРВУЮ свободную строку, а не в последнюю — иначе
+    // при сканировании пачки появляются лишние строки.
+    QStringList s{"", "", ""}, i1{"", "", ""}, i2{"", "", ""};
+
+    QVERIFY(BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("ABC-001")));
+    QCOMPARE(s, QStringList({"ABC-001", "", ""}));
+
+    QVERIFY(BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("111111111111111")));
+    QVERIFY(BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("222222222222222")));
+    QCOMPARE(s, QStringList({"ABC-001", "", ""}));
+    QCOMPARE(i1, QStringList({"111111111111111", "", ""}));
+    QCOMPARE(i2, QStringList({"222222222222222", "", ""}));
+    QCOMPARE(s.size(), 3);
+    QCOMPARE(i1.size(), 3);
+    QCOMPARE(i2.size(), 3);
+}
+
+void TestBarcodeParser::applyScanFixedGridDoesNotGrow()
+{
+    // Сканируем ровно столько комплектов, сколько строк-заготовок.
+    const int count = 3;
+    QStringList s(count, QString()), i1(count, QString()), i2(count, QString());
+    for (int kit = 0; kit < count; ++kit) {
+        BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse(QString("ABC-%1").arg(kit + 1, 3, 10, QLatin1Char('0'))));
+        BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("111111111111111"));
+        BarcodeParser::applyScan(s, i1, i2, BarcodeParser::parse("222222222222222"));
+    }
+    QCOMPARE(s.size(), count);
+    QCOMPARE(s, QStringList({"ABC-001", "ABC-002", "ABC-003"}));
+    QCOMPARE(i1, QStringList({"111111111111111", "111111111111111", "111111111111111"}));
+    QCOMPARE(i2, QStringList({"222222222222222", "222222222222222", "222222222222222"}));
 }
 
 QTEST_GUILESS_MAIN(TestBarcodeParser)

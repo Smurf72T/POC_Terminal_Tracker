@@ -58,12 +58,19 @@ bool BarcodeParser::applyScan(QStringList& serials, QStringList& imei1, QStringL
 {
     bool changed = false;
 
-    // Серийный номер: новый комплект. Если последняя строка осталась без
-    // серийника (например, первым отсканировали IMEI) — дописываем в неё.
+    // Серийный номер: заполняет ПЕРВЫЙ свободный комплект (в окне комплектов
+    // строки заранее созданы под количество — новая строка не нужна). Если
+    // свободных нет — добавляет новый комплект в конец.
     if (!scan.serial.isEmpty()) {
-        const int last = serials.size() - 1;
-        if (last >= 0 && serials.at(last).isEmpty()) {
-            serials[last] = scan.serial;
+        int idx = -1;
+        for (int k = 0; k < serials.size(); ++k) {
+            if (serials.at(k).isEmpty()) {
+                idx = k;
+                break;
+            }
+        }
+        if (idx >= 0) {
+            serials[idx] = scan.serial;
         } else {
             serials.append(scan.serial);
             imei1.append(QString());
@@ -86,8 +93,16 @@ bool BarcodeParser::applyScan(QStringList& serials, QStringList& imei1, QStringL
                 break;
             }
         }
-        if (idx < 0 && !serials.isEmpty())
-            idx = serials.size() - 1;
+        if (idx < 0 && !serials.isEmpty()) {
+            // Серийников ещё не отсканировано (только пустые строки-заготовки) —
+            // IMEI кладём в первый свободный комплект.
+            for (int k = 0; k < serials.size(); ++k) {
+                if (serials.at(k).isEmpty()) {
+                    idx = k;
+                    break;
+                }
+            }
+        }
 
         if (idx >= 0) {
             const bool slot1Empty = imei1.at(idx).isEmpty();
