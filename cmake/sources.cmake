@@ -54,6 +54,9 @@ set(SOURCES
         src/utils/barcodescanner.cpp
         src/utils/serialscanner.cpp
         src/ops/backupmanager.cpp
+        src/ops/backupmanager_helpers.cpp
+        src/ops/backupmanager_fallback.cpp
+        src/ops/backupmanager_restore.cpp
         src/ops/backupworker.cpp
         src/ops/opslog.cpp
         src/ops/opsscheduler.cpp
@@ -144,6 +147,7 @@ set(HEADERS
         src/utils/barcodescanner.h
         src/utils/password_utils.h
         src/ops/backupmanager.h
+        src/ops/backupmanager_internal.h
         src/ops/backupworker.h
         src/ops/opslog.h
         src/ops/opsscheduler.h

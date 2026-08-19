@@ -47,6 +47,9 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
     add_executable(test_opsscheduler tests/test_opsscheduler.cpp
             src/ops/opsscheduler.cpp
             src/ops/backupmanager.cpp
+            src/ops/backupmanager_helpers.cpp
+            src/ops/backupmanager_fallback.cpp
+            src/ops/backupmanager_restore.cpp
             src/ops/backupworker.cpp
             src/ops/opslog.cpp
             src/database/databasemanager.cpp
@@ -63,6 +66,9 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
 
     add_executable(test_db_integration tests/test_db_integration.cpp
             src/ops/backupmanager.cpp
+            src/ops/backupmanager_helpers.cpp
+            src/ops/backupmanager_fallback.cpp
+            src/ops/backupmanager_restore.cpp
             src/ops/opslog.cpp
             src/utils/logging.cpp)
     target_include_directories(test_db_integration PRIVATE ${CMAKE_SOURCE_DIR}/src)
