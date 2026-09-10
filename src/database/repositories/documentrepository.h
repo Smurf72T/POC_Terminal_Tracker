@@ -17,8 +17,8 @@ public:
     explicit DocumentRepository(const QSqlDatabase& db);
 
     // Типы документов (doctype) совпадают с кодами в recentDocuments:
-    // 1 — поступление, 2 — аренда, 3 — возврат, 5 — изменение статуса.
-    enum DocType : int { Receipt = 1, Rental = 2, Return = 3, StatusChange = 5 };
+    // 1 — поступление, 2 — аренда, 3 — возврат, 5 — изменение статуса, 6 — установка SIM.
+    enum DocType : int { Receipt = 1, Rental = 2, Return = 3, StatusChange = 5, SimInstall = 6 };
 
     struct RecentDocument {
         int docType = Receipt;

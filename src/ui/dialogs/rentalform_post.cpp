@@ -92,6 +92,8 @@ int RentalForm::postHeader(QSqlDatabase& db)
         }
         docId = query.value(0).toInt();
     }
+
+    return docId;
 }
 
 bool RentalForm::postDetails(QSqlDatabase& db, int docId)
@@ -116,10 +118,6 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
         }
 
         bool wasInDoc = previousTerminals.contains(terminalId);
-        const QPair<int, int> original =
-            m_editMode ? m_originalDetails.value(terminalId, qMakePair(0, 0)) : qMakePair(0, 0);
-        int origSim1 = original.first;
-        int origSim2 = original.second;
 
         // Введён новый номер SIM — создаём карточку в справочнике (или берём
         // существующую с таким же номером). Для каждого слота отдельно.
@@ -144,7 +142,8 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
 
         // Блокируем терминал и проверяем его состояние
         QSqlQuery checkQuery(db);
-        checkQuery.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+        checkQuery.prepare("SELECT status, currentsimcardid, currentsimcardid2 FROM tblterminals "
+                           "WHERE terminalid = :id FOR UPDATE NOWAIT");
         checkQuery.bindValue(":id", terminalId);
 
         if (!checkQuery.exec() || !checkQuery.next()) {
@@ -154,6 +153,8 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
             return false;
         }
         int status = checkQuery.value(0).toInt();
+        int origSim1 = checkQuery.value(1).toInt();
+        int origSim2 = checkQuery.value(2).toInt();
 
         if (!wasInDoc) {
             // Новый терминал в документе: должен быть свободен
@@ -170,21 +171,27 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
         bool sim1Changed = sim1Id != origSim1;
         bool sim2Changed = sim2Id != origSim2;
 
-        // Освобождаем прежние SIM, если привязка в слоте изменилась
-        if (wasInDoc && sim1Changed && origSim1 > 0) {
+        // Освобождаем прежние SIM из слота, если привязка изменилась. Базой
+        // считаем фактические привязки терминала: это и SIM из документа аренды
+        // (в режиме редактирования), и SIM, установленные документом «Установка SIM»
+        // (при сдаче в аренду свободного скомплектованного терминала).
+        if (sim1Changed && origSim1 > 0) {
             if (!SimCardService::free(db, origSim1, QString("слот 1, терминал %1").arg(terminalId), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return false;
             }
         }
-        if (wasInDoc && sim2Changed && origSim2 > 0) {
+        if (sim2Changed && origSim2 > 0) {
             if (!SimCardService::free(db, origSim2, QString("слот 2, терминал %1").arg(terminalId), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return false;
             }
         }
 
-        // Занимаем новые SIM (новый терминал или замена SIM в существующей строке)
+        // Занимаем новые SIM (новый терминал или замена SIM в существующей строке).
+        // SIM, уже установленная в этот терминал (документ «Установка SIM»), уже
+        // заблокирована (status = 1) — при неизменной привязке sim1Changed = false,
+        // повторно блокировать её не нужно.
         if (sim1Id > 0 && sim1Changed) {
             if (!SimCardService::lock(db, sim1Id, QString("SIM-карта %1").arg(sim1Number), &simError)) {
                 QMessageBox::critical(this, "Ошибка", simError);

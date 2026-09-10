@@ -298,11 +298,12 @@
      <property name="title">
       <string>Документы</string>
      </property>
-      <addaction name="actionReceipt"/>
-      <addaction name="actionRental"/>
-      <addaction name="actionReturn"/>
-      <addaction name="actionStatusChange"/>
-      <addaction name="actionPayment"/>
+       <addaction name="actionReceipt"/>
+       <addaction name="actionRental"/>
+       <addaction name="actionReturn"/>
+       <addaction name="actionSimInstall"/>
+       <addaction name="actionStatusChange"/>
+       <addaction name="actionPayment"/>
      </widget>
      <widget class="QMenu" name="menuArchives">
       <property name="title">
@@ -311,6 +312,7 @@
       <addaction name="actionArchiveReceipt"/>
       <addaction name="actionArchiveRental"/>
       <addaction name="actionArchiveReturn"/>
+      <addaction name="actionArchiveSimInstall"/>
       <addaction name="actionArchiveStatusChange"/>
       <addaction name="actionArchivePayment"/>
      </widget>
@@ -408,11 +410,16 @@
     <string>Передача в аренду</string>
    </property>
   </action>
-  <action name="actionReturn">
-   <property name="text">
-    <string>Возврат из аренды</string>
-   </property>
-  </action>
+   <action name="actionReturn">
+    <property name="text">
+     <string>Возврат из аренды</string>
+    </property>
+   </action>
+   <action name="actionSimInstall">
+    <property name="text">
+     <string>Установка SIM в терминал</string>
+    </property>
+   </action>
   <action name="actionStatusChange">
    <property name="text">
     <string>Изменение статуса терминалов</string>
@@ -436,6 +443,11 @@
    <action name="actionArchiveReturn">
     <property name="text">
      <string>Возврат</string>
+    </property>
+   </action>
+   <action name="actionArchiveSimInstall">
+    <property name="text">
+     <string>Установка SIM</string>
     </property>
    </action>
    <action name="actionArchiveStatusChange">

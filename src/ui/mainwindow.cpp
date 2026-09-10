@@ -14,6 +14,7 @@
 #include "dialogs/receiptform.h"
 #include "dialogs/rentalform.h"
 #include "dialogs/returnform.h"
+#include "dialogs/siminstallform.h"
 #include "dialogs/statuschangeform.h"
 #include "dialogs/paymentform.h"
 #include "dialogs/archivedocumentsform.h"
@@ -118,6 +119,7 @@ void MainWindow::setupUI()
     connect(ui->actionReceipt, &QAction::triggered, this, [this]() { openForm(new ReceiptForm(this)); });
     connect(ui->actionRental, &QAction::triggered, this, [this]() { openForm(new RentalForm(this)); });
     connect(ui->actionReturn, &QAction::triggered, this, [this]() { openForm(new ReturnForm(this)); });
+    connect(ui->actionSimInstall, &QAction::triggered, this, [this]() { openForm(new SimInstallForm(this)); });
     connect(ui->actionStatusChange, &QAction::triggered, this, [this]() { openForm(new StatusChangeForm(this)); });
     connect(ui->actionPayment, &QAction::triggered, this, [this]() { openForm(new PaymentForm(this)); });
     connect(ui->actionArchiveReceipt, &QAction::triggered, this,
@@ -126,6 +128,8 @@ void MainWindow::setupUI()
             [this]() { openForm(new ArchiveDocumentsForm(2, this)); });
     connect(ui->actionArchiveReturn, &QAction::triggered, this,
             [this]() { openForm(new ArchiveDocumentsForm(3, this)); });
+    connect(ui->actionArchiveSimInstall, &QAction::triggered, this,
+            [this]() { openForm(new ArchiveDocumentsForm(6, this)); });
     connect(ui->actionArchiveStatusChange, &QAction::triggered, this,
             [this]() { openForm(new ArchiveDocumentsForm(5, this)); });
     connect(ui->actionArchivePayment, &QAction::triggered, this,
@@ -220,6 +224,10 @@ void MainWindow::onRecentDocActivated(int docType, int docId)
         form.exec();
     } else if (docType == 3) {
         ReturnForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    } else if (docType == 6) {
+        SimInstallForm form(this);
         form.loadForEdit(docId);
         form.exec();
     } else if (docType == 5) {

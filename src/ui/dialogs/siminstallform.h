@@ -1,40 +1,37 @@
-#ifndef RENTALFORM_H
-#define RENTALFORM_H
+#ifndef SIMINSTALLFORM_H
+#define SIMINSTALLFORM_H
 
-#include "ui/base/clientdocdialog.h"
+#include "ui/base/documentdialog.h"
 #include <QMap>
 #include <QPair>
 
 namespace Ui {
-class RentalForm;
+class SimInstallForm;
 }
 
-class QSqlDatabase; // forward declaration (методы принимают ссылку)
+class QSqlDatabase;
 
-class RentalForm : public ClientDocumentDialog {
+class SimInstallForm : public DocumentDialog {
     Q_OBJECT
 
 public:
-    explicit RentalForm(QWidget* parent = nullptr);
-    ~RentalForm();
+    explicit SimInstallForm(QWidget* parent = nullptr);
+    ~SimInstallForm();
 
 private slots:
     void on_btnAddRow_clicked();
     void on_btnDeleteRow_clicked();
     void on_btnPost_clicked();
-    void on_btnPrintAct_clicked();
     void on_btnClose_clicked();
     void onTableViewDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight);
 
 private:
-    Ui::RentalForm* ui;
-    bool isPosted = false;
+    Ui::SimInstallForm* ui;
+
     // Снимок деталей документа из БД (terminalid -> {sim слота 1, sim слота 2})
-    // для корректного определения статусов при редактировании проведённого документа.
     QMap<int, QPair<int, int>> m_originalDetails;
 
-    // Данные о SIM, установленных в свободных терминалах (из документа «Установка SIM»).
-    // terminalId -> {simId, simNumber} для каждого слота.
+    // Уже установленные в свободные терминалы SIM (terminalId -> {simId, номер}).
     QMap<int, QPair<int, QString>> m_installedSim1;
     QMap<int, QPair<int, QString>> m_installedSim2;
 
@@ -56,4 +53,4 @@ private:
     void autoFillSimForTerminal(int row, int terminalId);
 };
 
-#endif // RENTALFORM_H
+#endif // SIMINSTALLFORM_H

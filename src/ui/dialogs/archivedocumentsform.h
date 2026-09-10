@@ -13,7 +13,8 @@ class ArchiveDocumentsForm : public QDialog {
     Q_OBJECT
 
 public:
-    // docType: 1 - Поступление, 2 - Аренда, 3 - Возврат, 4 - Оплата, 5 - Изменение статусов
+    // docType: 1 - Поступление, 2 - Аренда, 3 - Возврат, 4 - Оплата, 5 - Изменение статусов,
+    //          6 - Установка SIM
     explicit ArchiveDocumentsForm(int docType, QWidget* parent = nullptr);
     ~ArchiveDocumentsForm();
 
@@ -43,6 +44,7 @@ private:
     void openReturnForEdit(int docId);
     void openPaymentForEdit(int docId);
     void openStatusChangeForEdit(int docId);
+    void openSimInstallForEdit(int docId);
 };
 
 #endif // ARCHIVEDOCUMENTSFORM_H

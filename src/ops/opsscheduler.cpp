@@ -298,7 +298,10 @@ void OpsScheduler::runIntegrityCheck()
                  "SELECT t.terminalid, t.serialnumber, s.simcardid, s.simnumber "
                  "FROM tblterminals t "
                  "JOIN tblsimcards s ON (t.currentsimcardid = s.simcardid OR t.currentsimcardid2 = s.simcardid) "
-                 "WHERE t.status = 0 AND s.status = 1",
+                 "WHERE t.status = 0 AND s.status = 1 "
+                 "AND NOT EXISTS (SELECT 1 FROM tblsiminstalldetails d "
+                 "                WHERE d.terminalid = t.terminalid "
+                 "                  AND (d.simcardid = s.simcardid OR d.simcardid2 = s.simcardid))",
                  issues[0]);
     countProblem(db, "SIM в аренде, но не привязана к терминалу",
                  "SELECT s.simcardid, s.simnumber "

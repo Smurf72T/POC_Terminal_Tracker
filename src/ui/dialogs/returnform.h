@@ -29,6 +29,11 @@ private:
 
     void loadRentalDetails(int rentalDocId);
 
+    // Возвращает true, если SIM была установлена в терминал документом
+    // «Установка SIM» (см. tblsiminstalldetails) и после возврата должна
+    // остаться в терминале (status = 1, привязка сохраняется).
+    static bool isSIMInstalled(const QSqlDatabase& db, int terminalId, int simId);
+
     // --- DocumentDialog ---
     QString docType() const override;
     QLineEdit* headerNumberEdit() const override;

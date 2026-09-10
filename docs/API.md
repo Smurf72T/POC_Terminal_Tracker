@@ -81,6 +81,15 @@ Per-thread пул соединений для фоновых потоков (н�
 `loadById(int)`, `loadByIds(QList<int>)`, `loadFreeForSelection()` (свободные или
 привязанные к свободному терминалу).
 
+### `SimInstallRepository`
+Документ «Установка SIM» (комплектация SIM на складе, docType `SimInstall`).
+Write-логика формы — `siminstallform_post.cpp` (проведение/редактирование),
+а репозиторий используется для read-путей и в тестах:
+- `loadHeader(docId)` → `models::SimInstallDocument`, `loadDetails(docId)` →
+  `QVector<models::SimInstallRow>` (терминал и SIM слотов 1/2)
+- `createHeader(doc)`, `insertDetail(docId, terminalId, simId, sim2Id)`,
+  `deleteDetails(docId)`, `deleteHeader(docId)`
+
 ### `ClientRepository`
 `countAll()`, `loadById(int)`, `loadAll()` (сортировка по имени),
 `loadRentalStatistics()` (`clientid, clientname, count`), `populateRentalStatistics(*)`,
@@ -89,8 +98,8 @@ Per-thread пул соединений для фоновых потоков (н�
 ### `DocumentRepository`
 | Метод | Назначение |
 |-------|-----------|
-| `recentDocuments(int limit)` | Последние документы всех типов (doctype 1/2/3/5) |
-| `loadHeader(DocType, docId)` | Шапка поступления/возврата/изменения статуса |
+| `recentDocuments(int limit)` | Последние документы всех типов (doctype 1/2/3/5/6) |
+| `loadHeader(DocType, docId)` | Шапка поступления/возврата/изменения статуса/установки SIM |
 | `loadRentalDocument(int)` | Шапка аренды |
 | `loadRentalRows(int)` | Строки аренды с serial/SIM (слоты 1 и 2) и статусами терминала/SIM |
 | `loadRentalDocumentsByClient(int)` | Документы аренды клиента (для выпадающего списка возврата) |
@@ -111,6 +120,7 @@ Header-only структуры в `namespace models`, без QObject и зави
 | `models::Terminal` | `id, serialNumber, modelId, modelName, imei1, imei2, status, deactivated, currentSimCardId, currentSimCard2Id` |
 | `models::Client` | `id, name, inn, address, contactPhone, contactEmail` |
 | `models::SimCard` | `id, number, status, notes, createdAt` |
+| `models::SimInstallDocument` / `models::SimInstallRow` | шапка (`id, docNumber, date, comments`) и строка установки (`detailId, terminalId, terminalSerialNumber, simCardId, simNumber, simCard2Id, simNumber2`) |
 | `models::RentalDocument` / `models::RentalRow` | шапка (`docNumber, date, clientId, comments`) и строки (`terminalId, simCardId, simCard2Id, serial, simNumber, simNumber2, comment, terminalStatus, simStatus, sim2Status`) — слот 1 по IMEI1, слот 2 по IMEI2 |
 | `models::DocumentHeader` / `models::ReceiptRow` / `models::ReceiptItem` / `models::ReceiptSerial` | общая шапка; развёрнутая строка поступления (`terminalId, serialNumber, modelId, modelName, imei1, imei2`); строка-«исходник» (`itemId, modelId, modelName, qty, serials`) и комплект серийника (`linenum, serialNumber, imei1, imei2`) |
 

@@ -12,6 +12,7 @@ set(SOURCES
         src/database/repositories/clientrepository.cpp
         src/database/repositories/simcardrepository.cpp
         src/database/repositories/documentrepository.cpp
+        src/database/repositories/siminstallrepository.cpp
         src/database/repositories/paymentrepository.cpp
         src/ui/mainwindow.cpp
         src/ui/views/dashboardview.cpp
@@ -29,6 +30,7 @@ set(SOURCES
         src/ui/dialogs/serialunitsdialog.cpp
         src/ui/dialogs/rentalform.cpp
         src/ui/dialogs/returnform.cpp
+        src/ui/dialogs/siminstallform.cpp
         src/ui/dialogs/statuschangeform.cpp
         src/ui/dialogs/archivedocumentsform.cpp
         src/ui/dialogs/paymentform.cpp
@@ -69,6 +71,7 @@ set(SOURCES
         src/ui/dialogs/receiptform_scan.cpp
         src/ui/dialogs/rentalform_post.cpp
         src/ui/dialogs/returnform_post.cpp
+        src/ui/dialogs/siminstallform_post.cpp
         src/ui/dialogs/statuschangeform_post.cpp
         src/ui/dialogs/paymentform_post.cpp
         src/services/documentnumbergenerator.cpp
@@ -83,6 +86,7 @@ set(HEADERS
         src/models/client.h
         src/models/simcard.h
         src/models/rentaldocument.h
+        src/models/siminstalldocument.h
         src/models/document.h
         src/database/databasemanager.h
         src/database/idatabasemanager.h
@@ -92,6 +96,7 @@ set(HEADERS
         src/database/repositories/clientrepository.h
         src/database/repositories/simcardrepository.h
         src/database/repositories/documentrepository.h
+        src/database/repositories/siminstallrepository.h
         src/database/repositories/paymentrepository.h
         src/ui/mainwindow.h
         src/ui/views/dashboardview.h
@@ -112,6 +117,7 @@ set(HEADERS
         src/ui/delegates/CheckBoxDelegate.h
         src/ui/dialogs/rentalform.h
         src/ui/dialogs/returnform.h
+        src/ui/dialogs/siminstallform.h
         src/ui/dialogs/statuschangeform.h
         src/ui/dialogs/archivedocumentsform.h
         src/ui/dialogs/paymentform.h
@@ -167,6 +173,7 @@ set(UI_FILES
         src/ui/dialogs/serialunitsdialog.ui
         src/ui/dialogs/rentalform.ui
         src/ui/dialogs/returnform.ui
+        src/ui/dialogs/siminstallform.ui
         src/ui/dialogs/statuschangeform.ui
         src/ui/dialogs/archivedocumentsform.ui
         src/ui/dialogs/paymentform.ui

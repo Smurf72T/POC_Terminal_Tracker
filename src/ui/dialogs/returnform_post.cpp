@@ -49,6 +49,19 @@ bool ReturnForm::validateBeforePost()
     return true;
 }
 
+bool ReturnForm::isSIMInstalled(const QSqlDatabase& db, int terminalId, int simId)
+{
+    if (simId <= 0)
+        return false;
+
+    QSqlQuery query(db);
+    query.prepare("SELECT 1 FROM tblsiminstalldetails "
+                  "WHERE terminalid = :tid AND (simcardid = :sid OR simcardid2 = :sid) LIMIT 1");
+    query.bindValue(":tid", terminalId);
+    query.bindValue(":sid", simId);
+    return query.exec() && query.next();
+}
+
 int ReturnForm::postHeader(QSqlDatabase& db)
 {
     int clientId = ui->comboBoxClient->currentData().toInt();
@@ -130,7 +143,9 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
                 restored.append(tid);
         }
 
-        // Терминалы, добавленные в возврат: переводим «в аренде» -> «свободен»
+        // Терминалы, добавленные в возврат: переводим «в аренде» -> «свободен».
+        // SIM, установленные в терминал документом «Установка SIM», остаются
+        // в нём (status = 1, привязка сохраняется); остальные освобождаются.
         for (int termId : newlyReturned) {
             QSqlQuery lockTerm(db);
             lockTerm.prepare("SELECT status, currentsimcardid, currentsimcardid2 "
@@ -149,10 +164,15 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
             int simId = lockTerm.value(1).toInt();  // SIM слота 1 (imei1)
             int sim2Id = lockTerm.value(2).toInt(); // SIM слота 2 (imei2)
 
+            bool keepSim1 = ReturnForm::isSIMInstalled(db, termId, simId);
+            bool keepSim2 = ReturnForm::isSIMInstalled(db, termId, sim2Id);
+
             QSqlQuery upd(db);
-            upd.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = NULL, currentsimcardid2 = NULL "
-                        "WHERE terminalid = :id");
+            upd.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = :sim1, "
+                        "currentsimcardid2 = :sim2 WHERE terminalid = :id");
             upd.bindValue(":id", termId);
+            upd.bindValue(":sim1", keepSim1 ? QVariant(simId) : QVariant());
+            upd.bindValue(":sim2", keepSim2 ? QVariant(sim2Id) : QVariant());
             if (!upd.exec()) {
                 QMessageBox::critical(
                     this, "Ошибка БД",
@@ -161,6 +181,9 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
             }
             for (int sid : {simId, sim2Id}) {
                 if (sid <= 0)
+                    continue;
+                bool keep = (sid == simId) ? keepSim1 : keepSim2;
+                if (keep)
                     continue;
                 QSqlQuery updSim(db);
                 updSim.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");
@@ -178,7 +201,8 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
         // Терминалы, убранные из возврата: возвращаем в аренду (с прежней SIM)
         for (int termId : restored) {
             QSqlQuery lockTerm(db);
-            lockTerm.prepare("SELECT status FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
+            lockTerm.prepare("SELECT status, currentsimcardid, currentsimcardid2 FROM tblterminals "
+                             "WHERE terminalid = :id FOR UPDATE NOWAIT");
             lockTerm.bindValue(":id", termId);
             if (!lockTerm.exec() || !lockTerm.next()) {
                 QMessageBox::critical(
@@ -190,6 +214,8 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
                 QMessageBox::critical(this, "Ошибка", QString("Терминал %1 уже находится в аренде!").arg(termId));
                 return false;
             }
+            int termSim1 = lockTerm.value(1).toInt();
+            int termSim2 = lockTerm.value(2).toInt();
 
             // Прежние SIM-карты из документа аренды (слот 1 и слот 2)
             QSqlQuery origSim(db);
@@ -206,6 +232,10 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
 
             for (int sid : {simId, sim2Id}) {
                 if (sid <= 0)
+                    continue;
+                // SIM уже установлена в этот терминал (документ «Установка SIM») и
+                // осталась в нём после возврата — статус 1 сохраняем, повторно не блокируем.
+                if (sid == termSim1 || sid == termSim2)
                     continue;
                 QSqlQuery lockSim(db);
                 lockSim.prepare("SELECT status FROM tblsimcards WHERE simcardid = :id FOR UPDATE NOWAIT");
@@ -274,11 +304,18 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
             return false;
         }
 
-        // Меняем статус терминала на «Свободен» и очищаем привязки SIM
+        // SIM, установленные в терминал документом «Установка SIM», остаются
+        // в нём после возврата; остальные SIM освобождаются.
+        bool keepSim1 = ReturnForm::isSIMInstalled(db, termId, actualSimId);
+        bool keepSim2 = ReturnForm::isSIMInstalled(db, termId, actualSim2Id);
+
+        // Меняем статус терминала на «Свободен»; установленные SIM сохраняем
         QSqlQuery updateQuery(db);
-        updateQuery.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = NULL, "
-                            "currentsimcardid2 = NULL WHERE terminalid = :id");
+        updateQuery.prepare("UPDATE tblterminals SET status = 0, currentsimcardid = :sim1, "
+                            "currentsimcardid2 = :sim2 WHERE terminalid = :id");
         updateQuery.bindValue(":id", termId);
+        updateQuery.bindValue(":sim1", keepSim1 ? QVariant(actualSimId) : QVariant());
+        updateQuery.bindValue(":sim2", keepSim2 ? QVariant(actualSim2Id) : QVariant());
 
         if (!updateQuery.exec()) {
             QMessageBox::critical(this, "Ошибка БД",
@@ -288,9 +325,12 @@ bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
             return false;
         }
 
-        // Сбрасываем статусы SIM-карт (если были привязаны)
+        // Сбрасываем статусы SIM-карт, не установленных в терминал (были привязаны)
         for (int simId : {actualSimId, actualSim2Id}) {
             if (simId <= 0)
+                continue;
+            bool keep = (simId == actualSimId) ? keepSim1 : keepSim2;
+            if (keep)
                 continue;
             QSqlQuery simUpdateQuery(db);
             simUpdateQuery.prepare("UPDATE tblsimcards SET status = 0 WHERE simcardid = :id");

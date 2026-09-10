@@ -6,6 +6,7 @@
 #include "ui/dialogs/returnform.h"
 #include "ui/dialogs/paymentform.h"
 #include "ui/dialogs/statuschangeform.h"
+#include "ui/dialogs/siminstallform.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -59,6 +60,10 @@ void ArchiveDocumentsForm::setupUI()
         setWindowTitle("Архив: Изменение статусов");
         ui->labelClient->setVisible(false);
         ui->comboBoxClient->setVisible(false);
+    } else if (m_docType == 6) {
+        setWindowTitle("Архив: Установка SIM в терминал");
+        ui->labelClient->setVisible(false);
+        ui->comboBoxClient->setVisible(false);
     }
 
     ui->tableView->setModel(model);
@@ -92,6 +97,10 @@ void ArchiveDocumentsForm::applyFilter()
     // когда пользователь изменил хотя бы одну дату и нажал «Фильтр».
     const bool useDateFilter = (ui->dateEditFrom->date() != m_initialFrom) ||
                                (ui->dateEditTo->date() != m_initialTo);
+
+    // Для установки SIM (docType 6) нет клиента
+    if (m_docType == 6)
+        clientId = 0;
 
     // Условие по диапазону дат (верхняя граница включает весь день «до»).
     auto dateRange = [useDateFilter](const char* column) {
@@ -185,6 +194,20 @@ void ArchiveDocumentsForm::applyFilter()
         if (!d.isEmpty())
             queryStr += "WHERE " + d;
         queryStr += "ORDER BY sc.docdate DESC";
+    } else if (m_docType == 6) { // Установка SIM
+        queryStr = QString("SELECT s.siminstalldocid, "
+                           "s.docnumber AS \"Номер\", "
+                           "s.docdate AS \"Дата\", "
+                           "COALESCE(det.cnt, 0)::text || ' терминал(ов)' AS \"Терминалов\", "
+                           "s.comments AS \"Комментарий\" "
+                           "FROM tblsiminstalldocs s "
+                           "LEFT JOIN (SELECT siminstalldocid, COUNT(*) AS cnt "
+                           "          FROM tblsiminstalldetails GROUP BY siminstalldocid) det "
+                           "ON s.siminstalldocid = det.siminstalldocid ");
+        const QString dd = dateRange("s.docdate");
+        if (!dd.isEmpty())
+            queryStr += "WHERE " + dd;
+        queryStr += "ORDER BY s.docdate DESC";
     }
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
@@ -237,6 +260,9 @@ void ArchiveDocumentsForm::on_tableView_doubleClicked(const QModelIndex& index)
         case 5:
             openStatusChangeForEdit(docId);
             break;
+        case 6:
+            openSimInstallForEdit(docId);
+            break;
     }
 }
 
@@ -284,6 +310,15 @@ void ArchiveDocumentsForm::openPaymentForEdit(int docId)
 void ArchiveDocumentsForm::openStatusChangeForEdit(int docId)
 {
     StatusChangeForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
+void ArchiveDocumentsForm::openSimInstallForEdit(int docId)
+{
+    SimInstallForm form(this);
     form.loadForEdit(docId);
     if (form.exec() == QDialog::Accepted) {
         applyFilter();

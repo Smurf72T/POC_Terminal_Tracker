@@ -11,6 +11,7 @@
   - Поступление терминалов на склад
   - Передача в аренду (с автоматическим обновлением статусов)
   - Возврат из аренды (с автоматическим сбросом статусов SIM и терминалов)
+  - Установка SIM в терминал (комплектация на складе)
   - Отметка оплаты (с печатью квитанции)
 - **Архивы:** Просмотр и фильтрация документов по датам и клиентам, экспорт в Excel/PDF
 - **Дашборд:** Счётчики свободных/занятых терминалов и SIM-карт, графики (pie — статусы, bar — выручка), топ клиентов, последние документы
@@ -28,6 +29,7 @@
 - **Доставка (v1.4.0):** портативный ZIP-дистрибутив (`cmake --build build --target deploy` + `cpack`) с Qt runtime и PostgreSQL DLL; автообновление по манифесту-URL (проверка при старте и «Сервис → Проверка обновлений») — подробности в [docs/OPS.md](docs/OPS.md)
 - **Многопользовательский режим (v1.5.0):** защита от гонок — миграции под `pg_advisory_lock`, выдача SIM под блокировкой `FOR UPDATE NOWAIT`, атомарный rate limiting, межэкземплярное обновление через `NOTIFY`; конкуренто-тесты `test_concurrency` — подробности в [docs/OPS.md](docs/OPS.md)
 - **Двухслотовые терминалы (v1.6.0):** терминал с двумя IMEI может получать в аренду две SIM-карты (слот 1 по IMEI1, слот 2 по IMEI2); слот фиксируется в истории привязок; полная информация об обоих слотах — в `vwterminalsfull` и `vwcurrentrentals` (миграция `013_sim_slots.sql`)
+- **Комплектация SIM-картами (v1.7.0):** документ «Установка SIM» (номер `УС-XXXXX`, миграция `014_sim_install.sql`) — привязка свободных SIM к терминалу на складе; установленные SIM остаются в терминале после возврата из аренды; тип документа 6 добавлен в архив и «Последние документы»
 - **CI/CD (v1.5.1):** GitHub Actions — сборка (Qt 6.11 MSVC), все тесты против реального PostgreSQL, сборка портативного ZIP; артефакт в Actions → Run → Artifacts
 
 ## Требования
@@ -84,7 +86,7 @@ POC_DB_PASSWORD=postgres
 
 Подробное руководство по эксплуатации — [docs/OPS.md](docs/OPS.md).
 Внутренняя документация для разработчиков — [docs/API.md](docs/API.md),
-архитектурные решения — [docs/adr/ADR-0001.md](docs/adr/ADR-0001.md) (6 записей ADR-0001…0006).
+архитектурные решения — [docs/adr/ADR-0001.md](docs/adr/ADR-0001.md) (7 записей ADR-0001…0007).
 
 ### Обновление и дистрибутив
 
@@ -129,6 +131,7 @@ psql -U postgres -d pocbase -f sql/migrations/010_statuschange_old_status.sql
 psql -U postgres -d pocbase -f sql/migrations/011_terminals_deactivated.sql
 psql -U postgres -d pocbase -f sql/migrations/012_receipt_items_serials.sql
 psql -U postgres -d pocbase -f sql/migrations/013_sim_slots.sql
+psql -U postgres -d pocbase -f sql/migrations/014_sim_install.sql
 ```
 
 ## Логирование
@@ -157,6 +160,7 @@ src/
     terminal.h                — Value-модель терминала (id, серийник, IMEI, статус, деактивация)
     client.h                  — Value-модель клиента
     simcard.h                 — Value-модель SIM-карты
+    siminstalldocument.h      — Value-модель документа «Установка SIM»
     rentaldocument.h          — Value-модели арендного документа и строк
     document.h                — Value-модели шапки документа и строк поступления
   database/
@@ -165,6 +169,7 @@ src/
       terminalrepository.*    — SQL терминалов без UI: счётчики, свободные, loadById(s)
       clientrepository.*      — SQL клиентов: count/loadAll/loadById, арендная статистика
       simcardrepository.*     — SQL SIM: count/loadFree, loadById(s)
+      siminstallrepository.*  — SQL документов «Установка SIM»: шапки/строки по терминалам и SIM
       documentrepository.*    — SQL документов: шапки/строки аренды, поступления, возврата
       paymentrepository.*     — SQL платежей: выручка по месяцам
   ui/
@@ -185,6 +190,7 @@ src/
       receiptform.*           — Поступление терминалов
       rentalform.*            — Передача в аренду
       returnform.*            — Возврат из аренды
+      siminstallform.*        — Установка SIM в терминал
       paymentform.*           — Отметка оплаты
       archivedocumentsform.*  — Архив документов
       terminalhistoryform.*   — История терминала
@@ -201,6 +207,7 @@ src/
       receiptform_scan.cpp    — Логика сканера в поступлении (вынесено из формы)
       rentalform_post.cpp     — Проведение/редактирование аренды
       returnform_post.cpp     — Проведение/редактирование возврата
+      siminstallform_post.cpp — Проведение/редактирование установки SIM
       statuschangeform_post.cpp — Проведение изменения статуса
       paymentform_post.cpp    — Проведение оплаты
     base/
@@ -231,7 +238,7 @@ src/
 styles/
   modern.qss / light.qss      — Тёмная/светлая тема
 sql/
-  migrations/               — Миграции БД 000–013 (применяются автоматически)
+  migrations/               — Миграции БД 000–014 (применяются автоматически)
   legacy/                   — Архивные SQL-скрипты, заменённые миграциями (не применять вручную)
   add_trigger.sql           — Опциональный DB-триггер синхронизации статусов SIM (не миграция)
   diagnostics.sql           — Диагностика рассинхрона терминалов и SIM (ops, см. OPS.md)
@@ -263,10 +270,12 @@ tests/
 
 1. **Репозитории** (`src/database/repositories/`) — параметризованные запросы и
    готовые данные без QSql-зависимостей в сигнатурах: `TerminalRepository`,
-   `ClientRepository`, `SimCardRepository`, `DocumentRepository`, `PaymentRepository`.
+   `ClientRepository`, `SimCardRepository`, `SimInstallRepository`,
+   `DocumentRepository`, `PaymentRepository`.
    Методы `load*` возвращают value-структуры, `populate*` заполняют `QSqlQueryModel`.
 2. **Value-модели** (`src/models/`) — `models::Terminal`, `models::Client`,
-   `models::SimCard`, `models::RentalDocument`/`RentalRow`,
+   `models::SimCard`, `models::SimInstallDocument`,
+   `models::RentalDocument`/`RentalRow`,
    `models::DocumentHeader`/`ReceiptRow` (header-only, без QObject).
 3. **Формы** (`src/ui/dialogs/`) — читают/пишут документы (приёмка, аренда, возврат)
    через репозитории; write-логика (проведение, транзакции `FOR UPDATE NOWAIT`)

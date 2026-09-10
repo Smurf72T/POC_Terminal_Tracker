@@ -17,6 +17,8 @@ QVector<DocumentRepository::RecentDocument> DocumentRepository::recentDocuments(
                   "UNION ALL "
                   "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
                   "UNION ALL "
+                  "SELECT 6, siminstalldocid, docnumber, docdate, 'Установка SIM' FROM tblsiminstalldocs "
+                  "UNION ALL "
                   "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
                   "ORDER BY \"Дата\" DESC "
                   "LIMIT :limit");
@@ -40,6 +42,8 @@ void DocumentRepository::populateRecentDocuments(QSqlQueryModel* model, int limi
                   "UNION ALL "
                   "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
                   "UNION ALL "
+                  "SELECT 6, siminstalldocid, docnumber, docdate, 'Установка SIM' FROM tblsiminstalldocs "
+                  "UNION ALL "
                   "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
                   "ORDER BY \"Дата\" DESC "
                   "LIMIT :limit");
@@ -61,6 +65,10 @@ models::DocumentHeader DocumentRepository::loadHeader(DocType docType, int docId
         case StatusChange:
             query.prepare("SELECT docnumber, docdate, 0 AS clientid, comment AS comments "
                           "FROM tblstatuschangedocs WHERE statuschangedocid = :id");
+            break;
+        case SimInstall:
+            query.prepare("SELECT docnumber, docdate, 0 AS clientid, comments "
+                          "FROM tblsiminstalldocs WHERE siminstalldocid = :id");
             break;
         default:
             return {};
