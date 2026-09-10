@@ -35,7 +35,6 @@ bool ReturnForm::validateBeforePost()
     }
 
     // Собираем ID терминалов, которые нужно вернуть
-    QList<int> m_terminalsToReturn;
     for (int i = 0; i < rowsModel->rowCount(); ++i) {
         QStandardItem* checkItem = rowsModel->item(i, 0);
         if (checkItem && checkItem->checkState() == Qt::Checked) {
@@ -109,6 +108,7 @@ int ReturnForm::postHeader(QSqlDatabase& db)
         return -1;
     }
     int docId = query.value(0).toInt();
+    return docId;
 }
 
 bool ReturnForm::postDetails(QSqlDatabase& db, int docId)
