@@ -6,8 +6,8 @@
             <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>520</width>
-                <height>480</height>
+                <width>700</width>
+                <height>560</height>
             </rect>
         </property>
         <property name="windowTitle">
@@ -15,128 +15,172 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout">
             <item>
-                <layout class="QFormLayout" name="formLayout">
-                    <item row="0" column="0">
-                        <widget class="QLabel" name="labelSerial">
-                            <property name="text">
-                                <string>Серийный номер:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="0" column="1">
-                        <widget class="QLineEdit" name="lineEditSerial"/>
-                    </item>
-                    <item row="1" column="0">
-                        <widget class="QLabel" name="labelModel">
-                            <property name="text">
-                                <string>Модель:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="1" column="1">
-                        <widget class="QComboBox" name="comboModel"/>
-                    </item>
-                    <item row="2" column="0">
-                        <widget class="QLabel" name="labelImei1">
-                            <property name="text">
-                                <string>IMEI 1:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="2" column="1">
-                        <widget class="QLineEdit" name="lineEditImei1"/>
-                    </item>
-                    <item row="3" column="0">
-                        <widget class="QLabel" name="labelImei2">
-                            <property name="text">
-                                <string>IMEI 2:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="3" column="1">
-                        <widget class="QLineEdit" name="lineEditImei2"/>
-                    </item>
-                    <item row="4" column="0">
-                        <widget class="QLabel" name="labelStatus">
-                            <property name="text">
-                                <string>Статус:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="4" column="1">
-                        <widget class="QComboBox" name="comboStatus"/>
-                    </item>
-                    <item row="5" column="0">
-                        <widget class="QLabel" name="labelPurchaseDate">
-                            <property name="text">
-                                <string>Дата покупки:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="5" column="1">
-                        <layout class="QHBoxLayout" name="purchaseDateLayout">
+                <widget class="QTabWidget" name="tabWidget">
+                    <property name="currentIndex">
+                        <number>0</number>
+                    </property>
+                    <widget class="QWidget" name="tabParameters">
+                        <attribute name="title">
+                            <string>Параметры</string>
+                        </attribute>
+                        <layout class="QVBoxLayout" name="verticalLayoutParameters">
                             <item>
-                                <widget class="QCheckBox" name="checkBoxNoDate">
+                                <layout class="QFormLayout" name="formLayout">
+                                    <item row="0" column="0">
+                                        <widget class="QLabel" name="labelSerial">
+                                            <property name="text">
+                                                <string>Серийный номер:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="0" column="1">
+                                        <widget class="QLineEdit" name="lineEditSerial"/>
+                                    </item>
+                                    <item row="1" column="0">
+                                        <widget class="QLabel" name="labelModel">
+                                            <property name="text">
+                                                <string>Модель:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="1" column="1">
+                                        <widget class="QComboBox" name="comboModel"/>
+                                    </item>
+                                    <item row="2" column="0">
+                                        <widget class="QLabel" name="labelImei1">
+                                            <property name="text">
+                                                <string>IMEI 1:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="2" column="1">
+                                        <widget class="QLineEdit" name="lineEditImei1"/>
+                                    </item>
+                                    <item row="3" column="0">
+                                        <widget class="QLabel" name="labelImei2">
+                                            <property name="text">
+                                                <string>IMEI 2:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="3" column="1">
+                                        <widget class="QLineEdit" name="lineEditImei2"/>
+                                    </item>
+                                    <item row="4" column="0">
+                                        <widget class="QLabel" name="labelStatus">
+                                            <property name="text">
+                                                <string>Статус:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="4" column="1">
+                                        <widget class="QComboBox" name="comboStatus"/>
+                                    </item>
+                                    <item row="5" column="0">
+                                        <widget class="QLabel" name="labelPurchaseDate">
+                                            <property name="text">
+                                                <string>Дата покупки:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="5" column="1">
+                                        <layout class="QHBoxLayout" name="purchaseDateLayout">
+                                            <item>
+                                                <widget class="QCheckBox" name="checkBoxNoDate">
+                                                    <property name="text">
+                                                        <string>Без даты</string>
+                                                    </property>
+                                                </widget>
+                                            </item>
+                                            <item>
+                                                <widget class="QDateEdit" name="dateEditPurchase">
+                                                    <property name="calendarPopup">
+                                                        <bool>true</bool>
+                                                    </property>
+                                                </widget>
+                                            </item>
+                                        </layout>
+                                    </item>
+                                    <item row="6" column="0">
+                                        <widget class="QLabel" name="labelNotes">
+                                            <property name="text">
+                                                <string>Примечание:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="6" column="1">
+                                        <widget class="QTextEdit" name="textEditNotes">
+                                            <property name="maximumSize">
+                                                <size>
+                                                    <width>16777215</width>
+                                                    <height>90</height>
+                                                </size>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="7" column="0">
+                                        <widget class="QLabel" name="labelRepaired">
+                                            <property name="text">
+                                                <string>Был в ремонте:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="7" column="1">
+                                        <widget class="QCheckBox" name="checkBoxRepaired">
+                                            <property name="text">
+                                                <string>Да</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="8" column="0">
+                                        <widget class="QLabel" name="labelDeactivated">
+                                            <property name="text">
+                                                <string>Деактивирован:</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                    <item row="8" column="1">
+                                        <widget class="QCheckBox" name="checkBoxDeactivated">
+                                            <property name="text">
+                                                <string>Да</string>
+                                            </property>
+                                        </widget>
+                                    </item>
+                                </layout>
+                            </item>
+                        </layout>
+                    </widget>
+                    <widget class="QWidget" name="tabDocuments">
+                        <attribute name="title">
+                            <string>Связанные документы</string>
+                        </attribute>
+                        <layout class="QVBoxLayout" name="verticalLayoutDocuments">
+                            <item>
+                                <widget class="QLabel" name="lblDocsCount">
                                     <property name="text">
-                                        <string>Без даты</string>
+                                        <string>Документы:</string>
                                     </property>
                                 </widget>
                             </item>
                             <item>
-                                <widget class="QDateEdit" name="dateEditPurchase">
-                                    <property name="calendarPopup">
+                                <widget class="QTableView" name="tableViewDocuments">
+                                    <property name="alternatingRowColors">
+                                        <bool>true</bool>
+                                    </property>
+                                    <property name="selectionBehavior">
+                                        <enum>QAbstractItemView::SelectRows</enum>
+                                    </property>
+                                    <property name="editTriggers">
+                                        <set>QAbstractItemView::NoEditTriggers</set>
+                                    </property>
+                                    <property name="sortingEnabled">
                                         <bool>true</bool>
                                     </property>
                                 </widget>
                             </item>
                         </layout>
-                    </item>
-                    <item row="6" column="0">
-                        <widget class="QLabel" name="labelNotes">
-                            <property name="text">
-                                <string>Примечание:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="6" column="1">
-                        <widget class="QTextEdit" name="textEditNotes">
-                            <property name="maximumSize">
-                                <size>
-                                    <width>16777215</width>
-                                    <height>90</height>
-                                </size>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="7" column="0">
-                        <widget class="QLabel" name="labelRepaired">
-                            <property name="text">
-                                <string>Был в ремонте:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="7" column="1">
-                        <widget class="QCheckBox" name="checkBoxRepaired">
-                            <property name="text">
-                                <string>Да</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="8" column="0">
-                        <widget class="QLabel" name="labelDeactivated">
-                            <property name="text">
-                                <string>Деактивирован:</string>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="8" column="1">
-                        <widget class="QCheckBox" name="checkBoxDeactivated">
-                            <property name="text">
-                                <string>Да</string>
-                            </property>
-                        </widget>
-                    </item>
-                </layout>
+                    </widget>
+                </widget>
             </item>
             <item>
                 <layout class="QHBoxLayout" name="horizontalLayout">

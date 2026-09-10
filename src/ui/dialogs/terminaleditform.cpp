@@ -6,6 +6,8 @@
 #include "utils/validator.h"
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSqlError>
+#include <QSqlQuery>
 
 TerminalEditForm::TerminalEditForm(int terminalId, QWidget* parent)
     : QDialog(parent), ui(new Ui::TerminalEditForm), m_terminalId(terminalId)
@@ -18,7 +20,12 @@ TerminalEditForm::TerminalEditForm(int terminalId, QWidget* parent)
 
     connect(ui->checkBoxNoDate, &QCheckBox::toggled, this, &TerminalEditForm::on_checkBoxNoDate_toggled);
 
+    m_docsModel = new QSqlQueryModel(this);
+    ui->tableViewDocuments->setModel(m_docsModel);
+    ui->tableViewDocuments->horizontalHeader()->setStretchLastSection(true);
+
     loadModel();
+    loadDocuments();
 }
 
 TerminalEditForm::~TerminalEditForm()
@@ -76,6 +83,101 @@ void TerminalEditForm::loadModel()
     ui->textEditNotes->setPlainText(t.notes);
     ui->checkBoxRepaired->setChecked(t.wasRepaired);
     ui->checkBoxDeactivated->setChecked(t.deactivated);
+}
+
+void TerminalEditForm::loadDocuments()
+{
+    QSqlQuery query(DatabaseManager::instance().getDatabase());
+    query.prepare("SELECT 'Поступление' AS \"Тип документа\", "
+                  "rd.docnumber AS \"Номер документа\", "
+                  "rd.docdate AS \"Дата\", "
+                  "'' AS \"Клиент\", "
+                  "'' AS \"SIM (IMEI 1)\", "
+                  "'' AS \"SIM (IMEI 2)\", "
+                  "'' AS \"Действие\", "
+                  "COALESCE(rd.comments, '') AS \"Комментарий\" "
+                  "FROM tblreceiptdocs rd "
+                  "JOIN tblreceiptdetails rdet ON rd.receiptdocid = rdet.receiptdocid "
+                  "WHERE rdet.terminalid = :tid "
+                  "UNION ALL "
+                  "SELECT 'Аренда', "
+                  "rdo.docnumber, "
+                  "rdo.docdate, "
+                  "COALESCE(c.clientname, ''), "
+                  "COALESCE(s.simnumber, ''), "
+                  "COALESCE(s2.simnumber, ''), "
+                  "'' AS \"Действие\", "
+                  "COALESCE(rdo.comments, '') "
+                  "FROM tblrentaldocs rdo "
+                  "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
+                  "LEFT JOIN tblclients c ON rdo.clientid = c.clientid "
+                  "LEFT JOIN tblsimcards s ON rdet.simcardid = s.simcardid "
+                  "LEFT JOIN tblsimcards s2 ON rdet.simcardid2 = s2.simcardid "
+                  "WHERE rdet.terminalid = :tid "
+                  "UNION ALL "
+                  "SELECT 'Возврат', "
+                  "ret.docnumber, "
+                  "ret.docdate, "
+                  "COALESCE(c.clientname, ''), "
+                  "'' AS \"SIM (IMEI 1)\", "
+                  "'' AS \"SIM (IMEI 2)\", "
+                  "'' AS \"Действие\", "
+                  "COALESCE(ret.comments, '') "
+                  "FROM tblreturndocs ret "
+                  "JOIN tblreturndetails rdet ON ret.returndocid = rdet.returndocid "
+                  "LEFT JOIN tblclients c ON ret.clientid = c.clientid "
+                  "WHERE rdet.terminalid = :tid "
+                  "UNION ALL "
+                  "SELECT 'Оплата', "
+                  "('ОП-' || p.paymentid::text), "
+                  "p.paymentdate, "
+                  "COALESCE(c.clientname, ''), "
+                  "'' AS \"SIM (IMEI 1)\", "
+                  "'' AS \"SIM (IMEI 2)\", "
+                  "'' AS \"Действие\", "
+                  "COALESCE(p.comment, '') "
+                  "FROM tblpayments p "
+                  "JOIN tblpayment_rental_links prl ON p.paymentid = prl.paymentid "
+                  "JOIN tblrentaldocs rdo ON prl.rentaldocid = rdo.rentaldocid "
+                  "JOIN tblrentaldetails rdet ON rdo.rentaldocid = rdet.rentaldocid "
+                  "LEFT JOIN tblclients c ON rdo.clientid = c.clientid "
+                  "WHERE rdet.terminalid = :tid "
+                  "UNION ALL "
+                  "SELECT 'Изменение статуса', "
+                  "sc.docnumber, "
+                  "sc.docdate, "
+                  "'' AS \"Клиент\", "
+                  "'' AS \"SIM (IMEI 1)\", "
+                  "'' AS \"SIM (IMEI 2)\", "
+                  "CASE sc.actiontype "
+                  "    WHEN 'repair' THEN 'В ремонт' "
+                  "    WHEN 'repair_return' THEN 'Возврат из ремонта' "
+                  "    WHEN 'writeoff' THEN 'Списан' "
+                  "    WHEN 'lost' THEN 'Утерян' "
+                  "    ELSE sc.actiontype "
+                  "END AS \"Действие\", "
+                  "COALESCE(sc.comment, '') "
+                  "FROM tblstatuschangedocs sc "
+                  "JOIN tblstatuschangedetails scdet ON sc.statuschangedocid = scdet.statuschangedocid "
+                  "WHERE scdet.terminalid = :tid "
+                  "ORDER BY \"Дата\" DESC");
+    query.bindValue(":tid", m_terminalId);
+
+    if (!query.exec()) {
+        QMessageBox::warning(this, "Ошибка",
+                             "Не удалось загрузить связанные документы: " + query.lastError().text());
+        return;
+    }
+
+    m_docsModel->setQuery(std::move(query));
+    ui->lblDocsCount->setText(QString("Найдено документов: %1").arg(m_docsModel->rowCount()));
+    ui->tableViewDocuments->setColumnWidth(0, 150);
+    ui->tableViewDocuments->setColumnWidth(1, 140);
+    ui->tableViewDocuments->setColumnWidth(2, 120);
+    ui->tableViewDocuments->setColumnWidth(3, 180);
+    ui->tableViewDocuments->setColumnWidth(4, 100);
+    ui->tableViewDocuments->setColumnWidth(5, 100);
+    ui->tableViewDocuments->setColumnWidth(6, 130);
 }
 
 bool TerminalEditForm::validate()

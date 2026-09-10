@@ -5,6 +5,7 @@
 
 #include <QList>
 #include <QPair>
+#include <QSqlQueryModel>
 
 namespace Ui {
 class TerminalEditForm;
@@ -27,6 +28,7 @@ private slots:
 
 private:
     void loadModel();
+    void loadDocuments();
     bool validate();
     bool save();
 
@@ -34,6 +36,8 @@ private:
     int m_terminalId = 0;
     // Пары (modelId, отображаемое имя) для комбобокса моделей.
     QList<QPair<int, QString>> m_models;
+    // Список документов, в которых участвовал терминал.
+    QSqlQueryModel* m_docsModel = nullptr;
 };
 
 #endif // TERMINALEDITFORM_H
