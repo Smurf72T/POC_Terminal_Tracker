@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev libqt6sql6-psql libqt6sql6-sqlite
+          sudo apt-get install -y qt6-base-dev qt6-gui-private-dev libqt6sql6-psql libqt6sql6-sqlite
           sudo apt-get install -y qt6-charts-dev || sudo apt-get install -y libqt6charts6-dev
           sudo apt-get install -y libpq-dev
           test -f /usr/lib/x86_64-linux-gnu/cmake/Qt6/Qt6Config.cmake
@@ -72,7 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev libqt6sql6-psql libqt6sql6-sqlite
+          sudo apt-get install -y qt6-base-dev qt6-gui-private-dev libqt6sql6-psql libqt6sql6-sqlite
           sudo apt-get install -y qt6-charts-dev || sudo apt-get install -y libqt6charts6-dev
           test -f /usr/lib/x86_64-linux-gnu/cmake/Qt6/Qt6Config.cmake
           echo "QT_PLUGIN_PATH=/usr/lib/x86_64-linux-gnu/qt6/plugins" >> "$GITHUB_ENV"
@@ -131,7 +131,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev libqt6sql6-psql libqt6sql6-sqlite
+          sudo apt-get install -y qt6-base-dev qt6-gui-private-dev libqt6sql6-psql libqt6sql6-sqlite
           sudo apt-get install -y qt6-charts-dev || sudo apt-get install -y libqt6charts6-dev
           test -f /usr/lib/x86_64-linux-gnu/cmake/Qt6/Qt6Config.cmake
           echo "QT_PLUGIN_PATH=/usr/lib/x86_64-linux-gnu/qt6/plugins" >> "$GITHUB_ENV"

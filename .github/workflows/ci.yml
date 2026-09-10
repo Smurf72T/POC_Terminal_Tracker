@@ -108,7 +108,7 @@ jobs:
             Set-AuthenticodeSignature -FilePath $exe -Certificate $cert | Out-Null
             $sig = Get-AuthenticodeSignature $exe
             Write-Host "Signature status: $($sig.Status)"
-            if ($sig.Status -ne 'Valid') { throw "Signature verification failed: $($sig.Status)" }
+            if ($sig.Status -ne "Valid") { throw "Signature verification failed: $($sig.Status)" }
           }
 
       - name: Package ZIP + NSIS installer
