@@ -130,12 +130,11 @@ void ArchiveDocumentsForm::applyFilter()
                     "          GROUP BY rd.rentaldocid) ret ON r.rentaldocid = ret.rentaldocid "
                     "LEFT JOIN (SELECT rentaldocid, COUNT(*) AS payment_cnt FROM tblpayment_rental_links GROUP BY "
                     "rentaldocid) pay ON r.rentaldocid = pay.rentaldocid "
-                    "WHERE ");
+                    "WHERE (:clientId = 0 OR r.clientid = :clientId) ");
         const QString d = dateRange("r.docdate");
         if (!d.isEmpty())
-            queryStr += d + "AND ";
-        queryStr += "(:clientId = 0 OR r.clientid = :clientId) "
-                    "ORDER BY r.docdate DESC";
+            queryStr += "AND " + d;
+        queryStr += "ORDER BY r.docdate DESC";
     } else if (m_docType == 3) { // Возврат
         queryStr = QString("SELECT r.returndocid, "
                            "r.docnumber AS \"Номер\", "
@@ -144,12 +143,11 @@ void ArchiveDocumentsForm::applyFilter()
                            "r.comments AS \"Комментарий\" "
                            "FROM tblreturndocs r "
                            "LEFT JOIN tblclients c ON r.clientid = c.clientid "
-                           "WHERE ");
+                           "WHERE (:clientId = 0 OR r.clientid = :clientId) ");
         const QString d = dateRange("r.docdate");
         if (!d.isEmpty())
-            queryStr += d + "AND ";
-        queryStr += "(:clientId = 0 OR r.clientid = :clientId) "
-                    "ORDER BY r.docdate DESC";
+            queryStr += "AND " + d;
+        queryStr += "ORDER BY r.docdate DESC";
     } else if (m_docType == 4) { // Оплата
         queryStr = QString("SELECT p.paymentid, "
                            "p.paymentdate AS \"Дата\", "
@@ -165,12 +163,11 @@ void ArchiveDocumentsForm::applyFilter()
                            "(5, 'Май'), (6, 'Июнь'), (7, 'Июль'), (8, 'Август'), "
                            "(9, 'Сентябрь'), (10, 'Октябрь'), (11, 'Ноябрь'), (12, 'Декабрь') "
                            ") AS pm(monthnum, monthname) ON p.periodmonth = pm.monthnum "
-                           "WHERE ");
+                           "WHERE (:clientId = 0 OR p.clientid = :clientId) ");
         const QString d = dateRange("p.paymentdate");
         if (!d.isEmpty())
-            queryStr += d + "AND ";
-        queryStr += "(:clientId = 0 OR p.clientid = :clientId) "
-                    "ORDER BY p.paymentdate DESC";
+            queryStr += "AND " + d;
+        queryStr += "ORDER BY p.paymentdate DESC";
     } else if (m_docType == 5) { // Изменение статусов
         queryStr =
             QString("SELECT sc.statuschangedocid, "
