@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
 {
     QApplication a(argc, argv);
 
-    a.setWindowIcon(QIcon(":/media/70x70.png"));
+    a.setWindowIcon(QIcon(":/media/32x32.ico"));
 
 #ifdef Q_OS_WIN
     SetConsoleOutputCP(CP_UTF8);

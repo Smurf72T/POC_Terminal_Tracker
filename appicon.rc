@@ -1,0 +1,3 @@
+// Иконка исполняемого файла (Windows).
+// Компилируется windres (MinGW) или rc.exe (MSVC) и вшивается в POC_Terminal_Tracker.exe.
+IDI_ICON1 ICON "media/32x32.ico"

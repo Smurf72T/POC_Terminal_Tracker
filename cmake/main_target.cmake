@@ -1,5 +1,29 @@
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${UI_FILES})
 
+# Иконка исполняемого файла (Windows): appicon.rc → media/32x32.ico
+if(WIN32)
+    enable_language(RC)
+    if(MINGW)
+        # MinGW: windres теряет кавычки в include-путях target'а ("Program Files")
+        # и его препроцессор (gcc) падает — компилируем .rc вручную, без include-директорий.
+        add_custom_command(
+                OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/appicon_res.o
+                COMMAND ${CMAKE_RC_COMPILER} -O coff
+                        -I ${CMAKE_SOURCE_DIR}
+                        -i ${CMAKE_SOURCE_DIR}/appicon.rc
+                        -o ${CMAKE_CURRENT_BINARY_DIR}/appicon_res.o
+                DEPENDS ${CMAKE_SOURCE_DIR}/appicon.rc ${CMAKE_SOURCE_DIR}/media/32x32.ico
+                COMMENT "Generating app icon resource (windres)"
+                VERBATIM
+        )
+        target_sources(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/appicon_res.o)
+    else()
+        # MSVC: штатная обработка .rc через rc.exe.
+        target_sources(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/appicon.rc)
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/appicon.rc PROPERTIES LANGUAGE RC)
+    endif()
+endif()
+
 # Линковка Qt6 и PostgreSQL
 target_link_libraries(${PROJECT_NAME} PRIVATE
         Qt6::Core
