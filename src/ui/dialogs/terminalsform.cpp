@@ -27,18 +27,6 @@ TerminalsForm::TerminalsForm(QWidget* parent) : QDialog(parent), ui(new Ui::Term
 
     ui->tableView->hideColumn(0);
 
-    model->setHeaderData(0, Qt::Horizontal, "ID");
-    model->setHeaderData(1, Qt::Horizontal, "Серийный номер");
-    model->setHeaderData(2, Qt::Horizontal, "Модель");
-    model->setHeaderData(3, Qt::Horizontal, "IMEI 1");
-    model->setHeaderData(4, Qt::Horizontal, "IMEI 2");
-    model->setHeaderData(5, Qt::Horizontal, "Статус");
-    model->setHeaderData(6, Qt::Horizontal, "SIM-карта");
-    model->setHeaderData(7, Qt::Horizontal, "Дата покупки");
-    model->setHeaderData(8, Qt::Horizontal, "Примечание");
-    model->setHeaderData(9, Qt::Horizontal, "Был в ремонте");
-    model->setHeaderData(10, Qt::Horizontal, "Деактивирован");
-
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->setSelectionMode(QAbstractItemView::SingleSelection);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
@@ -121,16 +109,17 @@ void TerminalsForm::loadModel(const QString& filter)
     if (countQuery.exec() && countQuery.next())
         m_totalRows = countQuery.value(0).toInt();
 
-    QString queryStr = "SELECT t.terminalid, t.serialnumber, "
-                       "COALESCE(m.modelname, 'Неизвестная') AS modelname, "
-                       "t.imei1, t.imei2, " +
+    QString queryStr = "SELECT t.terminalid AS \"ID\", t.serialnumber AS \"Серийный номер\", "
+                       "COALESCE(m.modelname, 'Неизвестная') AS \"Модель\", "
+                       "t.imei1 AS \"IMEI 1\", t.imei2 AS \"IMEI 2\", " +
                        TerminalStatus::sqlCaseExpression("t.status") +
-                       " AS status, "
+                       " AS \"Статус\", "
                        "COALESCE(NULLIF(s.simnumber, '') || CASE WHEN s2.simnumber IS NOT NULL "
-                       "      THEN '; ' || s2.simnumber ELSE '' END, 'SIM не назначена') AS simnumber, "
-                       "t.purchasedate, t.notes, "
-                       "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS was_repaired, "
-                       "CASE WHEN t.is_deactivated THEN 'Да' ELSE 'Нет' END AS is_deactivated "
+                       "      THEN '; ' || s2.simnumber ELSE '' END, "
+                       "'SIM не назначена') AS \"SIM-карта\", "
+                       "t.purchasedate AS \"Дата покупки\", t.notes AS \"Примечание\", "
+                       "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS \"Был в ремонте\", "
+                       "CASE WHEN t.is_deactivated THEN 'Да' ELSE 'Нет' END AS \"Деактивирован\" "
                        "FROM tblterminals t "
                        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                        "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid "
