@@ -25,6 +25,7 @@ private slots:
     void on_btnSave_clicked();
     void on_btnCancel_clicked();
     void on_checkBoxNoDate_toggled(bool checked);
+    void on_tableViewDocuments_doubleClicked(const QModelIndex& index);
 
 private:
     void loadModel();

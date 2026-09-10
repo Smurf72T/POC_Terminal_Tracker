@@ -2,6 +2,11 @@
 #include "ui_terminaleditform.h"
 #include "database/databasemanager.h"
 #include "database/repositories/terminalrepository.h"
+#include "ui/dialogs/paymentform.h"
+#include "ui/dialogs/receiptform.h"
+#include "ui/dialogs/rentalform.h"
+#include "ui/dialogs/returnform.h"
+#include "ui/dialogs/statuschangeform.h"
 #include "utils/terminal_status.h"
 #include "utils/validator.h"
 #include <QMessageBox>
@@ -88,7 +93,8 @@ void TerminalEditForm::loadModel()
 void TerminalEditForm::loadDocuments()
 {
     QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT 'Поступление' AS \"Тип документа\", "
+    query.prepare("SELECT 1 AS \"Тип (код)\", rd.receiptdocid AS \"ID документа\", "
+                  "'Поступление' AS \"Тип документа\", "
                   "rd.docnumber AS \"Номер документа\", "
                   "rd.docdate AS \"Дата\", "
                   "'' AS \"Клиент\", "
@@ -100,7 +106,8 @@ void TerminalEditForm::loadDocuments()
                   "JOIN tblreceiptdetails rdet ON rd.receiptdocid = rdet.receiptdocid "
                   "WHERE rdet.terminalid = :tid "
                   "UNION ALL "
-                  "SELECT 'Аренда', "
+                  "SELECT 2, rdo.rentaldocid, "
+                  "'Аренда', "
                   "rdo.docnumber, "
                   "rdo.docdate, "
                   "COALESCE(c.clientname, ''), "
@@ -115,7 +122,8 @@ void TerminalEditForm::loadDocuments()
                   "LEFT JOIN tblsimcards s2 ON rdet.simcardid2 = s2.simcardid "
                   "WHERE rdet.terminalid = :tid "
                   "UNION ALL "
-                  "SELECT 'Возврат', "
+                  "SELECT 3, ret.returndocid, "
+                  "'Возврат', "
                   "ret.docnumber, "
                   "ret.docdate, "
                   "COALESCE(c.clientname, ''), "
@@ -128,7 +136,8 @@ void TerminalEditForm::loadDocuments()
                   "LEFT JOIN tblclients c ON ret.clientid = c.clientid "
                   "WHERE rdet.terminalid = :tid "
                   "UNION ALL "
-                  "SELECT 'Оплата', "
+                  "SELECT 4, p.paymentid, "
+                  "'Оплата', "
                   "('ОП-' || p.paymentid::text), "
                   "p.paymentdate, "
                   "COALESCE(c.clientname, ''), "
@@ -143,7 +152,8 @@ void TerminalEditForm::loadDocuments()
                   "LEFT JOIN tblclients c ON rdo.clientid = c.clientid "
                   "WHERE rdet.terminalid = :tid "
                   "UNION ALL "
-                  "SELECT 'Изменение статуса', "
+                  "SELECT 5, sc.statuschangedocid, "
+                  "'Изменение статуса', "
                   "sc.docnumber, "
                   "sc.docdate, "
                   "'' AS \"Клиент\", "
@@ -164,20 +174,69 @@ void TerminalEditForm::loadDocuments()
     query.bindValue(":tid", m_terminalId);
 
     if (!query.exec()) {
-        QMessageBox::warning(this, "Ошибка",
-                             "Не удалось загрузить связанные документы: " + query.lastError().text());
+        const QString message = "Не удалось загрузить связанные документы: " + query.lastError().text();
+        QMessageBox::warning(this, "Ошибка", message);
         return;
     }
 
     m_docsModel->setQuery(std::move(query));
+    ui->tableViewDocuments->hideColumn(0);
+    ui->tableViewDocuments->hideColumn(1);
     ui->lblDocsCount->setText(QString("Найдено документов: %1").arg(m_docsModel->rowCount()));
-    ui->tableViewDocuments->setColumnWidth(0, 150);
-    ui->tableViewDocuments->setColumnWidth(1, 140);
-    ui->tableViewDocuments->setColumnWidth(2, 120);
-    ui->tableViewDocuments->setColumnWidth(3, 180);
-    ui->tableViewDocuments->setColumnWidth(4, 100);
-    ui->tableViewDocuments->setColumnWidth(5, 100);
-    ui->tableViewDocuments->setColumnWidth(6, 130);
+    ui->tableViewDocuments->setColumnWidth(2, 150);
+    ui->tableViewDocuments->setColumnWidth(3, 140);
+    ui->tableViewDocuments->setColumnWidth(4, 120);
+    ui->tableViewDocuments->setColumnWidth(5, 180);
+    ui->tableViewDocuments->setColumnWidth(6, 100);
+    ui->tableViewDocuments->setColumnWidth(7, 100);
+    ui->tableViewDocuments->setColumnWidth(8, 130);
+}
+
+void TerminalEditForm::on_tableViewDocuments_doubleClicked(const QModelIndex& index)
+{
+    const int docType = m_docsModel->data(m_docsModel->index(index.row(), 0)).toInt();
+    const int docId = m_docsModel->data(m_docsModel->index(index.row(), 1)).toInt();
+    if (docId <= 0)
+        return;
+
+    bool changed = false;
+    switch (docType) {
+        case 1: {
+            ReceiptForm form(this);
+            form.loadForEdit(docId);
+            changed = form.exec() == QDialog::Accepted;
+            break;
+        }
+        case 2: {
+            RentalForm form(this);
+            form.loadForEdit(docId);
+            changed = form.exec() == QDialog::Accepted;
+            break;
+        }
+        case 3: {
+            ReturnForm form(this);
+            form.loadForEdit(docId);
+            changed = form.exec() == QDialog::Accepted;
+            break;
+        }
+        case 4: {
+            PaymentForm form(this);
+            form.loadForEdit(docId);
+            changed = form.exec() == QDialog::Accepted;
+            break;
+        }
+        case 5: {
+            StatusChangeForm form(this);
+            form.loadForEdit(docId);
+            changed = form.exec() == QDialog::Accepted;
+            break;
+        }
+        default:
+            return;
+    }
+
+    if (changed)
+        loadDocuments();
 }
 
 bool TerminalEditForm::validate()
