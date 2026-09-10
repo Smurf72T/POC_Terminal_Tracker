@@ -42,6 +42,10 @@ void TestRepositories::initTestCase()
            "terminalid INTEGER)");
     q.exec("CREATE TABLE tblstatuschangedocs (statuschangedocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
            "comment TEXT)");
+    q.exec("CREATE TABLE tblsiminstalldocs (siminstalldocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
+           "comments TEXT)");
+    q.exec("CREATE TABLE tblsiminstalldetails (siminstalldetailid INTEGER PRIMARY KEY, siminstalldocid INTEGER, "
+           "terminalid INTEGER, simcardid INTEGER, simcardid2 INTEGER)");
 
     insertModel(1, "PAX-A920");
     insertModel(2, "PAX-A910");

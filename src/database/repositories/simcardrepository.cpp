@@ -18,14 +18,7 @@ int SimCardRepository::countAll() const
 int SimCardRepository::countFree() const
 {
     QSqlQuery query(m_db);
-    if (!query.exec("SELECT COUNT(*) FROM tblsimcards s "
-                    "WHERE s.status = 0 "
-                    "OR EXISTS ("
-                    "    SELECT 1 FROM tblterminals t "
-                    "    WHERE (t.currentsimcardid = s.simcardid OR t.currentsimcardid2 = s.simcardid) "
-                    "    AND t.status = 0"
-                    ")") ||
-        !query.next())
+    if (!query.exec("SELECT COUNT(*) FROM tblsimcards WHERE status = 0") || !query.next())
         return 0;
     return query.value(0).toInt();
 }

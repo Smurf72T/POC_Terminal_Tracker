@@ -50,11 +50,22 @@ void TestRepositories::simCardQueries()
 {
     SimCardRepository repo(m_db);
     QCOMPARE(repo.countAll(), 4);
-    // Свободны: SIM1, SIM3 (статус 0) и SIM4 (статус 0). SIM2 — в работе.
+
+    // Китованная SIM (status=1) закреплена за свободным терминалом —
+    // состояние после документа «Установка SIM». Такая SIM занята и НЕ должна
+    // считаться свободной на дашборде.
+    QSqlQuery q(m_db);
+    q.exec("INSERT INTO tblsimcards (simcardid, simnumber, status, notes) "
+           "VALUES (5, '890100000000005', 1, 'установлена в свободный терминал')");
+    q.exec("UPDATE tblterminals SET currentsimcardid2 = 5 WHERE terminalid = 1");
+
+    // Свободны только SIM со status=0: SIM1, SIM3, SIM4. SIM2 — в аренде,
+    // SIM5 — установлена в свободный терминал (китованная) — занята.
+    QCOMPARE(repo.countAll(), 5);
     QCOMPARE(repo.countFree(), 3);
 
     // Отчёт о свободных SIM: статус 0 И не привязанные ни к одному терминалу.
-    // Привязанные SIM1 (к SN-0001) и SIM3 (к SN-0004) исключены.
+    // Привязанные SIM1 (к SN-0001) и SIM3 (к SN-0004) исключены, SIM5 — статус 1.
     const auto free = repo.loadFreeSimCards();
     QCOMPARE(free.size(), 1);
     QCOMPARE(free.at(0).simNumber, QString("890100000000004"));
