@@ -11,6 +11,8 @@
 #include <QHash>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QSqlRelationalTableModel>
+#include <QSqlRelation>
 #include <QtTest/QtTest>
 
 void TestRepositories::terminalQueries()
@@ -264,4 +266,54 @@ void TestRepositories::caseOperations()
         QVERIFY(repo.deleteWriteoffDetails(1));
         QVERIFY(repo.deleteWriteoffHeader(1));
     }
+}
+
+void TestRepositories::caseRelationalModelJoin()
+{
+    // Qt QSqlRelationalTableModel по умолчанию использует INNER JOIN для
+    // отношений — чехлы с terminalid=NULL (со склада) исключаются из выборки.
+    // LEFT JOIN обязателен для корректного отображения справочника чехлов.
+
+    // Вставка свободного чехла (terminalid=NULL) и привязанного к терминалу 1.
+    {
+        QSqlQuery q(m_db);
+        q.prepare("INSERT INTO tblcases (caseid, casetype, status, terminalid) "
+                  "VALUES (:id, 'JoinTest', 0, NULL)");
+        q.bindValue(":id", 100);
+        q.exec();
+    }
+
+    QSqlRelationalTableModel model(nullptr, m_db);
+    model.setTable("tblcases");
+    model.setRelation(3, QSqlRelation("tblterminals", "terminalid", "serialnumber"));
+
+    // INNER JOIN (по умолчанию) — свободные чехлы (terminalid NULL) не видны.
+    model.setJoinMode(QSqlRelationalTableModel::InnerJoin);
+    QVERIFY(model.select());
+    QCOMPARE(model.rowCount(), 0);
+
+    // LEFT JOIN — свободные чехлы видны, включая вставленный ниже.
+    model.setJoinMode(QSqlRelationalTableModel::LeftJoin);
+    const int connectedCases = 5;  // createBatch в caseOperations: 3×Slim + 2×Classic
+    QVERIFY(model.select());
+    QCOMPARE(model.rowCount(), connectedCases + 1);
+
+    bool found = false;
+    for (int r = 0; r < model.rowCount(); ++r) {
+        if (model.data(model.index(r, 1)).toString() == QStringLiteral("JoinTest")) {
+            found = true;
+            break;
+        }
+    }
+    QVERIFY(found);
+
+    // Очистка.
+    {
+        QSqlQuery q(m_db);
+        q.prepare("DELETE FROM tblcases WHERE caseid = :id");
+        q.bindValue(":id", 100);
+        q.exec();
+    }
+    QVERIFY(model.select());
+    QCOMPARE(model.rowCount(), connectedCases);
 }

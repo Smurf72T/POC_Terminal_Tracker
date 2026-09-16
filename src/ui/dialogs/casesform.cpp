@@ -51,8 +51,11 @@ CasesForm::CasesForm(QWidget* parent) : QDialog(parent), ui(new Ui::CasesForm)
                 QMessageBox::warning(this, "Ошибка сохранения", "Не удалось сохранить изменение:\n" + error);
             });
 
-    // Колонка 3 (terminalid) отображается как серийный номер терминала
+    // Колонка 3 (terminalid) отображается как серийный номер терминала.
+    // LeftJoin обязателен: у свободных чехлов terminalid = NULL, иначе inner-join
+    // QSqlRelationalTableModel отфильтрует все строки со склада.
     model->setRelation(3, QSqlRelation("tblterminals", "terminalid", "serialnumber"));
+    model->setJoinMode(QSqlRelationalTableModel::LeftJoin);
 
     if (!model->select()) {
         QMessageBox::critical(this, "Ошибка БД",
