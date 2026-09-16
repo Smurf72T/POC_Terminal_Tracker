@@ -40,7 +40,7 @@ int StatusChangeForm::postHeader(QSqlDatabase& db)
 
     if (m_editMode) {
         query.prepare("UPDATE tblstatuschangedocs SET docdate = :date, actiontype = :type, "
-                      "m_comment = :comm, basedocid = :base WHERE statuschangedocid = :id");
+                      "comment = :comm, basedocid = :base WHERE statuschangedocid = :id");
         query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
         query.bindValue(":type", actionType());
         query.bindValue(":comm", m_comment);
@@ -70,7 +70,7 @@ int StatusChangeForm::postHeader(QSqlDatabase& db)
             }
             ui->lineEditNumber->setText(num);
         }
-        query.prepare("INSERT INTO tblstatuschangedocs (docnumber, docdate, actiontype, m_comment, basedocid) "
+        query.prepare("INSERT INTO tblstatuschangedocs (docnumber, docdate, actiontype, comment, basedocid) "
                       "VALUES (:num, :date, :type, :comm, :base) RETURNING statuschangedocid");
         query.bindValue(":num", ui->lineEditNumber->text());
         query.bindValue(":date", QDateTime(ui->dateEdit->date(), QTime::currentTime()));
