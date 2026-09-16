@@ -2,10 +2,12 @@
 #include "ui_rentalform.h"
 #include "delegates/comboboxdelegate.h"
 #include "delegates/comboboxmodel.h"
+#include "delegates/checkboxdelegate.h"
 #include "database/databasemanager.h"
 #include "database/repositories/clientrepository.h"
 #include "database/repositories/documentrepository.h"
 #include "database/repositories/simcardrepository.h"
+#include "database/repositories/caserepository.h"
 #include "database/repositories/terminalrepository.h"
 #include <QMessageBox>
 #include <QSqlQuery>
@@ -37,11 +39,13 @@ RentalForm::RentalForm(QWidget* parent) : ClientDocumentDialog(parent), ui(new U
     // сжигать значения последовательности для отменённых форм.
 
     // Настройка модели для табличной части
-    rowsModel->setColumnCount(4);
-    rowsModel->setHorizontalHeaderLabels({"Терминал", "SIM (IMEI 1)", "SIM (IMEI 2)", "Примечание"});
+    rowsModel->setColumnCount(5);
+    rowsModel->setHorizontalHeaderLabels({"Терминал", "SIM (IMEI 1)", "SIM (IMEI 2)", "Чехол", "Примечание"});
     ui->tableView->setModel(rowsModel);
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
+    ui->tableView->setItemDelegateForColumn(3, new CheckBoxDelegate(this));
+    ui->tableView->setColumnWidth(3, 70);
 
     // Загружаем данные для выпадающих списков
     loadClientsToDelegate(ui->comboBoxClient);
@@ -88,6 +92,7 @@ void RentalForm::loadFreeTerminalsToDelegate()
     QList<QPair<int, QString>> terminals;
     m_installedSim1.clear();
     m_installedSim2.clear();
+    m_installedCase.clear();
     const auto free = TerminalRepository(DatabaseManager::instance().getDatabase()).loadFreeForSelection();
     for (const auto& t : free) {
         terminals.append(qMakePair(t.id, t.serialNumber));
@@ -100,6 +105,12 @@ void RentalForm::loadFreeTerminalsToDelegate()
             models::SimCard sim2 = SimCardRepository(DatabaseManager::instance().getDatabase()).loadById(t.currentSimCard2Id);
             if (sim2.id > 0)
                 m_installedSim2.insert(t.id, qMakePair(sim2.id, sim2.number));
+        }
+        // Установленный на терминале чехол (документ «Установка чехлов»)
+        if (t.currentCaseId > 0) {
+            models::CaseItem c = CaseRepository(DatabaseManager::instance().getDatabase()).loadById(t.currentCaseId);
+            if (c.id > 0)
+                m_installedCase.insert(t.id, qMakePair(c.id, c.caseType));
         }
     }
 
@@ -179,12 +190,19 @@ void RentalForm::loadSpecificEditData(int docId)
         sim2Item->setData(row.simCard2Id, Qt::UserRole);
         sim2Item->setData(row.simCard2Id > 0 ? row.simNumber2 : QString(), Qt::DisplayRole);
 
+        QStandardItem* caseItem = new QStandardItem();
+        caseItem->setData(row.hasCase, Qt::DisplayRole);
+        caseItem->setData(0, Qt::UserRole);
+        if (row.hasCase && m_installedCase.contains(row.terminalId))
+            caseItem->setData(m_installedCase.value(row.terminalId).first, Qt::UserRole);
+
         QStandardItem* commentItem = new QStandardItem(row.comment);
 
         rowsModel->setItem(r, 0, terminalItem);
         rowsModel->setItem(r, 1, simItem);
         rowsModel->setItem(r, 2, sim2Item);
-        rowsModel->setItem(r, 3, commentItem);
+        rowsModel->setItem(r, 3, caseItem);
+        rowsModel->setItem(r, 4, commentItem);
     }
 
     setWindowTitle(QString("Редактирование аренды ID %1").arg(docId));
@@ -208,12 +226,17 @@ void RentalForm::on_btnAddRow_clicked()
     sim2Item->setData(0, Qt::UserRole);     // ID SIM (слот 2)
     sim2Item->setData("", Qt::DisplayRole); // Текст для отображения
 
+    QStandardItem* caseItem = new QStandardItem();
+    caseItem->setData(false, Qt::DisplayRole); // Чехол
+    caseItem->setData(0, Qt::UserRole);
+
     QStandardItem* commentItem = new QStandardItem("");
 
     rowsModel->setItem(row, 0, terminalItem);
     rowsModel->setItem(row, 1, simItem);
     rowsModel->setItem(row, 2, sim2Item);
-    rowsModel->setItem(row, 3, commentItem);
+    rowsModel->setItem(row, 3, caseItem);
+    rowsModel->setItem(row, 4, commentItem);
 }
 
 void RentalForm::on_btnDeleteRow_clicked()
@@ -246,10 +269,25 @@ void RentalForm::onTableViewDataChanged(const QModelIndex& topLeft, const QModel
     int row = topLeft.row();
     int column = topLeft.column();
 
-    // Если изменилась колонка терминала (0) — автозаполняем SIM из установленных
+    // Если изменилась колонка терминала (0) — автозаполняем SIM и чехол
     if (column == 0) {
         int terminalId = rowsModel->data(rowsModel->index(row, 0), Qt::UserRole).toInt();
         autoFillSimForTerminal(row, terminalId);
+        autoFillCaseForTerminal(row, terminalId);
+    }
+}
+
+// Автозаполнение колонки «Чехол»: если на терминале уже установлен чехол
+// (документ «Установка чехлов»), галочка проставляется сама.
+void RentalForm::autoFillCaseForTerminal(int row, int terminalId)
+{
+    if (m_installedCase.contains(terminalId)) {
+        const auto& c = m_installedCase.value(terminalId);
+        rowsModel->setData(rowsModel->index(row, 3), true, Qt::DisplayRole);
+        rowsModel->setData(rowsModel->index(row, 3), c.first, Qt::UserRole);
+    } else {
+        rowsModel->setData(rowsModel->index(row, 3), false, Qt::DisplayRole);
+        rowsModel->setData(rowsModel->index(row, 3), 0, Qt::UserRole);
     }
 }
 

@@ -26,6 +26,7 @@ private slots:
     void clientLoadMethods();
     void documentModelMethods();
     void receiptItemQueries();
+    void caseOperations();
 
 private:
     static void insertTerminal(int id, const QString& serial, int status, int modelId, int simId);

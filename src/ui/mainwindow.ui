@@ -292,6 +292,7 @@
     <addaction name="actionModels"/>
     <addaction name="actionClients"/>
     <addaction name="actionSIMCards"/>
+    <addaction name="actionCases"/>
     <addaction name="actionTerminals"/>
    </widget>
     <widget class="QMenu" name="menuDocuments">
@@ -302,6 +303,9 @@
        <addaction name="actionRental"/>
        <addaction name="actionReturn"/>
        <addaction name="actionSimInstall"/>
+       <addaction name="actionCaseIncome"/>
+       <addaction name="actionCaseInstall"/>
+       <addaction name="actionCaseWriteoff"/>
        <addaction name="actionStatusChange"/>
        <addaction name="actionPayment"/>
      </widget>
@@ -313,6 +317,9 @@
       <addaction name="actionArchiveRental"/>
       <addaction name="actionArchiveReturn"/>
       <addaction name="actionArchiveSimInstall"/>
+      <addaction name="actionArchiveCaseIncome"/>
+      <addaction name="actionArchiveCaseInstall"/>
+      <addaction name="actionArchiveCaseWriteoff"/>
       <addaction name="actionArchiveStatusChange"/>
       <addaction name="actionArchivePayment"/>
      </widget>
@@ -353,6 +360,7 @@
     </property>
     <addaction name="actionTerminalHistory"/>
     <addaction name="actionFreeDevicesReport"/>
+    <addaction name="actionCaseTerminalsReport"/>
     <addaction name="actionReports"/>
     <addaction name="actionExpiryNotifications"/>
    </widget>
@@ -390,11 +398,16 @@
     <string>Клиенты</string>
    </property>
   </action>
-  <action name="actionSIMCards">
-   <property name="text">
-    <string>SIM-карты</string>
-   </property>
-  </action>
+<action name="actionSIMCards">
+    <property name="text">
+     <string>SIM-карты</string>
+    </property>
+   </action>
+   <action name="actionCases">
+    <property name="text">
+     <string>Чехлы</string>
+    </property>
+   </action>
   <action name="actionTerminals">
    <property name="text">
     <string>Терминалы</string>
@@ -415,11 +428,26 @@
      <string>Возврат из аренды</string>
     </property>
    </action>
-   <action name="actionSimInstall">
-    <property name="text">
-     <string>Установка SIM в терминал</string>
-    </property>
-   </action>
+<action name="actionSimInstall">
+     <property name="text">
+      <string>Установка SIM в терминал</string>
+     </property>
+    </action>
+    <action name="actionCaseIncome">
+     <property name="text">
+      <string>Поступление чехлов</string>
+     </property>
+    </action>
+    <action name="actionCaseInstall">
+     <property name="text">
+      <string>Установка чехлов</string>
+     </property>
+    </action>
+    <action name="actionCaseWriteoff">
+     <property name="text">
+      <string>Списание чехлов</string>
+     </property>
+    </action>
   <action name="actionStatusChange">
    <property name="text">
     <string>Изменение статуса терминалов</string>
@@ -445,11 +473,26 @@
      <string>Возврат</string>
     </property>
    </action>
-   <action name="actionArchiveSimInstall">
-    <property name="text">
-     <string>Установка SIM</string>
-    </property>
-   </action>
+<action name="actionArchiveSimInstall">
+     <property name="text">
+      <string>Установка SIM</string>
+     </property>
+    </action>
+    <action name="actionArchiveCaseIncome">
+     <property name="text">
+      <string>Поступление чехлов</string>
+     </property>
+    </action>
+    <action name="actionArchiveCaseInstall">
+     <property name="text">
+      <string>Установка чехлов</string>
+     </property>
+    </action>
+    <action name="actionArchiveCaseWriteoff">
+     <property name="text">
+      <string>Списание чехлов</string>
+     </property>
+    </action>
    <action name="actionArchiveStatusChange">
     <property name="text">
      <string>Изменение статусов</string>
@@ -468,11 +511,16 @@
     <string>Ctrl+H</string>
    </property>
   </action>
-  <action name="actionFreeDevicesReport">
-   <property name="text">
-    <string>Отчёт: Свободные устройства</string>
-   </property>
-  </action>
+<action name="actionFreeDevicesReport">
+    <property name="text">
+     <string>Отчёт: Свободные устройства</string>
+    </property>
+   </action>
+   <action name="actionCaseTerminalsReport">
+    <property name="text">
+     <string>Отчёт: Терминалы с чехлами</string>
+    </property>
+   </action>
   <action name="actionBulkImport">
    <property name="text">
     <string>Массовое поступление (из Excel)</string>

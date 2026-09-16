@@ -30,6 +30,7 @@ struct RentalRow {
     int terminalStatus = 0;
     int simStatus = 0;
     int sim2Status = 0;
+    bool hasCase = false;  // «чехол едет с терминалом» (tblrentaldetails.has_case)
 };
 
 } // namespace models

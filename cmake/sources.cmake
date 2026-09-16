@@ -14,6 +14,7 @@ set(SOURCES
         src/database/repositories/documentrepository.cpp
         src/database/repositories/siminstallrepository.cpp
         src/database/repositories/paymentrepository.cpp
+        src/database/repositories/caserepository.cpp
         src/ui/mainwindow.cpp
         src/ui/views/dashboardview.cpp
         src/ui/views/chartpanel.cpp
@@ -31,6 +32,10 @@ set(SOURCES
         src/ui/dialogs/rentalform.cpp
         src/ui/dialogs/returnform.cpp
         src/ui/dialogs/siminstallform.cpp
+        src/ui/dialogs/casesform.cpp
+        src/ui/dialogs/caseincomeform.cpp
+        src/ui/dialogs/caseinstallform.cpp
+        src/ui/dialogs/casewriteoffform.cpp
         src/ui/dialogs/statuschangeform.cpp
         src/ui/dialogs/archivedocumentsform.cpp
         src/ui/dialogs/paymentform.cpp
@@ -46,6 +51,7 @@ set(SOURCES
         src/ui/dialogs/terminalhistorypickerdialog.cpp
         src/ui/dialogs/freedevicesreportdialog.cpp
         src/ui/dialogs/clientrentalreportdialog.cpp
+        src/ui/dialogs/caseterminalsreportdialog.cpp
         src/ui/dialogs/updatesettingsdialog.cpp
         src/utils/reportexporter.cpp
         src/utils/validator.cpp
@@ -72,12 +78,16 @@ set(SOURCES
         src/ui/dialogs/rentalform_post.cpp
         src/ui/dialogs/returnform_post.cpp
         src/ui/dialogs/siminstallform_post.cpp
+        src/ui/dialogs/caseincomeform_post.cpp
+        src/ui/dialogs/caseinstallform_post.cpp
+        src/ui/dialogs/casewriteoffform_post.cpp
         src/ui/dialogs/statuschangeform_post.cpp
         src/ui/dialogs/paymentform_post.cpp
         src/services/documentnumbergenerator.cpp
         src/services/postactionlogger.cpp
         src/services/statuschangeservice.cpp
         src/services/simcardservice.cpp
+        src/services/caseservice.cpp
         src/services/serialunitsservice.cpp
 )
 
@@ -87,6 +97,7 @@ set(HEADERS
         src/models/simcard.h
         src/models/rentaldocument.h
         src/models/siminstalldocument.h
+        src/models/casesdocument.h
         src/models/document.h
         src/database/databasemanager.h
         src/database/idatabasemanager.h
@@ -98,6 +109,7 @@ set(HEADERS
         src/database/repositories/documentrepository.h
         src/database/repositories/siminstallrepository.h
         src/database/repositories/paymentrepository.h
+        src/database/repositories/caserepository.h
         src/ui/mainwindow.h
         src/ui/views/dashboardview.h
         src/ui/views/chartpanel.h
@@ -118,6 +130,10 @@ set(HEADERS
         src/ui/dialogs/rentalform.h
         src/ui/dialogs/returnform.h
         src/ui/dialogs/siminstallform.h
+        src/ui/dialogs/casesform.h
+        src/ui/dialogs/caseincomeform.h
+        src/ui/dialogs/caseinstallform.h
+        src/ui/dialogs/casewriteoffform.h
         src/ui/dialogs/statuschangeform.h
         src/ui/dialogs/archivedocumentsform.h
         src/ui/dialogs/paymentform.h
@@ -133,6 +149,7 @@ set(HEADERS
         src/ui/dialogs/terminalhistorypickerdialog.h
         src/ui/dialogs/freedevicesreportdialog.h
         src/ui/dialogs/clientrentalreportdialog.h
+        src/ui/dialogs/caseterminalsreportdialog.h
         src/ui/dialogs/updatesettingsdialog.h
         src/ui/base/documentdialog.h
         src/ui/base/clientdocdialog.h
@@ -142,6 +159,7 @@ set(HEADERS
         src/services/postactionlogger.h
         src/services/statuschangeservice.h
         src/services/simcardservice.h
+        src/services/caseservice.h
         src/services/serialunitsservice.h
         src/utils/reportexporter.h
         src/utils/validator.h
@@ -174,6 +192,10 @@ set(UI_FILES
         src/ui/dialogs/rentalform.ui
         src/ui/dialogs/returnform.ui
         src/ui/dialogs/siminstallform.ui
+        src/ui/dialogs/casesform.ui
+        src/ui/dialogs/caseincomeform.ui
+        src/ui/dialogs/caseinstallform.ui
+        src/ui/dialogs/casewriteoffform.ui
         src/ui/dialogs/statuschangeform.ui
         src/ui/dialogs/archivedocumentsform.ui
         src/ui/dialogs/paymentform.ui

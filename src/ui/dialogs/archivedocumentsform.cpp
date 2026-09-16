@@ -7,6 +7,9 @@
 #include "ui/dialogs/paymentform.h"
 #include "ui/dialogs/statuschangeform.h"
 #include "ui/dialogs/siminstallform.h"
+#include "ui/dialogs/caseincomeform.h"
+#include "ui/dialogs/caseinstallform.h"
+#include "ui/dialogs/casewriteoffform.h"
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -30,8 +33,8 @@ ArchiveDocumentsForm::ArchiveDocumentsForm(int docType, QWidget* parent) :
     m_initialFrom = ui->dateEditFrom->date();
     m_initialTo = ui->dateEditTo->date();
 
-    // Загружаем клиентов (если это не Поступление и не Изменение статусов)
-    if (m_docType != 1 && m_docType != 5) {
+    // Загружаем клиентов (если это не Поступление, не Изменение статусов и не чехлы)
+    if (m_docType != 1 && m_docType != 5 && m_docType != 7 && m_docType != 8 && m_docType != 9) {
         loadClients();
     }
 
@@ -62,6 +65,18 @@ void ArchiveDocumentsForm::setupUI()
         ui->comboBoxClient->setVisible(false);
     } else if (m_docType == 6) {
         setWindowTitle("Архив: Установка SIM в терминал");
+        ui->labelClient->setVisible(false);
+        ui->comboBoxClient->setVisible(false);
+    } else if (m_docType == 7) {
+        setWindowTitle("Архив: Поступление чехлов");
+        ui->labelClient->setVisible(false);
+        ui->comboBoxClient->setVisible(false);
+    } else if (m_docType == 8) {
+        setWindowTitle("Архив: Установка чехлов");
+        ui->labelClient->setVisible(false);
+        ui->comboBoxClient->setVisible(false);
+    } else if (m_docType == 9) {
+        setWindowTitle("Архив: Списание чехлов");
         ui->labelClient->setVisible(false);
         ui->comboBoxClient->setVisible(false);
     }
@@ -98,8 +113,8 @@ void ArchiveDocumentsForm::applyFilter()
     const bool useDateFilter = (ui->dateEditFrom->date() != m_initialFrom) ||
                                (ui->dateEditTo->date() != m_initialTo);
 
-    // Для установки SIM (docType 6) нет клиента
-    if (m_docType == 6)
+    // Для установки SIM (docType 6) и чехлов (docType 7-9) нет клиента
+    if (m_docType == 6 || m_docType == 7 || m_docType == 8 || m_docType == 9)
         clientId = 0;
 
     // Условие по диапазону дат (верхняя граница включает весь день «до»).
@@ -208,6 +223,48 @@ void ArchiveDocumentsForm::applyFilter()
         if (!dd.isEmpty())
             queryStr += "WHERE " + dd;
         queryStr += "ORDER BY s.docdate DESC";
+    } else if (m_docType == 7) { // Поступление чехлов
+        queryStr = QString("SELECT c.caseincomedocid, "
+                           "c.docnumber AS \"Номер\", "
+                           "c.docdate AS \"Дата\", "
+                           "COALESCE(det.qty, 0)::text || ' чехл.' AS \"Количество\", "
+                           "c.comments AS \"Комментарий\" "
+                           "FROM tblcaseincomedocs c "
+                           "LEFT JOIN (SELECT caseincomedocid, SUM(qty) AS qty "
+                           "          FROM tblcaseincomedetails GROUP BY caseincomedocid) det "
+                           "ON c.caseincomedocid = det.caseincomedocid ");
+        const QString d7 = dateRange("c.docdate");
+        if (!d7.isEmpty())
+            queryStr += "WHERE " + d7;
+        queryStr += "ORDER BY c.docdate DESC";
+    } else if (m_docType == 8) { // Установка чехлов
+        queryStr = QString("SELECT i.caseinstalldocid, "
+                           "i.docnumber AS \"Номер\", "
+                           "i.docdate AS \"Дата\", "
+                           "COALESCE(det.cnt, 0)::text || ' терминал(ов)' AS \"Терминалов\", "
+                           "i.comments AS \"Комментарий\" "
+                           "FROM tblcaseinstalldocs i "
+                           "LEFT JOIN (SELECT caseinstalldocid, COUNT(*) AS cnt "
+                           "          FROM tblcaseinstalldetails GROUP BY caseinstalldocid) det "
+                           "ON i.caseinstalldocid = det.caseinstalldocid ");
+        const QString d8 = dateRange("i.docdate");
+        if (!d8.isEmpty())
+            queryStr += "WHERE " + d8;
+        queryStr += "ORDER BY i.docdate DESC";
+    } else if (m_docType == 9) { // Списание чехлов
+        queryStr = QString("SELECT w.casewriteoffdocid, "
+                           "w.docnumber AS \"Номер\", "
+                           "w.docdate AS \"Дата\", "
+                           "COALESCE(det.cnt, 0)::text || ' чехл.' AS \"Количество\", "
+                           "w.comments AS \"Комментарий\" "
+                           "FROM tblcasewriteoffdocs w "
+                           "LEFT JOIN (SELECT casewriteoffdocid, COUNT(*) AS cnt "
+                           "          FROM tblcasewriteoffdetails GROUP BY casewriteoffdocid) det "
+                           "ON w.casewriteoffdocid = det.casewriteoffdocid ");
+        const QString d9 = dateRange("w.docdate");
+        if (!d9.isEmpty())
+            queryStr += "WHERE " + d9;
+        queryStr += "ORDER BY w.docdate DESC";
     }
 
     QSqlQuery query(DatabaseManager::instance().getDatabase());
@@ -262,6 +319,15 @@ void ArchiveDocumentsForm::on_tableView_doubleClicked(const QModelIndex& index)
             break;
         case 6:
             openSimInstallForEdit(docId);
+            break;
+        case 7:
+            openCaseIncomeForEdit(docId);
+            break;
+        case 8:
+            openCaseInstallForEdit(docId);
+            break;
+        case 9:
+            openCaseWriteoffForEdit(docId);
             break;
     }
 }
@@ -319,6 +385,33 @@ void ArchiveDocumentsForm::openStatusChangeForEdit(int docId)
 void ArchiveDocumentsForm::openSimInstallForEdit(int docId)
 {
     SimInstallForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
+void ArchiveDocumentsForm::openCaseIncomeForEdit(int docId)
+{
+    CaseIncomeForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
+void ArchiveDocumentsForm::openCaseInstallForEdit(int docId)
+{
+    CaseInstallForm form(this);
+    form.loadForEdit(docId);
+    if (form.exec() == QDialog::Accepted) {
+        applyFilter();
+    }
+}
+
+void ArchiveDocumentsForm::openCaseWriteoffForEdit(int docId)
+{
+    CaseWriteoffForm form(this);
     form.loadForEdit(docId);
     if (form.exec() == QDialog::Accepted) {
         applyFilter();

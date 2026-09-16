@@ -19,13 +19,14 @@ void TestRepositories::initTestCase()
     q.exec("CREATE TABLE tblterminals (terminalid INTEGER PRIMARY KEY, serialnumber TEXT, status INTEGER, "
            "modelid INTEGER, currentsimcardid INTEGER, currentsimcardid2 INTEGER, imei1 TEXT, imei2 TEXT, "
            "is_deactivated INTEGER NOT NULL DEFAULT 0, purchasedate TEXT, notes TEXT, "
-           "was_repaired INTEGER NOT NULL DEFAULT 0)");
+           "was_repaired INTEGER NOT NULL DEFAULT 0, currentcaseid INTEGER)");
     q.exec("CREATE TABLE tblclients (clientid INTEGER PRIMARY KEY, clientname TEXT, inn TEXT, address TEXT, "
            "contactphone TEXT, contactemail TEXT)");
     q.exec("CREATE TABLE tblrentaldocs (rentaldocid INTEGER PRIMARY KEY, clientid INTEGER, docnumber TEXT, "
            "docdate TEXT, comments TEXT)");
     q.exec("CREATE TABLE tblrentaldetails (rentaldetailid INTEGER PRIMARY KEY, rentaldocid INTEGER, "
-           "terminalid INTEGER, simcardid INTEGER, simcardid2 INTEGER, comment TEXT)");
+           "terminalid INTEGER, simcardid INTEGER, simcardid2 INTEGER, has_case INTEGER NOT NULL DEFAULT 0, "
+           "comment TEXT)");
     q.exec("CREATE TABLE tblpayments (paymentid INTEGER PRIMARY KEY, periodyear INTEGER, periodmonth INTEGER, "
            "amount REAL)");
     q.exec("CREATE TABLE tblreceiptdocs (receiptdocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
@@ -46,6 +47,21 @@ void TestRepositories::initTestCase()
            "comments TEXT)");
     q.exec("CREATE TABLE tblsiminstalldetails (siminstalldetailid INTEGER PRIMARY KEY, siminstalldocid INTEGER, "
            "terminalid INTEGER, simcardid INTEGER, simcardid2 INTEGER)");
+    // --- Учёт чехлов ---
+    q.exec("CREATE TABLE tblcases (caseid INTEGER PRIMARY KEY, casetype TEXT NOT NULL, status INTEGER NOT NULL "
+           "DEFAULT 0, terminalid INTEGER, notes TEXT)");
+    q.exec("CREATE TABLE tblcaseincomedocs (caseincomedocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
+           "comments TEXT, createdat TEXT)");
+    q.exec("CREATE TABLE tblcaseincomedetails (caseincomedetailid INTEGER PRIMARY KEY, caseincomedocid INTEGER, "
+           "casetype TEXT, qty INTEGER)");
+    q.exec("CREATE TABLE tblcaseinstalldocs (caseinstalldocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
+           "comments TEXT, createdat TEXT)");
+    q.exec("CREATE TABLE tblcaseinstalldetails (caseinstalldetailid INTEGER PRIMARY KEY, caseinstalldocid INTEGER, "
+           "terminalid INTEGER, caseid INTEGER)");
+    q.exec("CREATE TABLE tblcasewriteoffdocs (casewriteoffdocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
+           "comments TEXT, createdat TEXT)");
+    q.exec("CREATE TABLE tblcasewriteoffdetails (casewriteoffdetailid INTEGER PRIMARY KEY, casewriteoffdocid INTEGER, "
+           "caseid INTEGER, reason TEXT)");
 
     insertModel(1, "PAX-A920");
     insertModel(2, "PAX-A910");

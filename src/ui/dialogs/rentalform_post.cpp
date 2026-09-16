@@ -18,11 +18,23 @@
 #include "services/documentnumbergenerator.h"
 #include "services/postactionlogger.h"
 #include "services/simcardservice.h"
+#include "services/caseservice.h"
 #include "ui/base/printservice.h"
 #include "ui/base/transactionguard.h"
 #include <QSet>
 #include <QHash>
 #include <QSqlDatabase>
+
+// true, если на терминал чехол ставился документом «Установка чехлов»
+// (т.е. чехол не был выдан автоматически из аренды — его нельзя просто так
+// снимать без явного указания пользователя).
+static bool wasCaseInstalledByDoc(QSqlDatabase& db, int terminalId)
+{
+    QSqlQuery q(db);
+    q.prepare("SELECT 1 FROM tblcaseinstalldetails WHERE terminalid = :tid LIMIT 1");
+    q.bindValue(":tid", terminalId);
+    return q.exec() && q.next();
+}
 
 bool RentalForm::validateBeforePost()
 {
@@ -110,7 +122,8 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
         QString sim1Number = rowsModel->data(rowsModel->index(i, 1), Qt::DisplayRole).toString().trimmed();
         int sim2Id = rowsModel->data(rowsModel->index(i, 2), Qt::UserRole).toInt();
         QString sim2Number = rowsModel->data(rowsModel->index(i, 2), Qt::DisplayRole).toString().trimmed();
-        QString comment = rowsModel->data(rowsModel->index(i, 3), Qt::DisplayRole).toString();
+        bool hasCase = rowsModel->data(rowsModel->index(i, 3), Qt::DisplayRole).toBool();
+        QString comment = rowsModel->data(rowsModel->index(i, 4), Qt::DisplayRole).toString();
 
         if (terminalId <= 0) {
             QMessageBox::critical(this, "Ошибка", QString("Строка %1: выберите терминал.").arg(i + 1));
@@ -142,7 +155,8 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
 
         // Блокируем терминал и проверяем его состояние
         QSqlQuery checkQuery(db);
-        checkQuery.prepare("SELECT status, currentsimcardid, currentsimcardid2 FROM tblterminals "
+        checkQuery.prepare("SELECT status, currentsimcardid, currentsimcardid2, "
+                           "currentcaseid FROM tblterminals "
                            "WHERE terminalid = :id FOR UPDATE NOWAIT");
         checkQuery.bindValue(":id", terminalId);
 
@@ -155,6 +169,7 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
         int status = checkQuery.value(0).toInt();
         int origSim1 = checkQuery.value(1).toInt();
         int origSim2 = checkQuery.value(2).toInt();
+        int origCase = checkQuery.value(3).toInt();
 
         if (!wasInDoc) {
             // Новый терминал в документе: должен быть свободен
@@ -205,6 +220,38 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
             }
         }
 
+        // --- Чехол ---
+        // Галочка «Чехол» = TRUE → клиент получает чехол: если на терминале уже
+        // установлен чехол (документом «Установка чехлов»), он идёт вместе с ним;
+        // иначе выдаётся любой свободный чехол со склада.
+        // Галочка FALSE → чехол НЕ передаётся: если чехол был выдан ранее
+        // автоматически (а НЕ документом «Установка чехлов»), он возвращается
+        // на склад.
+        QString caseError;
+        if (hasCase) {
+            if (origCase > 0) {
+                // Чехол уже установлен (документ «Установка чехлов») — всё ок.
+            } else {
+                int newCaseId = CaseService::assignAnyFree(db, terminalId,
+                    QString("аренда, терминал %1").arg(terminalId), &caseError);
+                if (newCaseId <= 0) {
+                    QMessageBox::critical(this, "Ошибка",
+                        QString("Строка %1: нет свободных чехлов для выдачи: %2").arg(i + 1).arg(caseError));
+                    return false;
+                }
+            }
+        } else if (origCase > 0 && !wasCaseInstalledByDoc(db, terminalId)) {
+            // Чехол был выдан автоматически (из предыдущей аренды),
+            // пользователь снял галочку → возвращаем на склад.
+            if (!CaseService::free(db, origCase,
+                    QString("аренда (снятие галочки), терминал %1").arg(terminalId), &caseError)) {
+                QMessageBox::critical(this, "Ошибка БД", caseError);
+                return false;
+            }
+        }
+        // origCase > 0 + installed via case_install doc + unchecked → has_case=FALSE,
+        // чехол остаётся на терминале (установлен намеренно).
+
         if (!wasInDoc) {
             // Новый терминал — переводим в аренду и привязываем SIM обоих слотов
             QSqlQuery updateQuery(db);
@@ -236,12 +283,14 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
         }
 
         QSqlQuery detailQuery(db);
-        detailQuery.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid, simcardid, simcardid2, comment) "
-                            "VALUES (:did, :tid, :sid, :sid2, :comm)");
+        detailQuery.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid, simcardid, simcardid2, "
+                            "has_case, comment) "
+                            "VALUES (:did, :tid, :sid, :sid2, :hcase, :comm)");
         detailQuery.bindValue(":did", docId);
         detailQuery.bindValue(":tid", terminalId);
         detailQuery.bindValue(":sid", sim1Id > 0 ? QVariant(sim1Id) : QVariant());
         detailQuery.bindValue(":sid2", sim2Id > 0 ? QVariant(sim2Id) : QVariant());
+        detailQuery.bindValue(":hcase", hasCase);
         detailQuery.bindValue(":comm", comment);
 
         if (!detailQuery.exec()) {
@@ -264,7 +313,7 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
                 continue;
 
             QSqlQuery lockQuery(db);
-            lockQuery.prepare("SELECT status, currentsimcardid, currentsimcardid2 "
+            lockQuery.prepare("SELECT status, currentsimcardid, currentsimcardid2, currentcaseid "
                               "FROM tblterminals WHERE terminalid = :id FOR UPDATE NOWAIT");
             lockQuery.bindValue(":id", tid);
             if (!lockQuery.exec() || !lockQuery.next())
@@ -273,6 +322,7 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
             int tStatus = lockQuery.value(0).toInt();
             int tSim1 = lockQuery.value(1).toInt();
             int tSim2 = lockQuery.value(2).toInt();
+            int tCase = lockQuery.value(3).toInt();
             if (tStatus != 1)
                 continue;
 
@@ -284,6 +334,16 @@ bool RentalForm::postDetails(QSqlDatabase& db, int docId)
             if (tSim2 > 0 && !SimCardService::free(db, tSim2, QString("терминал %1").arg(tid), &simError)) {
                 QMessageBox::critical(this, "Ошибка БД", simError);
                 return false;
+            }
+
+            // Чехол, полученный автоматически из аренды (а не документом
+            // «Установка чехлов»), возвращается на склад при изъятии терминала.
+            if (tCase > 0 && !wasCaseInstalledByDoc(db, tid)) {
+                QString caseError;
+                if (!CaseService::free(db, tCase, QString("терминал %1").arg(tid), &caseError)) {
+                    QMessageBox::critical(this, "Ошибка БД", caseError);
+                    return false;
+                }
             }
 
             QSqlQuery upd(db);

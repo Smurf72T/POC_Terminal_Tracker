@@ -19,6 +19,7 @@ struct Terminal {
     bool deactivated = false;
     int currentSimCardId = 0;
     int currentSimCard2Id = 0;
+    int currentCaseId = 0;
     QDate purchaseDate;
     QString notes;
     bool wasRepaired = false;

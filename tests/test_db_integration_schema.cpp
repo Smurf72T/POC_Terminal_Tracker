@@ -58,10 +58,12 @@ void TestDbIntegration::test_schema_objects()
         found << s.value(0).toString();
     for (const QString& seq :
          {QString("seq_receipt_doc_number"), QString("seq_rental_doc_number"), QString("seq_return_doc_number"),
-          QString("seq_payment_doc_number"), QString("seq_statuschange_doc_number")})
+          QString("seq_payment_doc_number"), QString("seq_statuschange_doc_number"),
+          QString("seq_case_income_doc_number"), QString("seq_case_install_doc_number"),
+          QString("seq_case_writeoff_doc_number")})
         QVERIFY2(found.contains(seq), qPrintable("Нет последовательности: " + seq));
 
-    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 14);
+    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 16);
 }
 
 void TestDbIntegration::test_number_generation()
@@ -69,7 +71,9 @@ void TestDbIntegration::test_number_generation()
     struct {
         QString type;
         QString prefix;
-    } cases[] = {{"receipt", "ПП-"}, {"rental", "АР-"}, {"return", "ВР-"}, {"payment", "ОП-"}, {"statuschange", "ИС-"}};
+    } cases[] = {{"receipt", "ПП-"},        {"rental", "АР-"},       {"return", "ВР-"},
+                 {"payment", "ОП-"},       {"statuschange", "ИС-"}, {"case_income", "ПЧ-"},
+                 {"case_install", "УЧ-"},  {"case_writeoff", "СЧ-"}};
     for (const auto& c : cases) {
         bool ok = false;
         QString num = generateNumber(c.type, &ok);

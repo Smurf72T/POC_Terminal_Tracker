@@ -124,6 +124,7 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
             src/database/repositories/terminalrepository.cpp
             src/database/repositories/clientrepository.cpp
             src/database/repositories/simcardrepository.cpp
+            src/database/repositories/caserepository.cpp
             src/database/repositories/documentrepository.cpp
             src/database/repositories/paymentrepository.cpp)
     target_include_directories(test_repositories PRIVATE ${CMAKE_SOURCE_DIR}/src)

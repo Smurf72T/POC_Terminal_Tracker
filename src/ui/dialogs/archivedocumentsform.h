@@ -14,7 +14,8 @@ class ArchiveDocumentsForm : public QDialog {
 
 public:
     // docType: 1 - Поступление, 2 - Аренда, 3 - Возврат, 4 - Оплата, 5 - Изменение статусов,
-    //          6 - Установка SIM
+    //          6 - Установка SIM, 7 - Поступление чехлов, 8 - Установка чехлов,
+    //          9 - Списание чехлов
     explicit ArchiveDocumentsForm(int docType, QWidget* parent = nullptr);
     ~ArchiveDocumentsForm();
 
@@ -45,6 +46,9 @@ private:
     void openPaymentForEdit(int docId);
     void openStatusChangeForEdit(int docId);
     void openSimInstallForEdit(int docId);
+    void openCaseIncomeForEdit(int docId);
+    void openCaseInstallForEdit(int docId);
+    void openCaseWriteoffForEdit(int docId);
 };
 
 #endif // ARCHIVEDOCUMENTSFORM_H

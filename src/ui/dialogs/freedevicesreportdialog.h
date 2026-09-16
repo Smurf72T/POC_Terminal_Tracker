@@ -5,7 +5,7 @@
 
 class QTableView;
 
-// Отчёт «Свободные терминалы и SIM-карты» с экспортом в Excel.
+// Отчёт «Свободные терминалы, SIM-карты и чехлы» с экспортом в Excel.
 class FreeDevicesReportDialog : public QDialog {
     Q_OBJECT
 
@@ -15,10 +15,12 @@ public:
 private slots:
     void exportTerminals();
     void exportSimCards();
+    void exportCases();
 
 private:
     QTableView* m_termView = nullptr;
     QTableView* m_simView = nullptr;
+    QTableView* m_caseView = nullptr;
 };
 
 #endif // FREEDEVICESREPORTDIALOG_H

@@ -20,6 +20,12 @@ QVector<DocumentRepository::RecentDocument> DocumentRepository::recentDocuments(
                   "SELECT 6, siminstalldocid, docnumber, docdate, 'Установка SIM' FROM tblsiminstalldocs "
                   "UNION ALL "
                   "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
+                  "UNION ALL "
+                  "SELECT 7, caseincomedocid, docnumber, docdate, 'Поступление чехлов' FROM tblcaseincomedocs "
+                  "UNION ALL "
+                  "SELECT 8, caseinstalldocid, docnumber, docdate, 'Установка чехлов' FROM tblcaseinstalldocs "
+                  "UNION ALL "
+                  "SELECT 9, casewriteoffdocid, docnumber, docdate, 'Списание чехлов' FROM tblcasewriteoffdocs "
                   "ORDER BY \"Дата\" DESC "
                   "LIMIT :limit");
     query.bindValue(":limit", limit);
@@ -45,6 +51,12 @@ void DocumentRepository::populateRecentDocuments(QSqlQueryModel* model, int limi
                   "SELECT 6, siminstalldocid, docnumber, docdate, 'Установка SIM' FROM tblsiminstalldocs "
                   "UNION ALL "
                   "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
+                  "UNION ALL "
+                  "SELECT 7, caseincomedocid, docnumber, docdate, 'Поступление чехлов' FROM tblcaseincomedocs "
+                  "UNION ALL "
+                  "SELECT 8, caseinstalldocid, docnumber, docdate, 'Установка чехлов' FROM tblcaseinstalldocs "
+                  "UNION ALL "
+                  "SELECT 9, casewriteoffdocid, docnumber, docdate, 'Списание чехлов' FROM tblcasewriteoffdocs "
                   "ORDER BY \"Дата\" DESC "
                   "LIMIT :limit");
     query.bindValue(":limit", limit);
@@ -69,6 +81,18 @@ models::DocumentHeader DocumentRepository::loadHeader(DocType docType, int docId
         case SimInstall:
             query.prepare("SELECT docnumber, docdate, 0 AS clientid, comments "
                           "FROM tblsiminstalldocs WHERE siminstalldocid = :id");
+            break;
+        case CaseIncome:
+            query.prepare("SELECT docnumber, docdate, 0 AS clientid, comments "
+                          "FROM tblcaseincomedocs WHERE caseincomedocid = :id");
+            break;
+        case CaseInstall:
+            query.prepare("SELECT docnumber, docdate, 0 AS clientid, comments "
+                          "FROM tblcaseinstalldocs WHERE caseinstalldocid = :id");
+            break;
+        case CaseWriteoff:
+            query.prepare("SELECT docnumber, docdate, 0 AS clientid, comments "
+                          "FROM tblcasewriteoffdocs WHERE casewriteoffdocid = :id");
             break;
         default:
             return {};
@@ -107,7 +131,8 @@ QVector<models::RentalRow> DocumentRepository::loadRentalRows(int rentalDocId) c
     QSqlQuery query(m_db);
     query.prepare("SELECT rd.rentaldetailid, rd.terminalid, rd.simcardid, rd.simcardid2, "
                   "t.serialnumber, COALESCE(s.simnumber, ''), COALESCE(s2.simnumber, ''), rd.comment, "
-                  "t.status AS terminal_status, s.status AS sim_status, COALESCE(s2.status, 0) AS sim2_status "
+                  "t.status AS terminal_status, s.status AS sim_status, COALESCE(s2.status, 0) AS sim2_status, "
+                  "COALESCE(rd.has_case, FALSE) AS has_case "
                   "FROM tblrentaldetails rd "
                   "JOIN tblterminals t ON rd.terminalid = t.terminalid "
                   "LEFT JOIN tblsimcards s ON rd.simcardid = s.simcardid "
@@ -130,6 +155,7 @@ QVector<models::RentalRow> DocumentRepository::loadRentalRows(int rentalDocId) c
         row.terminalStatus = query.value(8).toInt();
         row.simStatus = query.value(9).toInt();
         row.sim2Status = query.value(10).toInt();
+        row.hasCase = query.value(11).toBool();
         result.append(row);
     }
     return result;

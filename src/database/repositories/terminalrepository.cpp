@@ -85,7 +85,8 @@ models::Terminal TerminalRepository::loadById(int terminalId) const
     QSqlQuery query = makeQuery();
     query.prepare("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
                   "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
-                  "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired "
+                  "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired, "
+                  "COALESCE(t.currentcaseid, 0) "
                   "FROM tblterminals t "
                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                   "WHERE t.terminalid = :id");
@@ -111,6 +112,7 @@ models::Terminal TerminalRepository::makeTerminal(const QSqlQuery& query, int st
     t.purchaseDate = query.value(startColumn + 10).toDate();
     t.notes = query.value(startColumn + 11).toString();
     t.wasRepaired = query.value(startColumn + 12).toBool();
+    t.currentCaseId = query.value(startColumn + 13).toInt();
     return t;
 }
 
@@ -128,7 +130,8 @@ QVector<models::Terminal> TerminalRepository::loadByIds(const QList<int>& ids) c
     QSqlQuery query = makeQuery();
     query.prepare(QString("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
                           "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
-                          "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired "
+                          "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired, "
+                          "COALESCE(t.currentcaseid, 0) "
                           "FROM tblterminals t "
                           "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                           "WHERE t.terminalid IN (%1) ")
@@ -156,7 +159,8 @@ QVector<models::Terminal> TerminalRepository::loadFreeForSelection() const
     QSqlQuery query = makeQuery();
     if (query.exec("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
                    "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
-                   "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired "
+                   "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired, "
+                   "COALESCE(t.currentcaseid, 0) "
                    "FROM tblterminals t "
                    "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                    "WHERE t.status = 0 AND t.is_deactivated = FALSE "

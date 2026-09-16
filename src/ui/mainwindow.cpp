@@ -15,6 +15,10 @@
 #include "dialogs/rentalform.h"
 #include "dialogs/returnform.h"
 #include "dialogs/siminstallform.h"
+#include "dialogs/casesform.h"
+#include "dialogs/caseincomeform.h"
+#include "dialogs/caseinstallform.h"
+#include "dialogs/casewriteoffform.h"
 #include "dialogs/statuschangeform.h"
 #include "dialogs/paymentform.h"
 #include "dialogs/archivedocumentsform.h"
@@ -28,6 +32,7 @@
 #include "dialogs/globalsearchdialog.h"
 #include "dialogs/terminalhistorypickerdialog.h"
 #include "dialogs/freedevicesreportdialog.h"
+#include "dialogs/caseterminalsreportdialog.h"
 #include "dialogs/clientrentalreportdialog.h"
 #include "dialogs/updatesettingsdialog.h"
 #include "ops/opslog.h"
@@ -115,11 +120,15 @@ void MainWindow::setupUI()
     connect(ui->actionModels, &QAction::triggered, this, [this]() { openForm(new ModelsForm(this)); });
     connect(ui->actionClients, &QAction::triggered, this, [this]() { openForm(new ClientsForm(this)); });
     connect(ui->actionSIMCards, &QAction::triggered, this, [this]() { openForm(new SIMCardsForm(this)); });
+    connect(ui->actionCases, &QAction::triggered, this, [this]() { openForm(new CasesForm(this)); });
     connect(ui->actionTerminals, &QAction::triggered, this, [this]() { openForm(new TerminalsForm(this)); });
     connect(ui->actionReceipt, &QAction::triggered, this, [this]() { openForm(new ReceiptForm(this)); });
     connect(ui->actionRental, &QAction::triggered, this, [this]() { openForm(new RentalForm(this)); });
     connect(ui->actionReturn, &QAction::triggered, this, [this]() { openForm(new ReturnForm(this)); });
     connect(ui->actionSimInstall, &QAction::triggered, this, [this]() { openForm(new SimInstallForm(this)); });
+    connect(ui->actionCaseIncome, &QAction::triggered, this, [this]() { openForm(new CaseIncomeForm(this)); });
+    connect(ui->actionCaseInstall, &QAction::triggered, this, [this]() { openForm(new CaseInstallForm(this)); });
+    connect(ui->actionCaseWriteoff, &QAction::triggered, this, [this]() { openForm(new CaseWriteoffForm(this)); });
     connect(ui->actionStatusChange, &QAction::triggered, this, [this]() { openForm(new StatusChangeForm(this)); });
     connect(ui->actionPayment, &QAction::triggered, this, [this]() { openForm(new PaymentForm(this)); });
     connect(ui->actionArchiveReceipt, &QAction::triggered, this,
@@ -130,12 +139,20 @@ void MainWindow::setupUI()
             [this]() { openForm(new ArchiveDocumentsForm(3, this)); });
     connect(ui->actionArchiveSimInstall, &QAction::triggered, this,
             [this]() { openForm(new ArchiveDocumentsForm(6, this)); });
+    connect(ui->actionArchiveCaseIncome, &QAction::triggered, this,
+            [this]() { openForm(new ArchiveDocumentsForm(7, this)); });
+    connect(ui->actionArchiveCaseInstall, &QAction::triggered, this,
+            [this]() { openForm(new ArchiveDocumentsForm(8, this)); });
+    connect(ui->actionArchiveCaseWriteoff, &QAction::triggered, this,
+            [this]() { openForm(new ArchiveDocumentsForm(9, this)); });
     connect(ui->actionArchiveStatusChange, &QAction::triggered, this,
             [this]() { openForm(new ArchiveDocumentsForm(5, this)); });
     connect(ui->actionArchivePayment, &QAction::triggered, this,
             [this]() { openForm(new ArchiveDocumentsForm(4, this)); });
     connect(ui->actionTerminalHistory, &QAction::triggered, this, &MainWindow::onActionTerminalHistory_triggered);
     connect(ui->actionFreeDevicesReport, &QAction::triggered, this, &MainWindow::onActionFreeDevicesReport_triggered);
+    connect(ui->actionCaseTerminalsReport, &QAction::triggered, this,
+            [this]() { openForm(new CaseTerminalsReportDialog(this)); });
     connect(ui->actionBulkImport, &QAction::triggered, this, [this]() { openForm(new BulkImportForm(this)); });
     connect(ui->actionBackup, &QAction::triggered, this, &MainWindow::onActionBackup_triggered);
     connect(ui->actionRestore, &QAction::triggered, this, &MainWindow::onActionRestore_triggered);
@@ -228,6 +245,18 @@ void MainWindow::onRecentDocActivated(int docType, int docId)
         form.exec();
     } else if (docType == 6) {
         SimInstallForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    } else if (docType == 7) {
+        CaseIncomeForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    } else if (docType == 8) {
+        CaseInstallForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    } else if (docType == 9) {
+        CaseWriteoffForm form(this);
         form.loadForEdit(docId);
         form.exec();
     } else if (docType == 5) {

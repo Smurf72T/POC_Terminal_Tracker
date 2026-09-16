@@ -1,5 +1,6 @@
 #include "test_repositories.h"
 
+#include "database/repositories/caserepository.h"
 #include "database/repositories/clientrepository.h"
 #include "database/repositories/documentrepository.h"
 #include "database/repositories/paymentrepository.h"
@@ -155,4 +156,112 @@ void TestRepositories::paymentQueries()
     QCOMPARE(byMonth.value(monthLabel(now)), 1000.0);
     QCOMPARE(byMonth.value(monthLabel(now.addMonths(-1))), 2500.0); // 2000 + 500
     QCOMPARE(byMonth.value(monthLabel(now.addMonths(-2))), 1500.0);
+}
+
+void TestRepositories::caseOperations()
+{
+    CaseRepository repo(m_db);
+
+    // Поступление: «Slim» × 3 и «Classic» × 2 → 5 единиц на складе (status 0).
+    QVERIFY(repo.createBatch(QStringLiteral("Slim"), 3));
+    QVERIFY(repo.createBatch(QStringLiteral("Classic"), 2));
+    QCOMPARE(repo.countByStatus(0), 5);
+    QCOMPARE(repo.countByStatus(1), 0);
+    QCOMPARE(repo.countByStatus(2), 0);
+
+    // Свободные остатки по типам.
+    const auto free = repo.summarizeFree();
+    QCOMPARE(free.size(), 2);
+    QCOMPARE(free.at(0).first, QStringLiteral("Classic"));
+    QCOMPARE(free.at(0).second, 2);
+    QCOMPARE(free.at(1).first, QStringLiteral("Slim"));
+    QCOMPARE(free.at(1).second, 3);
+
+    // Выбор свободных.
+    const auto freeSelection = repo.loadFreeForSelection();
+    QCOMPARE(freeSelection.size(), 5);
+    QCOMPARE(freeSelection.at(0).caseType, QStringLiteral("Classic"));
+
+    // Первый свободный чехол и его загрузка по id.
+    const int firstId = freeSelection.at(0).id;
+    const models::CaseItem c1 = repo.loadById(firstId);
+    QCOMPARE(c1.caseType, QStringLiteral("Classic"));
+    QCOMPARE(c1.status, 0);
+
+    // Установка на терминал 1 (свободный) — имитация lock(): status 0→1 + привязки.
+    {
+        QSqlQuery up(m_db);
+        up.prepare("UPDATE tblcases SET status = 1, terminalid = 1 WHERE caseid = :id");
+        up.bindValue(":id", firstId);
+        QVERIFY(up.exec());
+        QSqlQuery tp(m_db);
+        tp.prepare("UPDATE tblterminals SET currentcaseid = :cid WHERE terminalid = 1");
+        tp.bindValue(":cid", firstId);
+        QVERIFY(tp.exec());
+    }
+
+    // Чехол больше не числится свободным; терминал 1 видит его как свой.
+    QCOMPARE(repo.countByStatus(0), 4);
+    QCOMPARE(repo.countByStatus(1), 1);
+    QCOMPARE(repo.loadById(firstId).terminalId, 1);
+    QCOMPARE(repo.loadByTerminal(1).id, firstId);
+    QVERIFY(repo.loadByTerminal(999).id == 0);
+
+    // Освобождение (имитация free()) — возврат на склад.
+    {
+        QSqlQuery up(m_db);
+        up.prepare("UPDATE tblcases SET status = 0, terminalid = NULL WHERE caseid = :id");
+        up.bindValue(":id", firstId);
+        QVERIFY(up.exec());
+        QSqlQuery tp(m_db);
+        tp.prepare("UPDATE tblterminals SET currentcaseid = NULL WHERE terminalid = 1");
+        QVERIFY(tp.exec());
+    }
+    QCOMPARE(repo.countByStatus(0), 5);
+    QCOMPARE(repo.loadById(firstId).terminalId, 0);
+
+    // Строки документов: поступление с типом и количеством.
+    {
+        QSqlQuery dh(m_db);
+        dh.exec("INSERT INTO tblcaseincomedocs (caseincomedocid, docnumber, docdate, comments) "
+                "VALUES (1, 'ПЧ-00001', '2026-09-01', '')");
+        QSqlQuery dd(m_db);
+        dd.exec("INSERT INTO tblcaseincomedetails (caseincomedetailid, caseincomedocid, casetype, qty) "
+                "VALUES (1, 1, 'Slim', 3), (2, 1, 'Classic', 2)");
+        const auto rows = repo.loadIncomeRows(1);
+        QCOMPARE(rows.size(), 2);
+        QCOMPARE(rows.at(0).caseType, QStringLiteral("Slim"));
+        QCOMPARE(rows.at(0).qty, 3);
+        QCOMPARE(repo.loadIncomeHeader(1).docNumber, QStringLiteral("ПЧ-00001"));
+        QVERIFY(repo.deleteIncomeDetails(1));
+        QVERIFY(repo.deleteIncomeHeader(1));
+        QVERIFY(repo.loadIncomeRows(1).isEmpty());
+    }
+
+    // Строки установки и списания (пустые и с данными).
+    {
+        QSqlQuery ih(m_db);
+        ih.exec("INSERT INTO tblcaseinstalldocs (caseinstalldocid, docnumber, docdate, comments) "
+                "VALUES (1, 'УЧ-00001', '2026-09-02', '')");
+        QSqlQuery id(m_db);
+        id.exec("INSERT INTO tblcaseinstalldetails (caseinstalldetailid, caseinstalldocid, terminalid, caseid) "
+                "VALUES (1, 1, 2, 999)");
+        const auto rows = repo.loadInstallRows(1);
+        QCOMPARE(rows.size(), 1);
+        QCOMPARE(rows.at(0).terminalSerial, QStringLiteral("SN-0002"));
+        QVERIFY(repo.deleteInstallDetails(1));
+        QVERIFY(repo.deleteInstallHeader(1));
+
+        QSqlQuery wh(m_db);
+        wh.exec("INSERT INTO tblcasewriteoffdocs (casewriteoffdocid, docnumber, docdate, comments) "
+                "VALUES (1, 'СЧ-00001', '2026-09-03', '')");
+        QSqlQuery wd(m_db);
+        wd.exec("INSERT INTO tblcasewriteoffdetails (casewriteoffdetailid, casewriteoffdocid, caseid, reason) "
+                "VALUES (1, 1, 2, 'брак')");
+        const auto wrows = repo.loadWriteoffRows(1);
+        QCOMPARE(wrows.size(), 1);
+        QCOMPARE(wrows.at(0).reason, QStringLiteral("брак"));
+        QVERIFY(repo.deleteWriteoffDetails(1));
+        QVERIFY(repo.deleteWriteoffHeader(1));
+    }
 }

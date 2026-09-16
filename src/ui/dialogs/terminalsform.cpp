@@ -117,13 +117,15 @@ void TerminalsForm::loadModel(const QString& filter)
                        "COALESCE(NULLIF(s.simnumber, '') || CASE WHEN s2.simnumber IS NOT NULL "
                        "      THEN '; ' || s2.simnumber ELSE '' END, "
                        "'SIM не назначена') AS \"SIM-карта\", "
+                       "COALESCE(c.casetype, '—') AS \"Чехол\", "
                        "t.purchasedate AS \"Дата покупки\", t.notes AS \"Примечание\", "
                        "CASE WHEN t.was_repaired THEN 'Да' ELSE 'Нет' END AS \"Был в ремонте\", "
                        "CASE WHEN t.is_deactivated THEN 'Да' ELSE 'Нет' END AS \"Деактивирован\" "
                        "FROM tblterminals t "
                        "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
                        "LEFT JOIN tblsimcards s ON t.currentsimcardid = s.simcardid "
-                       "LEFT JOIN tblsimcards s2 ON t.currentsimcardid2 = s2.simcardid" +
+                       "LEFT JOIN tblsimcards s2 ON t.currentsimcardid2 = s2.simcardid "
+                       "LEFT JOIN tblcases c ON t.currentcaseid = c.caseid" +
                        whereClause + " ORDER BY t.serialnumber LIMIT :limit OFFSET :offset";
 
     QSqlQuery query(db);

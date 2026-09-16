@@ -90,6 +90,19 @@ Write-логика формы — `siminstallform_post.cpp` (проведени�
 - `createHeader(doc)`, `insertDetail(docId, terminalId, simId, sim2Id)`,
   `deleteDetails(docId)`, `deleteHeader(docId)`
 
+### `CaseRepository`
+Учёт чехлов (склад `tblcases` со статусами 0/1/2 + документы поступления/
+установки/списания, docTypes `CaseIncome`/`CaseInstall`/`CaseWriteoff` = 7/8/9).
+- Склад: `countByStatus(int)`, `loadById/loadByIds`, `loadByTerminal(int)`,
+  `loadFreeForSelection()`, `summarizeFree()` (остатки по типам),
+  `populateFreeCasesSummary(QSqlQueryModel*)`, `createBatch(caseType, qty)`
+  (создаёт N единиц status=0)
+- Документы: `loadIncome/Install/WriteoffHeader(docId)`;
+  `loadIncomeRows` (`QVector<models::CaseIncomeRow>`, тип × количество),
+  `loadInstallRows` (`CaseInstallRow`: терминал + чехол),
+  `loadWriteoffRows` (`CaseWriteoffRow`: чехол + причина);
+  `delete*Details(docId)` / `delete*Header(docId)`
+
 ### `ClientRepository`
 `countAll()`, `loadById(int)`, `loadAll()` (сортировка по имени),
 `loadRentalStatistics()` (`clientid, clientname, count`), `populateRentalStatistics(*)`,
@@ -98,10 +111,10 @@ Write-логика формы — `siminstallform_post.cpp` (проведени�
 ### `DocumentRepository`
 | Метод | Назначение |
 |-------|-----------|
-| `recentDocuments(int limit)` | Последние документы всех типов (doctype 1/2/3/5/6) |
-| `loadHeader(DocType, docId)` | Шапка поступления/возврата/изменения статуса/установки SIM |
+| `recentDocuments(int limit)` | Последние документы всех типов (doctype 1/2/3/5/6/7/8/9 — включая три документа по чехлам) |
+| `loadHeader(DocType, docId)` | Шапка поступления/возврата/изменения статуса/установки SIM/документов по чехлам |
 | `loadRentalDocument(int)` | Шапка аренды |
-| `loadRentalRows(int)` | Строки аренды с serial/SIM (слоты 1 и 2) и статусами терминала/SIM |
+| `loadRentalRows(int)` | Строки аренды с serial/SIM (слоты 1 и 2), флагом `has_case` и статусами терминала/SIM |
 | `loadRentalDocumentsByClient(int)` | Документы аренды клиента (для выпадающего списка возврата) |
 | `loadReceiptRows(int)` | Терминалы поступления (serial, модель, IMEI 1/2) |
 | `loadReceiptItems(int)` | Строки-«исходник» поступления (модель + кол-во + серийники/IMEI, `tblreceiptitems`) |
@@ -117,17 +130,36 @@ Header-only структуры в `namespace models`, без QObject и зави
 
 | Модель | Поля |
 |-------|------|
-| `models::Terminal` | `id, serialNumber, modelId, modelName, imei1, imei2, status, deactivated, currentSimCardId, currentSimCard2Id` |
+| `models::Terminal` | `id, serialNumber, modelId, modelName, imei1, imei2, status, deactivated, currentSimCardId, currentSimCard2Id, currentCaseId` |
 | `models::Client` | `id, name, inn, address, contactPhone, contactEmail` |
 | `models::SimCard` | `id, number, status, notes, createdAt` |
 | `models::SimInstallDocument` / `models::SimInstallRow` | шапка (`id, docNumber, date, comments`) и строка установки (`detailId, terminalId, terminalSerialNumber, simCardId, simNumber, simCard2Id, simNumber2`) |
-| `models::RentalDocument` / `models::RentalRow` | шапка (`docNumber, date, clientId, comments`) и строки (`terminalId, simCardId, simCard2Id, serial, simNumber, simNumber2, comment, terminalStatus, simStatus, sim2Status`) — слот 1 по IMEI1, слот 2 по IMEI2 |
+| `models::CaseItem` / `CaseIncomeRow` / `CaseInstallRow` / `CaseWriteoffRow` | единица-чехол (`id, caseType, status 0/1/2, terminalId, terminalSerial, notes`); строка поступления (`caseType, qty`); строка установки (`terminalId, terminalSerial, caseId, caseType`); строка списания (`caseId, caseType, reason`) |
+| `models::RentalDocument` / `models::RentalRow` | шапка (`docNumber, date, clientId, comments`) и строки (`terminalId, simCardId, simCard2Id, serial, simNumber, simNumber2, comment, terminalStatus, simStatus, sim2Status, hasCase`) — слот 1 по IMEI1, слот 2 по IMEI2 |
 | `models::DocumentHeader` / `models::ReceiptRow` / `models::ReceiptItem` / `models::ReceiptSerial` | общая шапка; развёрнутая строка поступления (`terminalId, serialNumber, modelId, modelName, imei1, imei2`); строка-«исходник» (`itemId, modelId, modelName, qty, serials`) и комплект серийника (`linenum, serialNumber, imei1, imei2`) |
 
 **Соглашение:** SQL репозиториев переносимый (без PostgreSQL-специфики вроде
 `to_char`/`EXTRACT`/`::date`) — тот же код работает на SQLite в тестах.
 Write-логика документов (проведение, транзакции `FOR UPDATE NOWAIT`) остаётся в
 формах; мигрируются только read-пути (загрузка, редактирование, печать).
+
+## 2в. services/* — сервисы бизнес-логики
+
+Сервисы инкапсулируют операции, общие для форм и критичные по целостности
+(блокировки `FOR UPDATE NOWAIT`). Принимают `QSqlDatabase&` — работают внутри
+транзакции вызывающей формы (`TransactionGuard`).
+
+### `SimCardService`
+- `lock(db, simId, context, error)` — status 0→1 (слот свободен)
+- `free(db, simId, context, error)` — status 1→0
+- `resolveOrCreate(db, simId, simNumber, error)` — найти по номеру или создать
+
+### `CaseService`
+- `lock(db, caseId, terminalId, context, error)` — status 0→1 + `tblterminals.currentcaseid`
+- `free(db, caseId, context, error)` — status 1→0 + сброс `currentcaseid`
+- `writeoff(db, caseId, context, error)` — status→2 + сброс `currentcaseid`
+- `assignAnyFree(db, terminalId, context, error)` — авто-выдача свободного чехла
+  (`ORDER BY caseid FOR UPDATE SKIP LOCKED LIMIT 1`) при аренде с галочкой «Чехол»
 
 ## 3. ops/backupmanager.h — `BackupManager`
 
@@ -214,7 +246,7 @@ Write-логика документов (проведение, транзакц�
 
 | Тест | Что покрывает |
 |------|---------------|
-| `test_repositories` | Репозитории и модели на SQLite in-memory: счётчики, выборки, `loadById(s)`, `loadFreeForSelection`, шапки/строки документов, связь возврата |
+| `test_repositories` | Репозитории и модели на SQLite in-memory: счётчики, выборки, `loadById(s)`, `loadFreeForSelection`, шапки/строки документов, связь возврата, учёт чехлов (поступление/остатки/установка/списание) |
 | `test_password_utils` | Хеширование PBKDF2, constant-time сравнение, сложность пароля |
 | `test_validator` | Валидаторы + fuzz-наборы (случайные входы, детерминированный seed) |
 | `test_loginform` | Rate limit саморегистрации |
@@ -228,5 +260,5 @@ Write-логика документов (проведение, транзакц�
 | `test_db_integration` | Миграции, аудит, роли, rate limiting, бизнес-поток, бэкап (в т.ч. шифрование) |
 | `test_concurrency` | Гонки: номера документов, выдача SIM, массовая смена статуса, rate limiting |
 
-Запуск: `ctest --test-dir cmake-build-debug --output-on-failure`
+Запуск: `cmake --build build && ctest --test-dir build --output-on-failure`
 (для интеграционных тестов требуется доступный PostgreSQL; без него тесты пропускаются через QSKIP).

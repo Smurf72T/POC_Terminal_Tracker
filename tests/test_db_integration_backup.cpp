@@ -89,7 +89,7 @@ void TestDbIntegration::test_backup_and_opslog()
         QSqlQuery mq(check);
         QVERIFY(mq.exec("SELECT count(*) FROM schema_migrations"));
         QVERIFY(mq.next());
-        QCOMPARE(mq.value(0).toInt(), 14);
+        QCOMPARE(mq.value(0).toInt(), 16);
         check.close();
         QSqlDatabase::removeDatabase("restoreCheckConnection");
     }

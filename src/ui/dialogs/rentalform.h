@@ -38,6 +38,9 @@ private:
     QMap<int, QPair<int, QString>> m_installedSim1;
     QMap<int, QPair<int, QString>> m_installedSim2;
 
+    // Уже установленные на свободных терминалах чехлы (terminalId -> {caseId, тип}).
+    QMap<int, QPair<int, QString>> m_installedCase;
+
     // --- DocumentDialog ---
     QString docType() const override;
     QLineEdit* headerNumberEdit() const override;
@@ -54,6 +57,8 @@ private:
     void loadFreeSIMsToDelegate();
     // Автозаполнение SIM-карт при выборе терминала в колонке 0.
     void autoFillSimForTerminal(int row, int terminalId);
+    // Автозаполнение колонки «Чехол» при выборе терминала в колонке 0.
+    void autoFillCaseForTerminal(int row, int terminalId);
 };
 
 #endif // RENTALFORM_H
