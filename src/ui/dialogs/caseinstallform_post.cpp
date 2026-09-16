@@ -94,7 +94,7 @@ bool CaseInstallForm::postDetails(QSqlDatabase& db, int docId)
             return false;
         }
 
-        // Блокируем терминал — он должен быть свободен (status = 0).
+        // Блокируем терминал — он должен быть свободен (0) или в аренде (1).
         QSqlQuery checkQuery(db);
         checkQuery.prepare("SELECT status, COALESCE(currentcaseid, 0) FROM tblterminals "
                            "WHERE terminalid = :id FOR UPDATE NOWAIT");
@@ -109,8 +109,11 @@ bool CaseInstallForm::postDetails(QSqlDatabase& db, int docId)
         int status = checkQuery.value(0).toInt();
         int origCase = checkQuery.value(1).toInt();
 
-        if (status != 0) {
-            QMessageBox::critical(this, "Ошибка", QString("Терминал %1 не свободен!").arg(terminalId));
+        if (status != 0 && status != 1) {
+            QMessageBox::critical(this, "Ошибка",
+                                  QString("Терминал %1 должен быть свободен или в аренде (текущий статус: %2).")
+                                      .arg(terminalId)
+                                      .arg(status));
             return false;
         }
 

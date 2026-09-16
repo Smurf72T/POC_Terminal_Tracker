@@ -171,6 +171,24 @@ QVector<models::Terminal> TerminalRepository::loadFreeForSelection() const
     return result;
 }
 
+QVector<models::Terminal> TerminalRepository::loadForCaseInstall() const
+{
+    QVector<models::Terminal> result;
+    QSqlQuery query = makeQuery();
+    if (query.exec("SELECT t.terminalid, t.serialnumber, t.modelid, COALESCE(m.modelname, ''), "
+                   "t.imei1, t.imei2, t.status, t.is_deactivated, t.currentsimcardid, "
+                   "t.currentsimcardid2, t.purchasedate, t.notes, t.was_repaired, "
+                   "COALESCE(t.currentcaseid, 0) "
+                   "FROM tblterminals t "
+                   "LEFT JOIN tblmodels m ON t.modelid = m.modelid "
+                   "WHERE t.status IN (0, 1) AND t.is_deactivated = FALSE "
+                   "ORDER BY t.serialnumber")) {
+        while (query.next())
+            result.append(makeTerminal(query, 0));
+    }
+    return result;
+}
+
 bool TerminalRepository::update(int terminalId, const TerminalUpdate& data) const
 {
     QSqlQuery query = makeQuery();

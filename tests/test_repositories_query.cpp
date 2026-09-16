@@ -167,6 +167,7 @@ void TestRepositories::caseOperations()
     // Поступление: «Slim» × 3 и «Classic» × 2 → 5 единиц на складе (status 0).
     QVERIFY(repo.createBatch(QStringLiteral("Slim"), 3));
     QVERIFY(repo.createBatch(QStringLiteral("Classic"), 2));
+    QCOMPARE(repo.countAll(), 5);
     QCOMPARE(repo.countByStatus(0), 5);
     QCOMPARE(repo.countByStatus(1), 0);
     QCOMPARE(repo.countByStatus(2), 0);
@@ -266,6 +267,34 @@ void TestRepositories::caseOperations()
         QVERIFY(repo.deleteWriteoffDetails(1));
         QVERIFY(repo.deleteWriteoffHeader(1));
     }
+}
+
+void TestRepositories::terminalCaseInstallSelection()
+{
+    TerminalRepository repo(m_db);
+    const int baseline = repo.loadForCaseInstall().size();
+
+    // В аренде (status 1) — доступен для установки чехла.
+    insertTerminal(5, "SN-CASE-5", 1, 1, 0);
+    QCOMPARE(repo.loadForCaseInstall().size(), baseline + 1);
+
+    // Списан/ремонт (status 2) — недоступен.
+    insertTerminal(6, "SN-CASE-6", 2, 1, 0);
+    QCOMPARE(repo.loadForCaseInstall().size(), baseline + 1);
+
+    // Свободный, но деактивированный — недоступен.
+    insertTerminalFull(7, "SN-CASE-7", 0, 1, 0, QString(), QString(), 1);
+    QCOMPARE(repo.loadForCaseInstall().size(), baseline + 1);
+
+    // Арендованный терминал реально присутствует в выборке.
+    bool foundRented = false;
+    for (const auto& t : repo.loadForCaseInstall()) {
+        if (t.serialNumber == QStringLiteral("SN-CASE-5")) {
+            foundRented = true;
+            QCOMPARE(t.status, 1);
+        }
+    }
+    QVERIFY(foundRented);
 }
 
 void TestRepositories::caseRelationalModelJoin()

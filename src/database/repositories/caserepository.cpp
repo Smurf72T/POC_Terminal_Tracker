@@ -16,6 +16,14 @@ int CaseRepository::countByStatus(int status) const
     return query.value(0).toInt();
 }
 
+int CaseRepository::countAll() const
+{
+    QSqlQuery query(m_db);
+    if (!query.exec("SELECT COUNT(*) FROM tblcases") || !query.next())
+        return 0;
+    return query.value(0).toInt();
+}
+
 models::CaseItem CaseRepository::loadById(int caseId) const
 {
     models::CaseItem c;

@@ -35,7 +35,7 @@ CaseInstallForm::CaseInstallForm(QWidget* parent) : DocumentDialog(parent), ui(n
     ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->tableView->horizontalHeader()->setStretchLastSection(true);
 
-    loadFreeTerminalsToDelegate();
+    loadTerminalsToDelegate();
     loadCasesToDelegate();
 
     connect(rowsModel, &QStandardItemModel::dataChanged, this, &CaseInstallForm::onTableViewDataChanged);
@@ -71,19 +71,46 @@ QTableView* CaseInstallForm::tableView() const
     return ui->tableView;
 }
 
-void CaseInstallForm::loadFreeTerminalsToDelegate()
+void CaseInstallForm::loadTerminalsToDelegate()
+{
+    ensureTerminalsInDelegate(QList<int>());
+}
+
+void CaseInstallForm::ensureTerminalsInDelegate(const QList<int>& terminalIds)
 {
     QList<QPair<int, QString>> terminals;
-    m_installedCase.clear();
+    QSet<int> seen;
     const QSqlDatabase& db = DatabaseManager::instance().getDatabase();
-    const auto free = TerminalRepository(db).loadFreeForSelection();
-    for (const auto& t : free) {
+
+    // Свободные и в аренде (status 0/1), не деактивированные.
+    const auto available = TerminalRepository(db).loadForCaseInstall();
+    for (const auto& t : available) {
         terminals.append(qMakePair(t.id, t.serialNumber));
+        seen.insert(t.id);
         if (t.currentCaseId > 0) {
             const models::CaseItem c = CaseRepository(db).loadById(t.currentCaseId);
             if (c.id > 0) {
                 m_installedCase.insert(t.id, qMakePair(c.id, c.caseType));
-                qCDebug(logSQL) << "Installed case" << c.id << c.caseType << "on free terminal" << t.serialNumber;
+                qCDebug(logSQL) << "Installed case" << c.id << c.caseType << "on terminal" << t.serialNumber;
+            }
+        }
+    }
+
+    // Терминалы документа (режим редактирования), которых нет в списке выше
+    // (например, стали списанными после проведения) — держим их доступными.
+    QList<int> missing;
+    for (int id : terminalIds) {
+        if (!seen.contains(id))
+            missing.append(id);
+    }
+    if (!missing.isEmpty()) {
+        const auto extra = TerminalRepository(db).loadByIds(missing);
+        for (const auto& t : extra) {
+            terminals.append(qMakePair(t.id, t.serialNumber));
+            if (t.currentCaseId > 0) {
+                const models::CaseItem c = CaseRepository(db).loadById(t.currentCaseId);
+                if (c.id > 0)
+                    m_installedCase.insert(t.id, qMakePair(c.id, c.caseType));
             }
         }
     }
@@ -91,7 +118,7 @@ void CaseInstallForm::loadFreeTerminalsToDelegate()
     ui->tableView->setItemDelegateForColumn(ColTerminal, new ComboBoxDelegate(terminals, this));
 }
 
-void CaseInstallForm::loadCasesToDelegate()
+void CaseInstallForm::loadCasesToDelegate(const QSet<int>& includeCaseIds)
 {
     QList<QPair<int, QString>> cases;
     QSet<int> seen;
@@ -102,12 +129,26 @@ void CaseInstallForm::loadCasesToDelegate()
         seen.insert(c.id);
     }
 
-    // Добавляем чехлы, уже установленные в свободные терминалы.
+    // Добавляем чехлы, уже установленные в терминалы.
     for (auto it = m_installedCase.constBegin(); it != m_installedCase.constEnd(); ++it) {
         if (it.value().first > 0 && !seen.contains(it.value().first)) {
             cases.append(qMakePair(it.value().first,
                                    QString("%1 [%2]").arg(it.value().second).arg(it.value().first)));
             seen.insert(it.value().first);
+        }
+    }
+
+    // Чехлы из строк документа (режим редактирования).
+    QList<int> missing;
+    for (int id : includeCaseIds) {
+        if (!seen.contains(id))
+            missing.append(id);
+    }
+    if (!missing.isEmpty()) {
+        const auto extra = CaseRepository(db).loadByIds(missing);
+        for (const auto& c : extra) {
+            cases.append(qMakePair(c.id, QString("%1 [%2]").arg(c.caseType).arg(c.id)));
+            seen.insert(c.id);
         }
     }
 
@@ -214,6 +255,18 @@ void CaseInstallForm::loadSpecificEditData(int docId)
         rowsModel->setItem(r, ColTerminal, terminalItem);
         rowsModel->setItem(r, ColCase, caseItem);
     }
+
+    // Делегаты должны включать терминалы (в т.ч. в аренде) и чехлы документа
+    // во избежание подмены значения редактором на первый пункт списка.
+    QList<int> docTerminals;
+    QSet<int> docCases;
+    for (const auto& row : rows) {
+        docTerminals.append(row.terminalId);
+        if (row.caseId > 0)
+            docCases.insert(row.caseId);
+    }
+    ensureTerminalsInDelegate(docTerminals);
+    loadCasesToDelegate(docCases);
 }
 
 void CaseInstallForm::onPostSuccess(int docId)

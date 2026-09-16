@@ -18,6 +18,7 @@ public:
     explicit CaseRepository(const QSqlDatabase& db);
 
     // --- Справочник/склад ---
+    int countAll() const;
     int countByStatus(int status) const;
     models::CaseItem loadById(int caseId) const;
     QVector<models::CaseItem> loadByIds(const QList<int>& ids) const;

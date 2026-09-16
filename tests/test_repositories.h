@@ -27,6 +27,7 @@ private slots:
     void documentModelMethods();
     void receiptItemQueries();
     void caseOperations();
+    void terminalCaseInstallSelection();
     void caseRelationalModelJoin();
 
 private:

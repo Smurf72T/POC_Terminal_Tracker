@@ -75,6 +75,7 @@ Per-thread пул соединений для фоновых потоков (н�
 | `loadSerialsWithIds()` | Пары (serial, id) для выбора в UI |
 | `loadById(int)` / `loadByIds(QList<int>)` | Полная модель терминала(ов) с именем модели; порядок входного списка сохраняется |
 | `loadFreeForSelection()` | Свободные и не деактивированные для аренды |
+| `loadForCaseInstall()` | Свободные (**status 0**) и в аренде (**status 1**), не деактивированные, для документа «Установка чехлов» |
 
 ### `SimCardRepository`
 `countAll()` / `countFree()`, `loadFreeSimCards()`, `populateFreeSimCards(*)`,
@@ -93,7 +94,7 @@ Write-логика формы — `siminstallform_post.cpp` (проведени�
 ### `CaseRepository`
 Учёт чехлов (склад `tblcases` со статусами 0/1/2 + документы поступления/
 установки/списания, docTypes `CaseIncome`/`CaseInstall`/`CaseWriteoff` = 7/8/9).
-- Склад: `countByStatus(int)`, `loadById/loadByIds`, `loadByTerminal(int)`,
+- Склад: `countAll()`/`countByStatus(int)`, `loadById/loadByIds`, `loadByTerminal(int)`,
   `loadFreeForSelection()`, `summarizeFree()` (остатки по типам),
   `populateFreeCasesSummary(QSqlQueryModel*)`, `createBatch(caseType, qty)`
   (создаёт N единиц status=0)

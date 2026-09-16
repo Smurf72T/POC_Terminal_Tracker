@@ -31,7 +31,7 @@ private:
     // Снимок деталей документа из БД (terminalid -> caseid).
     QMap<int, int> m_originalDetails;
 
-    // Уже установленные в свободные терминалы чехлы (terminalId -> {caseId, тип}).
+    // Уже установленные в терминалы (свободные/в аренде) чехлы (terminalId -> {caseId, тип}).
     QMap<int, QPair<int, QString>> m_installedCase;
 
     // --- DocumentDialog ---
@@ -46,8 +46,9 @@ private:
     void onPostSuccess(int docId) override;
     void loadSpecificEditData(int docId) override;
 
-    void loadFreeTerminalsToDelegate();
-    void loadCasesToDelegate();
+    void loadTerminalsToDelegate();
+    void loadCasesToDelegate(const QSet<int>& includeCaseIds = QSet<int>());
+    void ensureTerminalsInDelegate(const QList<int>& terminalIds);
     // Автозаполнение чехла при выборе терминала в колонке 0.
     void autoFillCaseForTerminal(int row, int terminalId);
 };

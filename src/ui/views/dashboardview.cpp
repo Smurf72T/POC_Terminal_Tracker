@@ -3,6 +3,7 @@
 #include "views/chartpanel.h"
 
 #include "database/databasemanager.h"
+#include "database/repositories/caserepository.h"
 #include "database/repositories/clientrepository.h"
 #include "database/repositories/documentrepository.h"
 #include "database/repositories/simcardrepository.h"
@@ -132,6 +133,7 @@ void DashboardView::loadCounters()
     TerminalRepository terminals(db);
     SimCardRepository sims(db);
     ClientRepository clients(db);
+    CaseRepository cases(db);
 
     updateCounterWidget(m_ui->labelValueTotal, m_ui->labelNameTotal, QString::number(terminals.countAll()),
                         "Всего терминалов", "#3498db");
@@ -143,6 +145,12 @@ void DashboardView::loadCounters()
                         "Всего SIM-карт", "#9b59b6");
     updateCounterWidget(m_ui->labelValueFreeSIM, m_ui->labelNameFreeSIM, QString::number(sims.countFree()),
                         "Свободно SIM", "#1abc9c");
+    updateCounterWidget(m_ui->labelValueTotalCases, m_ui->labelNameTotalCases, QString::number(cases.countAll()),
+                        "Всего чехлов", "#8e44ad");
+    updateCounterWidget(m_ui->labelValueFreeCases, m_ui->labelNameFreeCases, QString::number(cases.countByStatus(0)),
+                        "Свободно чехлов", "#1abc9c");
+    updateCounterWidget(m_ui->labelValueInstalledCases, m_ui->labelNameInstalledCases,
+                        QString::number(cases.countByStatus(1)), "Установлено чехлов", "#e67e22");
     updateCounterWidget(m_ui->labelValueClients, m_ui->labelNameClients, QString::number(clients.countAll()),
                         "Клиентов", "#f39c12");
 }

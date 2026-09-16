@@ -60,6 +60,9 @@ public:
     QVector<models::Terminal> loadByIds(const QList<int>& ids) const;
     // Терминалы для выбора в аренду: свободные и не деактивированные.
     QVector<models::Terminal> loadFreeForSelection() const;
+    // Терминалы для установки чехла: свободные (status 0) и в аренде (status 1),
+    // не деактивированные.
+    QVector<models::Terminal> loadForCaseInstall() const;
 
     // Сохраняет изменения существующего терминала. true при успехе.
     bool update(int terminalId, const TerminalUpdate& data) const;
