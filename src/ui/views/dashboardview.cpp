@@ -10,6 +10,7 @@
 #include "database/repositories/terminalrepository.h"
 
 #include <QDateTime>
+#include <QGridLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QModelIndex>
@@ -19,22 +20,34 @@
 #include <QVBoxLayout>
 
 DashboardView::DashboardView(Ui::MainWindow* ui, QWidget* centralWidget, QObject* parent) :
-    QObject(parent), m_ui(ui), m_topClientsModel(new QSqlQueryModel(this)), m_recentDocsModel(new QSqlQueryModel(this)),
+    QObject(parent), m_ui(ui), m_centralWidget(centralWidget),
+    m_topClientsModel(new QSqlQueryModel(this)), m_recentDocsModel(new QSqlQueryModel(this)),
     m_refreshTimer(new QTimer(this))
 {
-    setupTables();
-    setupCharts(centralWidget);
-
     connect(m_refreshTimer, &QTimer::timeout, this, &DashboardView::refreshAll);
     connect(m_refreshTimer, &QTimer::timeout, this, &DashboardView::refreshCharts);
-    m_refreshTimer->start(30000);
 
     connect(&DatabaseManager::instance(), &DatabaseManager::dataChanged, this, &DashboardView::onDatabaseDataChanged);
 
     connect(m_ui->tableViewRecentDocs, &QTableView::doubleClicked, this, &DashboardView::onRecentDocDoubleClicked);
     connect(m_ui->tableViewTopClients, &QTableView::doubleClicked, this, &DashboardView::onTopClientDoubleClicked);
 
+    // setupTables/setupCharts создают виджеты (setModel, QChartView...) и
+    // запускают начальную отрисовку. В Qt 6 на Windows это вызывает
+    // QWidget::paintEngine() до выделения backing store → crash. Откладываем
+    // полную инициализацию до первого тика event loop, когда окно уже показано.
+    QTimer::singleShot(0, this, &DashboardView::init);
+}
+
+void DashboardView::init()
+{
+    setupTables();
+    setupCharts(m_centralWidget);
+    if (auto* grid = qobject_cast<QGridLayout*>(m_ui->countersLayout))
+        for (int c = 0; c < grid->columnCount(); ++c)
+            grid->setColumnStretch(c, 1);
     refreshAll();
+    m_refreshTimer->start(30000);
 }
 
 void DashboardView::setupTables()

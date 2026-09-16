@@ -21,6 +21,10 @@ class MainWindow;
 // панель «Аналитика» (ChartPanel) и периодическое автообновление.
 // Подключает сигнал dataChanged от DatabaseManager и сообщает о действиях
 // пользователя (двойной клик) сигналами, чтобы MainWindow оставался тонким.
+//
+// Вся инициализация виджетов (setupTables/setupCharts +.refreshAll)
+// откладывается на QTimer::singleShot(0) — иначе QT6 на Windows вызывает
+// QWidget::paintEngine() до выделения backing-store → crash (QTBUG).
 class DashboardView : public QObject {
     Q_OBJECT
 
@@ -47,6 +51,7 @@ private slots:
     void onTopClientDoubleClicked(const QModelIndex& index);
 
 private:
+    void init();
     void setupTables();
     void setupCharts(QWidget* centralWidget);
     void loadCounters();
@@ -57,6 +62,7 @@ private:
                              const QString& color);
 
     Ui::MainWindow* m_ui = nullptr;
+    QWidget* m_centralWidget = nullptr;
     ChartPanel* m_charts = nullptr;
     QSqlQueryModel* m_topClientsModel = nullptr;
     QSqlQueryModel* m_recentDocsModel = nullptr;
