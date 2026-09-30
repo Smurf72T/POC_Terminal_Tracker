@@ -28,7 +28,7 @@ void TestRepositories::initTestCase()
            "terminalid INTEGER, simcardid INTEGER, simcardid2 INTEGER, has_case INTEGER NOT NULL DEFAULT 0, "
            "comment TEXT)");
     q.exec("CREATE TABLE tblpayments (paymentid INTEGER PRIMARY KEY, clientid INTEGER, periodyear INTEGER, "
-           "periodmonth INTEGER, amount REAL)");
+           "periodmonth INTEGER, amount REAL, paymentdate TEXT)");
     q.exec("CREATE TABLE tblpayment_rental_links (linkid INTEGER PRIMARY KEY, paymentid INTEGER, rentaldocid INTEGER)");
     q.exec("CREATE TABLE tblreceiptdocs (receiptdocid INTEGER PRIMARY KEY, docnumber TEXT, docdate TEXT, "
            "comments TEXT)");

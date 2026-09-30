@@ -103,14 +103,35 @@ void TestRepositories::documentQueries()
     q.exec("INSERT INTO tblreturndocs (returndocid, docnumber, docdate) VALUES (1, 'RT-2026-00001', '2026-06-01')");
     q.exec("INSERT INTO tblstatuschangedocs (statuschangedocid, docnumber, docdate) "
            "VALUES (1, 'SC-2026-00001', '2026-05-01')");
+    // У оплаты нет docnumber/docdate: номер синтезируется из paymentid, дата — paymentdate.
+    // Период 2020-03 — вне окна revenueByMonth(6), чтобы не влиять на paymentQueries.
+    q.prepare("INSERT INTO tblpayments (paymentid, clientid, periodyear, periodmonth, amount, paymentdate) "
+              "VALUES (901, NULL, 2020, 3, 35000.00, '2026-09-15')");
+    QVERIFY2(q.exec(), qPrintable(q.lastError().text()));
 
     const auto docs = repo.recentDocuments();
-    // 2 аренды + поступление + возврат + изменение статуса, сортировка по дате DESC.
-    QCOMPARE(docs.size(), 5);
-    QCOMPARE(docs.at(0).docType, DocumentRepository::Receipt);
-    QCOMPARE(docs.at(0).date, QString("2026-08-02"));
-    QCOMPARE(docs.at(1).docType, DocumentRepository::Rental);
-    QCOMPARE(docs.at(1).number, QString("AR-2026-00002"));
+    // 2 аренды + поступление + возврат + изменение статуса + 4 оплаты из сида + эта.
+    QCOMPARE(docs.size(), 10);
+
+    // Оплата присутствует в «последних документах» с синтезированным номером.
+    int payIdx = -1;
+    int receiptIdx = -1;
+    for (int i = 0; i < docs.size(); ++i) {
+        if (docs.at(i).docType == DocumentRepository::Payment && docs.at(i).docId == 901)
+            payIdx = i;
+        if (docs.at(i).docType == DocumentRepository::Receipt && docs.at(i).date == QLatin1String("2026-08-02"))
+            receiptIdx = i;
+    }
+    QVERIFY2(payIdx >= 0, "оплата отсутствует в списке последних документов");
+    QCOMPARE(docs.at(payIdx).number, QString("ОП-901"));
+    QCOMPARE(docs.at(payIdx).date, QString("2026-09-15"));
+    QCOMPARE(docs.at(payIdx).typeName, QString("Оплата"));
+    // Оплата от 15.09.2026 новее поступления от 02.08.2026 — сортировка по дате DESC.
+    // Абсолютный индекс не проверяем: у сид-оплат paymentdate NULL, а NULL в ORDER BY DESC
+    // встаёт в начало в PostgreSQL и в конец в SQLite.
+    QVERIFY2(receiptIdx >= 0, "поступление отсутствует в списке");
+    QVERIFY(payIdx < receiptIdx);
+    QCOMPARE(docs.at(receiptIdx).docType, DocumentRepository::Receipt);
 }
 
 void TestRepositories::receiptItemQueries()

@@ -6,28 +6,41 @@
 
 DocumentRepository::DocumentRepository(const QSqlDatabase& db) : m_db(db) {}
 
+namespace {
+
+// Общий SQL для «последних документов» (дашборд и QVector-вариант) — раньше он
+// был продублирован в двух функциях, и оплата потерялась в обеих копиях.
+// У tblpayments нет полей docnumber/docdate: номер синтезируется из paymentid
+// (так же, как в TerminalHistoryForm и TerminalEditForm), дата — paymentdate.
+const char* const kRecentDocumentsSql =
+    "SELECT 1 AS doctype, receiptdocid AS docid, docnumber AS \"Номер\", docdate AS \"Дата\", "
+    "'Поступление' AS \"Тип\" FROM tblreceiptdocs "
+    "UNION ALL "
+    "SELECT 2, rentaldocid, docnumber, docdate, 'Аренда' FROM tblrentaldocs "
+    "UNION ALL "
+    "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
+    "UNION ALL "
+    "SELECT 4, paymentid, 'ОП-' || CAST(paymentid AS TEXT), paymentdate, 'Оплата' FROM tblpayments "
+    "UNION ALL "
+    "SELECT 6, siminstalldocid, docnumber, docdate, 'Установка SIM' FROM tblsiminstalldocs "
+    "UNION ALL "
+    "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
+    "UNION ALL "
+    "SELECT 7, caseincomedocid, docnumber, docdate, 'Поступление чехлов' FROM tblcaseincomedocs "
+    "UNION ALL "
+    "SELECT 8, caseinstalldocid, docnumber, docdate, 'Установка чехлов' FROM tblcaseinstalldocs "
+    "UNION ALL "
+    "SELECT 9, casewriteoffdocid, docnumber, docdate, 'Списание чехлов' FROM tblcasewriteoffdocs "
+    "ORDER BY \"Дата\" DESC "
+    "LIMIT :limit";
+
+} // namespace
+
 QVector<DocumentRepository::RecentDocument> DocumentRepository::recentDocuments(int limit) const
 {
     QVector<RecentDocument> result;
     QSqlQuery query(m_db);
-    query.prepare("SELECT 1 AS doctype, receiptdocid AS docid, docnumber AS \"Номер\", docdate AS \"Дата\", "
-                  "'Поступление' AS \"Тип\" FROM tblreceiptdocs "
-                  "UNION ALL "
-                  "SELECT 2, rentaldocid, docnumber, docdate, 'Аренда' FROM tblrentaldocs "
-                  "UNION ALL "
-                  "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
-                  "UNION ALL "
-                  "SELECT 6, siminstalldocid, docnumber, docdate, 'Установка SIM' FROM tblsiminstalldocs "
-                  "UNION ALL "
-                  "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
-                  "UNION ALL "
-                  "SELECT 7, caseincomedocid, docnumber, docdate, 'Поступление чехлов' FROM tblcaseincomedocs "
-                  "UNION ALL "
-                  "SELECT 8, caseinstalldocid, docnumber, docdate, 'Установка чехлов' FROM tblcaseinstalldocs "
-                  "UNION ALL "
-                  "SELECT 9, casewriteoffdocid, docnumber, docdate, 'Списание чехлов' FROM tblcasewriteoffdocs "
-                  "ORDER BY \"Дата\" DESC "
-                  "LIMIT :limit");
+    query.prepare(kRecentDocumentsSql);
     query.bindValue(":limit", limit);
     if (!query.exec())
         return result;
@@ -41,24 +54,7 @@ QVector<DocumentRepository::RecentDocument> DocumentRepository::recentDocuments(
 void DocumentRepository::populateRecentDocuments(QSqlQueryModel* model, int limit) const
 {
     QSqlQuery query(m_db);
-    query.prepare("SELECT 1 AS doctype, receiptdocid AS docid, docnumber AS \"Номер\", docdate AS \"Дата\", "
-                  "'Поступление' AS \"Тип\" FROM tblreceiptdocs "
-                  "UNION ALL "
-                  "SELECT 2, rentaldocid, docnumber, docdate, 'Аренда' FROM tblrentaldocs "
-                  "UNION ALL "
-                  "SELECT 3, returndocid, docnumber, docdate, 'Возврат' FROM tblreturndocs "
-                  "UNION ALL "
-                  "SELECT 6, siminstalldocid, docnumber, docdate, 'Установка SIM' FROM tblsiminstalldocs "
-                  "UNION ALL "
-                  "SELECT 5, statuschangedocid, docnumber, docdate, 'Изменение статуса' FROM tblstatuschangedocs "
-                  "UNION ALL "
-                  "SELECT 7, caseincomedocid, docnumber, docdate, 'Поступление чехлов' FROM tblcaseincomedocs "
-                  "UNION ALL "
-                  "SELECT 8, caseinstalldocid, docnumber, docdate, 'Установка чехлов' FROM tblcaseinstalldocs "
-                  "UNION ALL "
-                  "SELECT 9, casewriteoffdocid, docnumber, docdate, 'Списание чехлов' FROM tblcasewriteoffdocs "
-                  "ORDER BY \"Дата\" DESC "
-                  "LIMIT :limit");
+    query.prepare(kRecentDocumentsSql);
     query.bindValue(":limit", limit);
     if (query.exec())
         model->setQuery(std::move(query));

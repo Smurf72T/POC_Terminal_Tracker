@@ -17,13 +17,14 @@ public:
     explicit DocumentRepository(const QSqlDatabase& db);
 
     // Типы документов (doctype) совпадают с кодами в recentDocuments:
-    // 1 — поступление, 2 — аренда, 3 — возврат, 5 — изменение статуса,
+    // 1 — поступление, 2 — аренда, 3 — возврат, 4 — оплата, 5 — изменение статуса,
     // 6 — установка SIM, 7 — поступление чехлов, 8 — установка чехлов,
     // 9 — списание чехлов.
     enum DocType : int {
         Receipt = 1,
         Rental = 2,
         Return = 3,
+        Payment = 4,
         StatusChange = 5,
         SimInstall = 6,
         CaseIncome = 7,

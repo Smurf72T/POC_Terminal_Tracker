@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.9.1] — 2026-09-30
+
+### Исправлено
+
+- **FIX**: оплаты не появлялись в таблице «Последние документы» на главной форме.
+  Запрос `DocumentRepository::populateRecentDocuments()` вообще не включал
+  `tblpayments` — код типа документа 4 «Оплата» был пропущен (он использовался
+  только в архиве документов). Пробел существовал с момента выноса SQL в
+  репозиторий и был продублирован в двух функциях — `recentDocuments()` и
+  `populateRecentDocuments()`; теперь оба используют общий `kRecentDocumentsSql`
+- У `tblpayments` нет полей `docnumber`/`docdate`, поэтому номер документа
+  синтезируется как `'ОП-' || paymentid` (как в `terminalhistoryform` и
+  `terminaleditform`), а дата берётся из `paymentdate`
+- **Двойной клик** по оплате в «Последних документах» открывает `PaymentForm` на
+  редактирование — раньше ветки `docType == 4` в `MainWindow::onRecentDocActivated`
+  не было
+
 ## [1.9.0] — 2026-09-30
 
 ### Несколько оплат за один период

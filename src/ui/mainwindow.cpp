@@ -14,6 +14,7 @@
 #include "dialogs/receiptform.h"
 #include "dialogs/rentalform.h"
 #include "dialogs/returnform.h"
+#include "dialogs/paymentform.h"
 #include "dialogs/siminstallform.h"
 #include "dialogs/casesform.h"
 #include "dialogs/caseincomeform.h"
@@ -241,6 +242,10 @@ void MainWindow::onRecentDocActivated(int docType, int docId)
         form.exec();
     } else if (docType == 3) {
         ReturnForm form(this);
+        form.loadForEdit(docId);
+        form.exec();
+    } else if (docType == 4) {
+        PaymentForm form(this);
         form.loadForEdit(docId);
         form.exec();
     } else if (docType == 6) {
