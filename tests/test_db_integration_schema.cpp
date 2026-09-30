@@ -63,7 +63,7 @@ void TestDbIntegration::test_schema_objects()
           QString("seq_case_writeoff_doc_number")})
         QVERIFY2(found.contains(seq), qPrintable("Нет последовательности: " + seq));
 
-    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 16);
+    QCOMPARE(countRows("SELECT count(*) FROM schema_migrations"), 17);
 }
 
 void TestDbIntegration::test_number_generation()

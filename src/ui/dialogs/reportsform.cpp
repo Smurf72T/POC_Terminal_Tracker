@@ -63,18 +63,25 @@ void ReportsForm::generateRevenueByClient()
     QString dateFrom = ui->dateEditFrom->date().toString("yyyy-MM-dd");
     QString dateTo = ui->dateEditTo->date().toString("yyyy-MM-dd");
 
+    // Оплаты и терминалы агрегируются в отдельных подзапросах: при плоских
+    // JOIN'ах строка оплаты повторялась по каждой строке аренды клиента и
+    // SUM(p.amount) завышался в разы.
     QSqlQuery query(DatabaseManager::instance().getDatabase());
     query.prepare("SELECT c.clientname AS \"Клиент\", "
-                  "COUNT(DISTINCT p.paymentid) AS \"Платежей\", "
-                  "COALESCE(SUM(p.amount), 0) AS \"Сумма оплат\", "
-                  "COUNT(DISTINCT rd.terminalid) AS \"Терминалов в аренде\" "
+                  "COALESCE(p.payment_cnt, 0) AS \"Платежей\", "
+                  "COALESCE(p.total, 0) AS \"Сумма оплат\", "
+                  "COALESCE(r.terminal_cnt, 0) AS \"Терминалов в аренде\" "
                   "FROM tblclients c "
-                  "LEFT JOIN tblpayments p ON c.clientid = p.clientid "
-                  "AND p.paymentdate >= :dateFrom::date AND p.paymentdate < :dateTo::date + interval '1 day' "
-                  "LEFT JOIN tblrentaldocs r ON c.clientid = r.clientid "
-                  "LEFT JOIN tblrentaldetails rd ON r.rentaldocid = rd.rentaldocid "
-                  "GROUP BY c.clientid, c.clientname "
-                  "ORDER BY COALESCE(SUM(p.amount), 0) DESC");
+                  "LEFT JOIN (SELECT clientid, COUNT(*) AS payment_cnt, SUM(amount) AS total "
+                  "           FROM tblpayments "
+                  "           WHERE paymentdate >= :dateFrom::date "
+                  "             AND paymentdate < :dateTo::date + interval '1 day' "
+                  "           GROUP BY clientid) p ON p.clientid = c.clientid "
+                  "LEFT JOIN (SELECT r.clientid, COUNT(DISTINCT rd.terminalid) AS terminal_cnt "
+                  "           FROM tblrentaldetails rd "
+                  "           JOIN tblrentaldocs r ON r.rentaldocid = rd.rentaldocid "
+                  "           GROUP BY r.clientid) r ON r.clientid = c.clientid "
+                  "ORDER BY COALESCE(p.total, 0) DESC");
     query.bindValue(":dateFrom", dateFrom);
     query.bindValue(":dateTo", dateTo);
 

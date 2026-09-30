@@ -29,6 +29,9 @@ private slots:
     void caseOperations();
     void terminalCaseInstallSelection();
     void caseRelationalModelJoin();
+    // Последний слот: добавляет клиентов/документы/оплаты, поэтому идёт
+    // после проверок, считающих общее число записей.
+    void paymentRentalLinkQueries();
 
 private:
     static void insertTerminal(int id, const QString& serial, int status, int modelId, int simId);
@@ -49,6 +52,8 @@ private:
     static void insertReturnDoc(int id, int clientId, const QString& docNumber, const QString& docDate);
     static void insertReturnDetail(int id, int returnDocId, int terminalId);
     static void insertPayment(int id, int year, int month, double amount);
+    static void insertPaymentForClient(int id, int clientId, int year, int month, double amount);
+    static void insertPaymentRentalLink(int id, int paymentId, int rentalDocId);
 
     QSqlDatabase m_db;
 };

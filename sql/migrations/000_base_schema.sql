@@ -113,7 +113,10 @@ CREATE TABLE IF NOT EXISTS tblreturndetails (
     terminalid INTEGER NOT NULL REFERENCES tblterminals(terminalid) ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
--- Отметки об оплате аренды
+-- Отметки об оплате аренды.
+-- Оплат за один период может быть несколько (клиент платит дважды в месяце),
+-- поэтому UNIQUE (clientid, periodmonth, periodyear) снят миграцией
+-- 016_payments_multiple_per_month.sql — см. также idx_payments_client_period.
 CREATE TABLE IF NOT EXISTS tblpayments (
     paymentid SERIAL PRIMARY KEY,
     clientid INTEGER NOT NULL REFERENCES tblclients(clientid) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -123,8 +126,7 @@ CREATE TABLE IF NOT EXISTS tblpayments (
     amount NUMERIC(12, 2) DEFAULT 0,
     comment TEXT,
     createdby INTEGER,
-    createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (clientid, periodmonth, periodyear)
+    createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Связь документов оплаты с документами аренды

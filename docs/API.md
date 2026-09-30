@@ -122,7 +122,11 @@ Write-логика формы — `siminstallform_post.cpp` (проведени�
 | `rentalDocIdForReturn(int)` / `returnedTerminalIds(int)` | Связь возврата с арендой и возвращённые терминалы |
 
 ### `PaymentRepository`
-`revenueByMonth(int months)` — выручка по месяцам с заполнением нулями (bar-график).
+- `revenueByMonth(int months)` — выручка по месяцам с заполнением нулями (bar-график).
+- `paidByRentalDocs(int clientId, int excludePaymentId = 0)` — суммы уже оплаченного
+  по каждому документу аренды клиента (`QHash<rentaldocid, сумма>`) для колонки
+  «Оплачено» в форме отметки оплаты; `excludePaymentId` исключает вклад
+  редактируемого платежа.
 
 ## 2б. models/* — value-модели бизнес-сущностей
 

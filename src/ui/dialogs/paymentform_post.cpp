@@ -30,14 +30,16 @@ bool PaymentForm::validateBeforePost()
         return false;
     }
 
-    // Собираем выбранные документы аренды
-    QList<int> m_selectedRentalIds;
-    QStandardItemModel* listModel = qobject_cast<QStandardItemModel*>(ui->listViewRentals->model());
+    // Собираем выбранные документы аренды в член класса: postDetails() берёт
+    // их оттуда (раньше здесь объявлялась локальная переменная с тем же именем
+    // — из-за затенения связи с документами не сохранялись).
+    m_selectedRentalIds.clear();
+    QStandardItemModel* listModel = qobject_cast<QStandardItemModel*>(ui->tableViewRentals->model());
     if (listModel) {
         for (int i = 0; i < listModel->rowCount(); ++i) {
-            QStandardItem* item = listModel->item(i);
+            QStandardItem* item = listModel->item(i, ColRental);
             if (item && item->checkState() == Qt::Checked) {
-                m_selectedRentalIds.append(item->data(Qt::UserRole).toInt());
+                m_selectedRentalIds.append(item->data(kRentalIdRole).toInt());
             }
         }
     }
@@ -80,33 +82,10 @@ int PaymentForm::postHeader(QSqlDatabase& db)
             return -1;
         }
     } else {
-        // Режим создания — проверка дубликата
-        if (checkExistingPayment(clientId, month, year)) {
-            QMessageBox::StandardButton reply = QMessageBox::question(
-                this, "Подтверждение",
-                QString("Оплата за %1 %2 года уже существует. Заменить её (включая привязанные документы)?")
-                    .arg(ui->comboBoxMonth->currentText(), QString::number(year)),
-                QMessageBox::Yes | QMessageBox::No);
-
-            if (reply != QMessageBox::Yes) {
-                return -1;
-            }
-
-            QSqlQuery deleteQuery(db);
-            deleteQuery.prepare("DELETE FROM tblpayments "
-                                "WHERE clientid = :cid AND periodmonth = :month AND periodyear = :year");
-            deleteQuery.bindValue(":cid", clientId);
-            deleteQuery.bindValue(":month", month);
-            deleteQuery.bindValue(":year", year);
-
-            if (!deleteQuery.exec()) {
-                QMessageBox::critical(this, "Ошибка БД",
-                                      "Не удалось удалить старую запись: " + deleteQuery.lastError().text());
-                return -1;
-            }
-        }
-
-        // Вставляем новую оплату
+        // Режим создания. Оплат за один период может быть несколько (клиент
+        // платит дважды в месяце) — новая оплата просто добавляется к
+        // существующим, ничего не заменяя. Ограничение UNIQUE
+        // (clientid, periodmonth, periodyear) снято миграцией 016.
         QSqlQuery query(db);
         query.prepare("INSERT INTO tblpayments (clientid, paymentdate, periodmonth, periodyear, amount, comment) "
                       "VALUES (:cid, :date, :month, :year, :amount, :comment) RETURNING paymentid");
@@ -129,7 +108,6 @@ int PaymentForm::postHeader(QSqlDatabase& db)
 bool PaymentForm::postDetails(QSqlDatabase& db, int docId)
 {
     for (int rentalId : m_selectedRentalIds) {
-
         QSqlQuery linkQuery(db);
         linkQuery.prepare("INSERT INTO tblpayment_rental_links (paymentid, rentaldocid) VALUES (:pid, :rid)");
         linkQuery.bindValue(":pid", docId);

@@ -1,9 +1,12 @@
 #include "paymentform.h"
 #include "ui_paymentform.h"
 #include "database/databasemanager.h"
+#include "database/repositories/documentrepository.h"
+#include "database/repositories/paymentrepository.h"
 #include "services/postactionlogger.h"
 #include "ui/base/printservice.h"
 #include "ui/base/transactionguard.h"
+#include <QHeaderView>
 #include <QMessageBox>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -18,7 +21,7 @@ PaymentForm::PaymentForm(QWidget* parent) : ClientDocumentDialog(parent), ui(new
 {
     ui->setupUi(this);
     setWindowTitle("Документ: Отметка оплаты за аренду");
-    resize(500, 450);
+    resize(620, 470);
 
     ui->dateEdit->setDate(QDate::currentDate());
     loadClientsToComboBox(ui->comboBoxClient, true);
@@ -30,10 +33,13 @@ PaymentForm::PaymentForm(QWidget* parent) : ClientDocumentDialog(parent), ui(new
     ui->doubleSpinBoxAmount->setMinimum(0.00);
     ui->doubleSpinBoxAmount->setMaximum(999999.99);
 
-    // Настраиваем список документов аренды
-    QStandardItemModel* listModel = new QStandardItemModel(this);
-    ui->listViewRentals->setModel(listModel);
-    ui->listViewRentals->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    // Таблица привязки: документ аренды + сумма уже оплаченного по нему
+    QStandardItemModel* linkModel = new QStandardItemModel(this);
+    linkModel->setHorizontalHeaderLabels({"Документ аренды", "Уже оплачено"});
+    ui->tableViewRentals->setModel(linkModel);
+    ui->tableViewRentals->verticalHeader()->setVisible(false);
+    ui->tableViewRentals->horizontalHeader()->setSectionResizeMode(ColRental, QHeaderView::Stretch);
+    ui->tableViewRentals->horizontalHeader()->setSectionResizeMode(ColPaid, QHeaderView::ResizeToContents);
 }
 
 PaymentForm::~PaymentForm()
@@ -122,17 +128,22 @@ void PaymentForm::loadSpecificEditData(int docId)
         linkedRentalIds.insert(linkQuery.value(0).toInt());
     }
 
-    QStandardItemModel* listModel = qobject_cast<QStandardItemModel*>(ui->listViewRentals->model());
-    if (listModel) {
-        for (int i = 0; i < listModel->rowCount(); ++i) {
-            QStandardItem* item = listModel->item(i);
-            if (item && linkedRentalIds.contains(item->data(Qt::UserRole).toInt())) {
-                item->setCheckState(Qt::Checked);
-            }
-        }
-    }
+    applyLinkedRentalDocs(linkedRentalIds);
 
     setWindowTitle(QString("Редактирование оплаты ID %1").arg(docId));
+}
+
+void PaymentForm::applyLinkedRentalDocs(const QSet<int>& linkedRentalIds)
+{
+    QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->tableViewRentals->model());
+    if (!model)
+        return;
+
+    for (int i = 0; i < model->rowCount(); ++i) {
+        QStandardItem* item = model->item(i, ColRental);
+        if (item && linkedRentalIds.contains(item->data(kRentalIdRole).toInt()))
+            item->setCheckState(Qt::Checked);
+    }
 }
 
 void PaymentForm::loadMonths()
@@ -156,9 +167,9 @@ void PaymentForm::loadYears()
 
 void PaymentForm::loadRentalDocsForClient(int clientId)
 {
-    QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->listViewRentals->model());
+    QStandardItemModel* model = qobject_cast<QStandardItemModel*>(ui->tableViewRentals->model());
     if (!model) {
-        qCWarning(logApp) << "Модель listViewRentals не инициализирована";
+        qCWarning(logApp) << "Модель tableViewRentals не инициализирована";
         return;
     }
     model->removeRows(0, model->rowCount());
@@ -171,26 +182,27 @@ void PaymentForm::loadRentalDocsForClient(int clientId)
         return;
     }
 
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT rentaldocid, docnumber, docdate FROM tblrentaldocs "
-                  "WHERE clientid = :cid ORDER BY docdate DESC");
-    query.bindValue(":cid", clientId);
+    const QSqlDatabase db = DatabaseManager::instance().getDatabase();
 
-    if (!query.exec()) {
-        QMessageBox::critical(this, "Ошибка", "Не удалось загрузить документы аренды: " + query.lastError().text());
-        return;
-    }
+    // Сколько уже оплачено по каждому документу (при редактировании — без вклада
+    // самого редактируемого платежа).
+    const QHash<int, double> paid = PaymentRepository(db).paidByRentalDocs(clientId, m_editMode ? m_editDocId : 0);
 
-    while (query.next()) {
-        QString displayText =
-            QString("%1 от %2").arg(query.value(1).toString()).arg(query.value(2).toDateTime().toString("dd.MM.yyyy"));
+    const auto docs = DocumentRepository(db).loadRentalDocumentsByClient(clientId);
+    for (const auto& doc : docs) {
+        const QString displayText = QString("%1 от %2").arg(doc.docNumber, doc.date.toString("dd.MM.yyyy"));
 
-        QStandardItem* item = new QStandardItem(displayText);
-        item->setData(query.value(0).toInt(), Qt::UserRole);
-        item->setCheckable(true);
-        item->setCheckState(Qt::Unchecked);
+        QStandardItem* rentalItem = new QStandardItem(displayText);
+        rentalItem->setData(doc.id, kRentalIdRole);
+        rentalItem->setCheckable(true);
+        rentalItem->setCheckState(Qt::Unchecked);
 
-        model->appendRow(item);
+        QStandardItem* paidItem = new QStandardItem(QString::number(paid.value(doc.id, 0.0), 'f', 2));
+        paidItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        paidItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+        paidItem->setToolTip("Сумма оплат, привязанных к этому документу аренды");
+
+        model->appendRow({rentalItem, paidItem});
     }
 }
 
@@ -199,18 +211,6 @@ void PaymentForm::on_comboBoxClient_currentIndexChanged(int index)
     Q_UNUSED(index);
     int clientId = ui->comboBoxClient->currentData().toInt();
     loadRentalDocsForClient(clientId);
-}
-
-bool PaymentForm::checkExistingPayment(int clientId, int month, int year)
-{
-    QSqlQuery query(DatabaseManager::instance().getDatabase());
-    query.prepare("SELECT paymentid FROM tblpayments "
-                  "WHERE clientid = :cid AND periodmonth = :month AND periodyear = :year");
-    query.bindValue(":cid", clientId);
-    query.bindValue(":month", month);
-    query.bindValue(":year", year);
-
-    return (query.exec() && query.next());
 }
 
 void PaymentForm::on_btnSave_clicked()

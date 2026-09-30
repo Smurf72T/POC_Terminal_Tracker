@@ -126,7 +126,8 @@ target_include_directories(test_update_utils PRIVATE ${CMAKE_SOURCE_DIR}/src ${C
             src/database/repositories/simcardrepository.cpp
             src/database/repositories/caserepository.cpp
             src/database/repositories/documentrepository.cpp
-            src/database/repositories/paymentrepository.cpp)
+            src/database/repositories/paymentrepository.cpp
+            src/utils/logging.cpp)
     target_include_directories(test_repositories PRIVATE ${CMAKE_SOURCE_DIR}/src)
     target_link_libraries(test_repositories PRIVATE Qt6::Test Qt6::Core Qt6::Sql)
     add_test(NAME test_repositories COMMAND test_repositories)

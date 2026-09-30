@@ -1,5 +1,6 @@
 #include "test_db_integration.h"
 
+#include <QDate>
 #include <QSqlError>
 #include <QtTest>
 
@@ -103,10 +104,79 @@ void TestDbIntegration::test_business_flow()
     link.bindValue(":r", rentalId);
     QVERIFY2(link.exec(), qPrintable(link.lastError().text()));
 
-    QSqlQuery dupPay(m_testDb);
-    dupPay.prepare("INSERT INTO tblpayments (clientid, periodmonth, periodyear) VALUES (:c, 7, 2026)");
-    dupPay.bindValue(":c", clientId);
-    QVERIFY(!dupPay.exec());
+    // Клиент может платить дважды в месяце: вторая оплата за тот же период
+    // добавляется, а не заменяет первую (UNIQUE снят миграцией 016).
+    QSqlQuery secondPay(m_testDb);
+    secondPay.prepare("INSERT INTO tblpayments (clientid, periodmonth, periodyear, amount) "
+                      "VALUES (:c, 7, 2026, 250.50) RETURNING paymentid");
+    secondPay.bindValue(":c", clientId);
+    QVERIFY2(secondPay.exec(), qPrintable(secondPay.lastError().text()));
+    QVERIFY(secondPay.next());
+    int secondPayId = secondPay.value(0).toInt();
+    QVERIFY(secondPayId != payId);
+
+    // Первая оплата сохранилась — обе лежат в одном периоде
+    QCOMPARE(countRows("SELECT count(*) FROM tblpayments WHERE clientid = " + QString::number(clientId) +
+                       " AND periodmonth = 7 AND periodyear = 2026"),
+             2);
+
+    // Обе оплаты привязаны к тому же документу аренды — их суммы складываются
+    // (такой запрос делает PaymentRepository::paidByRentalDocs для колонки
+    // «Оплачено» в форме отметки оплаты).
+    QSqlQuery secondLink(m_testDb);
+    secondLink.prepare("INSERT INTO tblpayment_rental_links (paymentid, rentaldocid) VALUES (:p, :r)");
+    secondLink.bindValue(":p", secondPayId);
+    secondLink.bindValue(":r", rentalId);
+    QVERIFY2(secondLink.exec(), qPrintable(secondLink.lastError().text()));
+
+    QSqlQuery paidSum(m_testDb);
+    paidSum.prepare("SELECT COALESCE(SUM(p.amount), 0) FROM tblpayment_rental_links pl "
+                    "JOIN tblpayments p ON p.paymentid = pl.paymentid "
+                    "WHERE p.clientid = :c AND pl.rentaldocid = :r");
+    paidSum.bindValue(":c", clientId);
+    paidSum.bindValue(":r", rentalId);
+    QVERIFY2(paidSum.exec(), qPrintable(paidSum.lastError().text()));
+    QVERIFY(paidSum.next());
+    QCOMPARE(paidSum.value(0).toDouble(), 350.50);
+
+    // Агрегация отчёта «Выручка по клиентам»: у клиента две строки аренды и две
+    // оплаты — сумма оплат не должна умножаться на число строк аренды
+    // (запрос из ReportsForm::generateRevenueByClient, reportsform.cpp).
+    QSqlQuery term2(m_testDb);
+    term2.prepare("INSERT INTO tblterminals (serialnumber, modelid, status) "
+                  "VALUES (:s, :m, 1) RETURNING terminalid");
+    term2.bindValue(":s", "ТЕРМ-ТЕСТ-002");
+    term2.bindValue(":m", modelId);
+    QVERIFY2(term2.exec(), qPrintable(term2.lastError().text()));
+    QVERIFY(term2.next());
+
+    QSqlQuery rentDetail2(m_testDb);
+    rentDetail2.prepare("INSERT INTO tblrentaldetails (rentaldocid, terminalid) VALUES (:d, :t)");
+    rentDetail2.bindValue(":d", rentalId);
+    rentDetail2.bindValue(":t", term2.value(0).toInt());
+    QVERIFY2(rentDetail2.exec(), qPrintable(rentDetail2.lastError().text()));
+
+    QSqlQuery revenue(m_testDb);
+    revenue.prepare("SELECT COALESCE(p.payment_cnt, 0), COALESCE(p.total, 0), COALESCE(r.terminal_cnt, 0) "
+                    "FROM tblclients c "
+                    "LEFT JOIN (SELECT clientid, COUNT(*) AS payment_cnt, SUM(amount) AS total "
+                    "           FROM tblpayments "
+                    "           WHERE paymentdate >= :dateFrom::date "
+                    "             AND paymentdate < :dateTo::date + interval '1 day' "
+                    "           GROUP BY clientid) p ON p.clientid = c.clientid "
+                    "LEFT JOIN (SELECT r.clientid, COUNT(DISTINCT rd.terminalid) AS terminal_cnt "
+                    "           FROM tblrentaldetails rd "
+                    "           JOIN tblrentaldocs r ON r.rentaldocid = rd.rentaldocid "
+                    "           GROUP BY r.clientid) r ON r.clientid = c.clientid "
+                    "WHERE c.clientid = :c");
+    revenue.bindValue(":dateFrom", "2000-01-01");
+    revenue.bindValue(":dateTo", QDate::currentDate().toString("yyyy-MM-dd"));
+    revenue.bindValue(":c", clientId);
+    QVERIFY2(revenue.exec(), qPrintable(revenue.lastError().text()));
+    QVERIFY(revenue.next());
+    QCOMPARE(revenue.value(0).toInt(), 2);         // платежей
+    QCOMPARE(revenue.value(1).toDouble(), 350.50); // 100.00 + 250.50, не ×2 строки аренды
+    QCOMPARE(revenue.value(2).toInt(), 2);         // терминалов в аренде
 
     QString retNum = generateNumber("return");
     QVERIFY2(retNum.startsWith("ВР-"), qPrintable(retNum));

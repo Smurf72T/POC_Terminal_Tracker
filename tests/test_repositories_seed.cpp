@@ -110,6 +110,28 @@ void TestRepositories::insertPayment(int id, int year, int month, double amount)
     q.exec();
 }
 
+void TestRepositories::insertPaymentForClient(int id, int clientId, int year, int month, double amount)
+{
+    QSqlQuery q(QSqlDatabase::database(QLatin1String()));
+    q.prepare("INSERT INTO tblpayments (paymentid, clientid, periodyear, periodmonth, amount) VALUES (?, ?, ?, ?, ?)");
+    q.addBindValue(id);
+    q.addBindValue(clientId);
+    q.addBindValue(year);
+    q.addBindValue(month);
+    q.addBindValue(amount);
+    q.exec();
+}
+
+void TestRepositories::insertPaymentRentalLink(int id, int paymentId, int rentalDocId)
+{
+    QSqlQuery q(QSqlDatabase::database(QLatin1String()));
+    q.prepare("INSERT INTO tblpayment_rental_links (linkid, paymentid, rentaldocid) VALUES (?, ?, ?)");
+    q.addBindValue(id);
+    q.addBindValue(paymentId);
+    q.addBindValue(rentalDocId);
+    q.exec();
+}
+
 void TestRepositories::insertReceiptDoc(int id, const QString& docNumber, const QString& docDate)
 {
     QSqlQuery q(QSqlDatabase::database(QLatin1String()));

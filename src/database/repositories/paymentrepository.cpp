@@ -1,7 +1,10 @@
 #include "database/repositories/paymentrepository.h"
 
+#include "utils/logging.h"
+
 #include <QDate>
 #include <QSet>
+#include <QSqlError>
 #include <QSqlQuery>
 
 #include <algorithm>
@@ -48,6 +51,32 @@ QVector<PaymentRepository::MonthlyRevenue> PaymentRepository::revenueByMonth(int
 
     std::sort(result.begin(), result.end(),
               [](const MonthlyRevenue& a, const MonthlyRevenue& b) { return a.month < b.month; });
+
+    return result;
+}
+
+QHash<int, double> PaymentRepository::paidByRentalDocs(int clientId, int excludePaymentId) const
+{
+    QHash<int, double> result;
+    if (clientId == 0)
+        return result;
+
+    QSqlQuery query(m_db);
+    query.prepare("SELECT pl.rentaldocid, COALESCE(SUM(p.amount), 0) "
+                  "FROM tblpayment_rental_links pl "
+                  "JOIN tblpayments p ON p.paymentid = pl.paymentid "
+                  "WHERE p.clientid = :cid AND (:exclude = 0 OR pl.paymentid <> :exclude) "
+                  "GROUP BY pl.rentaldocid");
+    query.bindValue(":cid", clientId);
+    query.bindValue(":exclude", excludePaymentId);
+
+    if (!query.exec()) {
+        qCWarning(logDB) << "Не удалось получить суммы оплат по документам аренды:" << query.lastError().text();
+        return result;
+    }
+
+    while (query.next())
+        result.insert(query.value(0).toInt(), query.value(1).toDouble());
 
     return result;
 }

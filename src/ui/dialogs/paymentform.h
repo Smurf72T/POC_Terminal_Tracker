@@ -3,6 +3,11 @@
 
 #include "ui/base/clientdocdialog.h"
 
+#include <QList>
+#include <QSet>
+
+class QStandardItemModel;
+
 namespace Ui {
 class PaymentForm;
 }
@@ -25,10 +30,15 @@ private slots:
 private:
     Ui::PaymentForm* ui;
 
+    // Колонки таблицы привязки оплаты к документам аренды.
+    enum LinkColumn { ColRental = 0, ColPaid = 1 };
+    // Роль данных, в которой у элемента колонки ColRental лежит rentaldocid.
+    static constexpr int kRentalIdRole = Qt::UserRole;
+
     void loadMonths();
     void loadYears();
     void loadRentalDocsForClient(int clientId);
-    bool checkExistingPayment(int clientId, int month, int year);
+    void applyLinkedRentalDocs(const QSet<int>& linkedRentalIds);
 
     // --- DocumentDialog ---
     // У оплаты нет табличной части и поля номера, поэтому tableView() и

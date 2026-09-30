@@ -160,6 +160,45 @@ void TestRepositories::paymentQueries()
     QCOMPARE(byMonth.value(monthLabel(now.addMonths(-2))), 1500.0);
 }
 
+void TestRepositories::paymentRentalLinkQueries()
+{
+    PaymentRepository repo(m_db);
+
+    // Сколько уже оплачено по документам аренды клиента (колонка «Оплачено»
+    // в форме отметки оплаты). Идентификаторы не пересекаются с данными
+    // остальных тестов.
+    const int client = 101;
+    const int otherClient = 102;
+    const int rentalJan = 101; // обе январские оплаты клиента привязаны к нему
+    const int rentalFeb = 102;
+    const int rentalOther = 103;
+    insertClient(client, "Клиент-Оплата");
+    insertClient(otherClient, "Другой-Клиент");
+    insertRentalDoc(rentalJan, client, "АР-00101", "2026-01-10");
+    insertRentalDoc(rentalFeb, client, "АР-00102", "2026-02-10");
+    insertRentalDoc(rentalOther, otherClient, "АР-00103", "2026-01-11");
+
+    // Клиент платит за один месяц дважды: обе оплаты привязаны к одному документу.
+    insertPaymentForClient(101, client, 2026, 1, 1000.0);
+    insertPaymentForClient(102, client, 2026, 1, 250.5);
+    insertPaymentForClient(103, client, 2026, 2, 700.0);
+    insertPaymentForClient(104, otherClient, 2026, 1, 500.0);
+    insertPaymentRentalLink(101, 101, rentalJan);
+    insertPaymentRentalLink(102, 102, rentalJan);
+    insertPaymentRentalLink(103, 103, rentalFeb);
+    insertPaymentRentalLink(104, 104, rentalOther);
+
+    const auto paid = repo.paidByRentalDocs(client);
+    QCOMPARE(paid.value(rentalJan), 1250.5); // две оплаты за январь складываются
+    QCOMPARE(paid.value(rentalFeb), 700.0);
+    QVERIFY(!paid.contains(rentalOther)); // документ другого клиента
+
+    // При редактировании платежа его собственный вклад исключается.
+    QCOMPARE(repo.paidByRentalDocs(client, 102).value(rentalJan), 1000.0);
+    QVERIFY(repo.paidByRentalDocs(0).isEmpty());
+    QVERIFY(repo.paidByRentalDocs(999).isEmpty());
+}
+
 void TestRepositories::caseOperations()
 {
     CaseRepository repo(m_db);
